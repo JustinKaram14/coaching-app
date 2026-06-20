@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, todayISO } from '../lib/utils'
@@ -76,10 +77,13 @@ function UebungForm({ entries, onChange }: {
 
 export function Training() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [entries, setEntries] = useState<TrainingWithExercises[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [vorlagen, setVorlagen] = useState<any[]>([])
+  const [selectedVorlage, setSelectedVorlage] = useState('')
   const [form, setForm] = useState({
     datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '',
   })
@@ -104,7 +108,34 @@ export function Training() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [user])
+  async function loadVorlagen() {
+    if (!user) return
+    const { data: vData } = await supabase.from('training_vorlagen').select('*').eq('user_id', user.id)
+    if (!vData?.length) return
+    const { data: uData } = await supabase.from('vorlagen_uebungen').select('*').in('vorlage_id', vData.map((v: any) => v.id)).order('reihenfolge')
+    const uMap = (uData ?? []).reduce<Record<string, any[]>>((acc, u: any) => {
+      if (!acc[u.vorlage_id]) acc[u.vorlage_id] = []
+      acc[u.vorlage_id].push(u)
+      return acc
+    }, {})
+    setVorlagen(vData.map((v: any) => ({ ...v, uebungen: uMap[v.id] ?? [] })))
+  }
+
+  function applyVorlage(vorlageId: string) {
+    const v = vorlagen.find(x => x.id === vorlageId)
+    if (!v) return
+    setForm(f => ({ ...f, trainingstyp: v.trainingstyp ?? f.trainingstyp }))
+    setUebungen(v.uebungen.map((u: any) => ({
+      uebungsname: u.uebungsname,
+      saetze: String(u.saetze ?? ''),
+      wdh: String(u.wdh ?? ''),
+      gewicht_kg: String(u.gewicht_kg ?? ''),
+      notizen: '',
+    })))
+    setSelectedVorlage(vorlageId)
+  }
+
+  useEffect(() => { load(); loadVorlagen() }, [user])
 
   function toggleExpand(id: string) {
     setEntries(e => e.map(t => t.id === id ? { ...t, expanded: !t.expanded } : t))
@@ -170,9 +201,14 @@ export function Training() {
           <h1 className="section-title text-2xl">Training</h1>
           <p className="text-text-secondary text-sm mt-0.5">Einheiten & Übungslog</p>
         </div>
-        <button onClick={() => setOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={18} /> Einheit eintragen
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/training/vorlagen')} className="btn-secondary flex items-center gap-2">
+            <BookOpen size={16} /> Vorlagen
+          </button>
+          <button onClick={() => setOpen(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> Einheit eintragen
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -266,6 +302,24 @@ export function Training() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Trainingseinheit eintragen" size="lg">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {/* Vorlage Selector */}
+          {vorlagen.length > 0 && (
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
+              <label className="label text-xs text-primary">Vorlage laden</label>
+              <div className="flex gap-2">
+                <select
+                  className="input flex-1 text-sm"
+                  value={selectedVorlage}
+                  onChange={e => applyVorlage(e.target.value)}
+                >
+                  <option value="">— Vorlage auswählen —</option>
+                  {vorlagen.map((v: any) => (
+                    <option key={v.id} value={v.id}>{v.name} ({v.uebungen.length} Übungen)</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Datum</label>

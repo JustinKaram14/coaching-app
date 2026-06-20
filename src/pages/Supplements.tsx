@@ -1,12 +1,31 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Pill, Check, X as XIcon, Edit2 } from 'lucide-react'
+import { Plus, Trash2, Pill, Check, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { formatDate, todayISO } from '../lib/utils'
+import { todayISO, formatDate } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
 import type { Supplement, SupplementLog } from '../types/database'
+
+const PRESETS = [
+  { name: 'Whey Protein', beschreibung: 'Muskelaufbau & Regeneration', dosierung: '30g', zeitpunkt: 'Nach dem Training' },
+  { name: 'Kreatin', beschreibung: 'Kraft & Leistung', dosierung: '5g', zeitpunkt: 'Täglich' },
+  { name: 'Vitamin D3', beschreibung: 'Immunsystem & Knochen', dosierung: '2000 IU', zeitpunkt: 'Morgens' },
+  { name: 'Magnesium', beschreibung: 'Muskelfunktion & Schlaf', dosierung: '300mg', zeitpunkt: 'Abends' },
+  { name: 'Omega-3', beschreibung: 'Herzgesundheit & Entzündung', dosierung: '1000mg', zeitpunkt: 'Zum Essen' },
+  { name: 'Zink', beschreibung: 'Immunsystem & Testosteron', dosierung: '25mg', zeitpunkt: 'Abends' },
+  { name: 'Vitamin C', beschreibung: 'Immunsystem & Antioxidans', dosierung: '500mg', zeitpunkt: 'Morgens' },
+  { name: 'BCAA', beschreibung: 'Muskelerhalt & Regeneration', dosierung: '10g', zeitpunkt: 'Während Training' },
+  { name: 'Koffein / Pre-Workout', beschreibung: 'Energie & Fokus', dosierung: '200mg', zeitpunkt: 'Vor dem Training' },
+  { name: 'Melatonin', beschreibung: 'Schlaf & Regeneration', dosierung: '1mg', zeitpunkt: 'Vor dem Schlafen' },
+  { name: 'Ashwagandha', beschreibung: 'Stressreduktion & Kraft', dosierung: '600mg', zeitpunkt: 'Morgens' },
+  { name: 'Vitamin B12', beschreibung: 'Energie & Nervensystem', dosierung: '1000µg', zeitpunkt: 'Morgens' },
+  { name: 'Collagen', beschreibung: 'Gelenke & Haut', dosierung: '10g', zeitpunkt: 'Morgens' },
+  { name: 'L-Glutamin', beschreibung: 'Immunsystem & Darm', dosierung: '5g', zeitpunkt: 'Nach Training' },
+  { name: 'Vitamin K2', beschreibung: 'Knochen & Herzgesundheit', dosierung: '100µg', zeitpunkt: 'Zum Essen' },
+  { name: 'Eisen', beschreibung: 'Energie & Blutbildung', dosierung: '14mg', zeitpunkt: 'Morgens nüchtern' },
+]
 
 interface SupplementWithLog extends Supplement {
   todayLog?: SupplementLog
@@ -18,6 +37,7 @@ export function Supplements() {
   const [supplements, setSupplements] = useState<SupplementWithLog[]>([])
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  const [presetOpen, setPresetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', beschreibung: '', dosierung: '', zeitpunkt: '' })
 
@@ -43,6 +63,19 @@ export function Supplements() {
   }
 
   useEffect(() => { load() }, [user])
+
+  async function addFromPreset(preset: typeof PRESETS[0]) {
+    if (!user) return
+    await supabase.from('supplements').insert({
+      user_id: user.id,
+      name: preset.name,
+      beschreibung: preset.beschreibung,
+      dosierung: preset.dosierung,
+      zeitpunkt: preset.zeitpunkt,
+      aktiv: true,
+    })
+    await load()
+  }
 
   async function handleAddSupplement() {
     if (!user || !form.name) return
@@ -91,9 +124,14 @@ export function Supplements() {
           <h1 className="section-title text-2xl">Supplements</h1>
           <p className="text-text-secondary text-sm mt-0.5">Tägliche Einnahme-Tracking</p>
         </div>
-        <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={18} /> Supplement hinzufügen
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setPresetOpen(true)} className="btn-secondary flex items-center gap-2">
+            <Zap size={16} /> Schnell hinzufügen
+          </button>
+          <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> Manuell
+          </button>
+        </div>
       </div>
 
       {/* Today overview */}
@@ -210,6 +248,36 @@ export function Supplements() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Preset Modal */}
+      <Modal open={presetOpen} onClose={() => setPresetOpen(false)} title="Supplement schnell hinzufügen" size="lg">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          <p className="text-sm text-text-secondary">Klicke auf ein Supplement um es direkt hinzuzufügen. Dosierung und Zeitpunkt kannst du danach anpassen.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {PRESETS.filter(p => !supplements.find(s => s.name === p.name)).map(preset => (
+              <button
+                key={preset.name}
+                onClick={async () => { await addFromPreset(preset) }}
+                className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20">
+                  <Pill size={14} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-medium text-text-primary text-sm">{preset.name}</div>
+                  <div className="text-xs text-text-muted">{preset.dosierung} · {preset.zeitpunkt}</div>
+                  <div className="text-xs text-text-muted opacity-70">{preset.beschreibung}</div>
+                </div>
+                <Plus size={14} className="text-text-muted group-hover:text-primary transition-colors shrink-0 mt-0.5" />
+              </button>
+            ))}
+          </div>
+          {PRESETS.filter(p => !supplements.find(s => s.name === p.name)).length === 0 && (
+            <p className="text-sm text-text-muted text-center py-4">Alle Standard-Supplements wurden bereits hinzugefügt.</p>
+          )}
+        </div>
+        <button onClick={() => setPresetOpen(false)} className="btn-secondary w-full mt-4">Schließen</button>
       </Modal>
     </div>
   )

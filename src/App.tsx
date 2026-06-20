@@ -14,6 +14,7 @@ import { Calendar } from './pages/Calendar'
 import { Settings } from './pages/Settings'
 import { CoachDashboard } from './pages/coach/CoachDashboard'
 import { ClientDetail } from './pages/coach/ClientDetail'
+import { TrainingVorlagen } from './pages/TrainingVorlagen'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -51,6 +52,7 @@ function AppRoutes() {
       </ProtectedRoute>} />
       <Route path="/weight" element={<ProtectedRoute><Weight /></ProtectedRoute>} />
       <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
+      <Route path="/training/vorlagen" element={<ProtectedRoute><TrainingVorlagen /></ProtectedRoute>} />
       <Route path="/sleep" element={<ProtectedRoute><Sleep /></ProtectedRoute>} />
       <Route path="/nutrition" element={<ProtectedRoute><Nutrition /></ProtectedRoute>} />
       <Route path="/supplements" element={<ProtectedRoute><Supplements /></ProtectedRoute>} />

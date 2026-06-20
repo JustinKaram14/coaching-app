@@ -76,17 +76,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: new Error('Dieser Einladungscode ist abgelaufen.') }
     }
 
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`,
+      },
+    })
     if (signUpError || !authData.user) return { error: signUpError }
 
-    // Create profile
-    await supabase.from('profiles').insert({
+    // Upsert profile — trigger may have already created it without coach_id
+    await supabase.from('profiles').upsert({
       id: authData.user.id,
       email,
       name,
       role: 'client',
       coach_id: code.coach_id,
-    })
+    }, { onConflict: 'id' })
 
     // Mark code as used
     await supabase.from('invite_codes').update({ used_by: authData.user.id }).eq('id', code.id)

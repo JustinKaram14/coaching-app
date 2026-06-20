@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Apple } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Trash2, Apple, Camera, Sparkles, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, todayISO } from '../lib/utils'
@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
 import type { ErnaehrungEntry } from '../types/database'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
@@ -42,6 +42,9 @@ export function Nutrition() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [settings, setSettings] = useState({ kalorie_tagesziel: 2000, protein_ziel: 150, karbs_ziel: 200, fett_ziel: 70 })
   const [form, setForm] = useState({
     datum: todayISO(), kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', wasser_ml: '', notizen: '',
@@ -60,6 +63,36 @@ export function Nutrition() {
 
   useEffect(() => { load() }, [user])
 
+  async function analyzePhoto(file: File) {
+    setAnalyzing(true)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1]
+      const mimeType = file.type
+      setPhotoPreview(reader.result as string)
+      try {
+        const { data, error } = await supabase.functions.invoke('analyze-nutrition', {
+          body: { imageBase64: base64, mimeType },
+        })
+        if (data?.nutrition) {
+          const n = data.nutrition
+          setForm(f => ({
+            ...f,
+            kalorien: n.kalorien ? String(Math.round(n.kalorien)) : f.kalorien,
+            protein_g: n.protein_g ? String(Math.round(n.protein_g * 10) / 10) : f.protein_g,
+            kohlenhydrate_g: n.kohlenhydrate_g ? String(Math.round(n.kohlenhydrate_g * 10) / 10) : f.kohlenhydrate_g,
+            fett_g: n.fett_g ? String(Math.round(n.fett_g * 10) / 10) : f.fett_g,
+            notizen: n.notizen || f.notizen,
+          }))
+        }
+      } catch (e) {
+        console.error('Analysis failed:', e)
+      }
+      setAnalyzing(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function handleSave() {
     if (!user) return
     setSaving(true)
@@ -75,6 +108,7 @@ export function Nutrition() {
     }, { onConflict: 'user_id,datum' })
     await load()
     setOpen(false)
+    setPhotoPreview(null)
     setForm({ datum: todayISO(), kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', wasser_ml: '', notizen: '' })
     setSaving(false)
   }
@@ -224,8 +258,61 @@ export function Nutrition() {
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Ernährung eintragen">
+      <Modal open={open} onClose={() => { setOpen(false); setPhotoPreview(null) }} title="Ernährung eintragen">
         <div className="space-y-4">
+          {/* Photo AI Analysis */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => { if (e.target.files?.[0]) analyzePhoto(e.target.files[0]) }}
+          />
+          <div
+            onClick={() => fileRef.current?.click()}
+            className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
+              ${photoPreview ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-primary/5'}`}
+          >
+            {photoPreview ? (
+              <>
+                <img src={photoPreview} alt="Mahlzeit" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {analyzing ? (
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <Spinner size={14} />
+                      <span>Analysiere mit KI...</span>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-success font-medium flex items-center gap-1.5">
+                      <Sparkles size={14} />
+                      Makros automatisch ausgefüllt
+                    </div>
+                  )}
+                  <div className="text-xs text-text-muted mt-0.5">Anderes Bild wählen</div>
+                </div>
+                <button
+                  onClick={e => { e.stopPropagation(); setPhotoPreview(null) }}
+                  className="p-1 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Camera size={18} className="text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-accent" />
+                    KI-Analyse: Foto hochladen
+                  </div>
+                  <div className="text-xs text-text-muted">Mahlzeit, Rezept oder Screenshot — Makros werden automatisch erkannt</div>
+                </div>
+              </>
+            )}
+          </div>
+
           <div>
             <label className="label">Datum</label>
             <input type="date" className="input" value={form.datum} onChange={e => setForm(f => ({ ...f, datum: e.target.value }))} />
