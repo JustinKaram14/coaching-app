@@ -36,17 +36,25 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build APK
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/coaching-release.keystore
+
+      - name: Build signed APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/coaching-release.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: coaching-app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: coaching-app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
       - name: Create Release
@@ -55,7 +63,7 @@ jobs:
         with:
           tag_name: apk-${{ github.run_number }}
           name: "Coaching App v${{ github.run_number }}"
-          body: "Android APK — direkt auf Android installierbar (Einstellungen → Unbekannte Quellen aktivieren)"
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          body: "Android APK — direkt auf Android installierbar.\n\nEinstellungen → Sicherheit → Unbekannte Quellen aktivieren → APK öffnen → Installieren"
+          files: android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
