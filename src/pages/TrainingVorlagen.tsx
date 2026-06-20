@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, BookOpen, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react'
+import { Plus, Trash2, BookOpen, ChevronDown, ChevronUp, ArrowLeft, CalendarDays } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { format, addWeeks, parseISO, getDay, addDays } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Modal } from '../components/ui/Modal'
@@ -8,14 +9,23 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
 
 const TRAINING_TYPES = ['Kraft', 'Cardio', 'HIIT', 'Yoga', 'Stretching', 'Schwimmen', 'Radfahren', 'Laufen', 'Sonstiges']
+const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+// JS getDay: 0=Sun,1=Mon...6=Sat → we store 1=Mon...7=Sun
+const JS_TO_OUR: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7 }
+const OUR_TO_JS: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 0 }
 
 interface UebungRow {
   id?: string; uebungsname: string; saetze: string; wdh: string; gewicht_kg: string
 }
 
 interface Vorlage {
-  id: string; name: string; trainingstyp: string | null; created_at: string
+  id: string; name: string; trainingstyp: string | null; wochentage: string | null; created_at: string
   uebungen?: UebungRow[]; expanded?: boolean
+}
+
+function parseDays(wochentage: string | null): number[] {
+  if (!wochentage) return []
+  return wochentage.split(',').map(Number).filter(Boolean)
 }
 
 export function TrainingVorlagen() {
@@ -25,28 +35,22 @@ export function TrainingVorlagen() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', trainingstyp: 'Kraft' })
-  const [uebungen, setUebungen] = useState<UebungRow[]>([
-    { uebungsname: '', saetze: '', wdh: '', gewicht_kg: '' }
-  ])
+  const [form, setForm] = useState({ name: '', trainingstyp: 'Kraft', wochentage: [] as number[] })
+  const [uebungen, setUebungen] = useState<UebungRow[]>([{ uebungsname: '', saetze: '', wdh: '', gewicht_kg: '' }])
+
+  // Calendar generation modal
+  const [calModalVorlage, setCalModalVorlage] = useState<Vorlage | null>(null)
+  const [calWeeks, setCalWeeks] = useState('8')
+  const [calStart, setCalStart] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [calSaving, setCalSaving] = useState(false)
 
   async function load() {
     if (!user) return
-    const { data: vData } = await supabase
-      .from('training_vorlagen')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-
+    const { data: vData } = await supabase.from('training_vorlagen').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
     if (!vData?.length) { setVorlagen([]); setLoading(false); return }
 
     const ids = vData.map((v: any) => v.id)
-    const { data: uData } = await supabase
-      .from('vorlagen_uebungen')
-      .select('*')
-      .in('vorlage_id', ids)
-      .order('reihenfolge')
-
+    const { data: uData } = await supabase.from('vorlagen_uebungen').select('*').in('vorlage_id', ids).order('reihenfolge')
     const uMap = (uData ?? []).reduce<Record<string, UebungRow[]>>((acc, u: any) => {
       if (!acc[u.vorlage_id]) acc[u.vorlage_id] = []
       acc[u.vorlage_id].push({ id: u.id, uebungsname: u.uebungsname, saetze: String(u.saetze ?? ''), wdh: String(u.wdh ?? ''), gewicht_kg: String(u.gewicht_kg ?? '') })
@@ -59,39 +63,35 @@ export function TrainingVorlagen() {
 
   useEffect(() => { load() }, [user])
 
-  function addUebung() {
-    setUebungen(u => [...u, { uebungsname: '', saetze: '', wdh: '', gewicht_kg: '' }])
+  function toggleDay(day: number) {
+    setForm(f => ({
+      ...f,
+      wochentage: f.wochentage.includes(day) ? f.wochentage.filter(d => d !== day) : [...f.wochentage, day].sort(),
+    }))
   }
 
+  function addUebung() { setUebungen(u => [...u, { uebungsname: '', saetze: '', wdh: '', gewicht_kg: '' }]) }
+  function removeUebung(i: number) { setUebungen(u => u.filter((_, idx) => idx !== i)) }
   function updateUebung(i: number, field: string, val: string) {
     setUebungen(u => { const n = [...u]; n[i] = { ...n[i], [field]: val }; return n })
-  }
-
-  function removeUebung(i: number) {
-    setUebungen(u => u.filter((_, idx) => idx !== i))
   }
 
   async function handleSave() {
     if (!user || !form.name) return
     setSaving(true)
-
     const { data: vorlage } = await supabase
       .from('training_vorlagen')
-      .insert({ user_id: user.id, name: form.name, trainingstyp: form.trainingstyp })
-      .select()
-      .single()
+      .insert({ user_id: user.id, name: form.name, trainingstyp: form.trainingstyp, wochentage: form.wochentage.join(',') || null })
+      .select().single()
 
     if (vorlage) {
-      const validUebungen = uebungen.filter(u => u.uebungsname.trim())
-      if (validUebungen.length) {
+      const valid = uebungen.filter(u => u.uebungsname.trim())
+      if (valid.length) {
         await supabase.from('vorlagen_uebungen').insert(
-          validUebungen.map((u, i) => ({
-            vorlage_id: vorlage.id,
-            uebungsname: u.uebungsname,
-            saetze: u.saetze ? parseInt(u.saetze) : null,
-            wdh: u.wdh ? parseInt(u.wdh) : null,
-            gewicht_kg: u.gewicht_kg ? parseFloat(u.gewicht_kg) : null,
-            reihenfolge: i,
+          valid.map((u, i) => ({
+            vorlage_id: vorlage.id, uebungsname: u.uebungsname,
+            saetze: u.saetze ? parseInt(u.saetze) : null, wdh: u.wdh ? parseInt(u.wdh) : null,
+            gewicht_kg: u.gewicht_kg ? parseFloat(u.gewicht_kg) : null, reihenfolge: i,
           }))
         )
       }
@@ -99,7 +99,7 @@ export function TrainingVorlagen() {
 
     await load()
     setOpen(false)
-    setForm({ name: '', trainingstyp: 'Kraft' })
+    setForm({ name: '', trainingstyp: 'Kraft', wochentage: [] })
     setUebungen([{ uebungsname: '', saetze: '', wdh: '', gewicht_kg: '' }])
     setSaving(false)
   }
@@ -111,6 +111,47 @@ export function TrainingVorlagen() {
 
   function toggle(id: string) {
     setVorlagen(v => v.map(x => x.id === id ? { ...x, expanded: !x.expanded } : x))
+  }
+
+  async function createCalendarEvents() {
+    if (!user || !calModalVorlage) return
+    const days = parseDays(calModalVorlage.wochentage)
+    if (!days.length) return
+    setCalSaving(true)
+
+    const weeks = parseInt(calWeeks) || 8
+    const events: { user_id: string; coach_id: string; client_id: string; titel: string; datum: string; typ: string }[] = []
+    const start = parseISO(calStart)
+
+    for (let w = 0; w < weeks; w++) {
+      for (const day of days) {
+        const weekStart = addWeeks(start, w)
+        // Find the correct day in that week
+        const currentDay = JS_TO_OUR[getDay(weekStart)]
+        let diff = day - currentDay
+        if (diff < 0) diff += 7
+        const eventDate = addDays(weekStart, diff)
+        // Only add if on or after start date
+        if (format(eventDate, 'yyyy-MM-dd') >= calStart) {
+          events.push({
+            user_id: user.id,
+            coach_id: user.id,
+            client_id: user.id,
+            titel: calModalVorlage.name,
+            datum: format(eventDate, 'yyyy-MM-dd'),
+            typ: 'training',
+          })
+        }
+      }
+    }
+
+    // Deduplicate by datum+titel
+    const unique = events.filter((e, i, arr) => arr.findIndex(x => x.datum === e.datum) === i || true)
+    await supabase.from('kalender_events').insert(unique)
+
+    setCalSaving(false)
+    setCalModalVorlage(null)
+    alert(`${unique.length} Kalendereinträge erstellt!`)
   }
 
   return (
@@ -135,69 +176,78 @@ export function TrainingVorlagen() {
           <div className="flex justify-center py-8"><Spinner /></div>
         ) : vorlagen.length === 0 ? (
           <div className="card">
-            <EmptyState
-              icon={BookOpen}
-              title="Noch keine Vorlagen"
+            <EmptyState icon={BookOpen} title="Noch keine Vorlagen"
               description="Erstelle Vorlagen für deine typischen Trainingstage — Push Day, Pull Day, Legs…"
-              action={
-                <button onClick={() => setOpen(true)} className="btn-primary flex items-center gap-2 mx-auto">
-                  <Plus size={16} /> Erste Vorlage erstellen
-                </button>
-              }
-            />
+              action={<button onClick={() => setOpen(true)} className="btn-primary flex items-center gap-2 mx-auto"><Plus size={16} /> Erste Vorlage erstellen</button>} />
           </div>
-        ) : vorlagen.map(v => (
-          <div key={v.id} className="card">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <BookOpen size={18} className="text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-text-primary">{v.name}</div>
-                <div className="text-xs text-text-muted mt-0.5">
-                  {v.trainingstyp} · {v.uebungen?.length ?? 0} Übungen
+        ) : vorlagen.map(v => {
+          const days = parseDays(v.wochentage)
+          return (
+            <div key={v.id} className="card">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <BookOpen size={18} className="text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-text-primary">{v.name}</div>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <span className="text-xs text-text-muted">{v.trainingstyp} · {v.uebungen?.length ?? 0} Übungen</span>
+                    {days.length > 0 && (
+                      <div className="flex gap-1">
+                        {WEEKDAYS.map((d, i) => (
+                          <span key={d} className={`text-xs w-5 h-5 rounded flex items-center justify-center font-medium ${days.includes(i + 1) ? 'bg-primary/20 text-primary' : 'text-text-muted'}`}>
+                            {d[0]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {days.length > 0 && (
+                    <button
+                      onClick={() => setCalModalVorlage(v)}
+                      className="p-1.5 rounded-lg hover:bg-success/10 hover:text-success text-text-muted transition-colors"
+                      title="Im Kalender eintragen"
+                    >
+                      <CalendarDays size={16} />
+                    </button>
+                  )}
+                  <button onClick={() => toggle(v.id)} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors">
+                    {v.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  <button onClick={() => handleDelete(v.id)} className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => toggle(v.id)} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors">
-                  {v.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-                <button onClick={() => handleDelete(v.id)} className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
 
-            {v.expanded && (v.uebungen?.length ?? 0) > 0 && (
-              <div className="mt-4 pt-4 border-t border-border space-y-2">
-                {v.uebungen!.map((u, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-bg-elevated">
-                    <span className="font-medium text-text-primary">{u.uebungsname}</span>
-                    <span className="text-text-secondary text-xs">
-                      {u.saetze && u.wdh ? `${u.saetze}×${u.wdh}` : ''}
-                      {u.gewicht_kg ? ` @ ${u.gewicht_kg}kg` : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+              {v.expanded && (v.uebungen?.length ?? 0) > 0 && (
+                <div className="mt-4 pt-4 border-t border-border space-y-2">
+                  {v.uebungen!.map((u, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-bg-elevated">
+                      <span className="font-medium text-text-primary">{u.uebungsname}</span>
+                      <span className="text-text-secondary text-xs">
+                        {u.saetze && u.wdh ? `${u.saetze}×${u.wdh}` : ''}
+                        {u.gewicht_kg ? ` @ ${u.gewicht_kg}kg` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
+      {/* Create Vorlage Modal */}
       <Modal open={open} onClose={() => setOpen(false)} title="Vorlage erstellen" size="lg">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Name *</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="z.B. Push Day"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                autoFocus
-              />
+              <input type="text" className="input" placeholder="z.B. Push Day" value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
             </div>
             <div>
               <label className="label">Typ</label>
@@ -207,21 +257,41 @@ export function TrainingVorlagen() {
             </div>
           </div>
 
+          {/* Weekday selector */}
+          <div>
+            <label className="label">Wiederkehrende Tage (optional)</label>
+            <div className="flex gap-2">
+              {WEEKDAYS.map((d, i) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDay(i + 1)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all border ${
+                    form.wochentage.includes(i + 1)
+                      ? 'bg-primary/20 text-primary border-primary/40'
+                      : 'bg-bg-elevated text-text-muted border-border hover:border-border-light'
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            {form.wochentage.length > 0 && (
+              <p className="text-xs text-text-muted mt-1.5">
+                Jede Woche: {form.wochentage.map(d => WEEKDAYS[d - 1]).join(', ')} — du kannst diese Tage dann automatisch im Kalender eintragen lassen.
+              </p>
+            )}
+          </div>
+
           <div className="border-t border-border pt-4">
             <div className="text-sm font-medium text-text-primary mb-3">Übungen</div>
             <div className="space-y-3">
               {uebungen.map((u, i) => (
                 <div key={i} className="p-3 bg-bg-elevated rounded-lg space-y-2">
                   <div className="flex gap-2">
-                    <input
-                      className="input flex-1 text-sm py-2"
-                      placeholder="Übungsname (z.B. Bankdrücken)"
-                      value={u.uebungsname}
-                      onChange={e => updateUebung(i, 'uebungsname', e.target.value)}
-                    />
-                    <button onClick={() => removeUebung(i)} className="p-2 rounded hover:bg-danger/10 hover:text-danger text-text-muted">
-                      <Trash2 size={14} />
-                    </button>
+                    <input className="input flex-1 text-sm py-2" placeholder="Übungsname (z.B. Bankdrücken)" value={u.uebungsname}
+                      onChange={e => updateUebung(i, 'uebungsname', e.target.value)} />
+                    <button onClick={() => removeUebung(i)} className="p-2 rounded hover:bg-danger/10 hover:text-danger text-text-muted"><Trash2 size={14} /></button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
@@ -253,6 +323,41 @@ export function TrainingVorlagen() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Calendar Events Modal */}
+      <Modal open={!!calModalVorlage} onClose={() => setCalModalVorlage(null)} title="Im Kalender eintragen">
+        {calModalVorlage && (
+          <div className="space-y-4">
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="font-medium text-text-primary">{calModalVorlage.name}</div>
+              <div className="text-xs text-text-muted mt-0.5">
+                Tage: {parseDays(calModalVorlage.wochentage).map(d => WEEKDAYS[d - 1]).join(', ')}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Startdatum</label>
+                <input type="date" className="input" value={calStart} onChange={e => setCalStart(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Wie viele Wochen?</label>
+                <input type="number" className="input" min="1" max="52" value={calWeeks}
+                  onChange={e => setCalWeeks(e.target.value)} />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted">
+              Es werden ca. {parseDays(calModalVorlage.wochentage).length * (parseInt(calWeeks) || 8)} Kalendereinträge erstellt. Jeder kann danach einzeln bearbeitet oder gelöscht werden.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setCalModalVorlage(null)} className="btn-secondary flex-1">Abbrechen</button>
+              <button onClick={createCalendarEvents} className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={calSaving}>
+                {calSaving && <Spinner size={16} />}
+                Einträge erstellen
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

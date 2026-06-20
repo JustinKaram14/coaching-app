@@ -29,6 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .single()
     setProfile(data)
+    // Update last_active silently — used by coach dashboard to show activity
+    supabase.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId)
   }
 
   async function refreshProfile() {
