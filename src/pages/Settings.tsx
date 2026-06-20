@@ -1,0 +1,203 @@
+import { useEffect, useState } from 'react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+import { bmi, bmiCategory, generateCode } from '../lib/utils'
+import { Spinner } from '../components/ui/Spinner'
+import type { ClientSettings, InviteCode } from '../types/database'
+
+export function Settings() {
+  const { user, profile, refreshProfile } = useAuth()
+  const [settings, setSettings] = useState<Partial<ClientSettings>>({})
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [name, setName] = useState(profile?.name ?? '')
+
+  const isCoach = profile?.role === 'coach'
+
+  async function load() {
+    if (!user) return
+    const settingsRes = await supabase.from('client_settings').select('*').eq('user_id', user.id).single()
+    if (settingsRes.data) setSettings(settingsRes.data)
+    if (isCoach) {
+      const codesRes = await supabase.from('invite_codes').select('*').eq('coach_id', user.id).order('created_at', { ascending: false })
+      if (codesRes.data) setInviteCodes(codesRes.data as any[])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [user])
+  useEffect(() => { setName(profile?.name ?? '') }, [profile])
+
+  async function handleSave() {
+    if (!user) return
+    setSaving(true)
+    await Promise.all([
+      supabase.from('profiles').update({ name }).eq('id', user.id),
+      supabase.from('client_settings').upsert({ ...settings, user_id: user.id }, { onConflict: 'user_id' }),
+    ])
+    await refreshProfile()
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function createInviteCode() {
+    if (!user) return
+    const code = generateCode()
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 30)
+    await supabase.from('invite_codes').insert({
+      code,
+      coach_id: user.id,
+      used_by: null,
+      expires_at: expiresAt.toISOString(),
+    })
+    await load()
+  }
+
+  async function deleteCode(id: string) {
+    await supabase.from('invite_codes').delete().eq('id', id)
+    setInviteCodes(c => c.filter(x => x.id !== id))
+  }
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code)
+  }
+
+  const bmiVal = settings.startgewicht && settings.koerpergroesse
+    ? bmi(settings.startgewicht, settings.koerpergroesse)
+    : null
+
+  return (
+    <div className="space-y-8 max-w-2xl">
+      <div>
+        <h1 className="section-title text-2xl">Einstellungen</h1>
+        <p className="text-text-secondary text-sm mt-0.5">Persönliche Daten & Coaching-Ziele</p>
+      </div>
+
+      {/* Profile */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <SettingsIcon size={18} className="text-primary" /> Profil
+        </h2>
+        <div>
+          <label className="label">Name</label>
+          <input type="text" className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Dein Name" />
+        </div>
+        <div>
+          <label className="label">E-Mail</label>
+          <input type="email" className="input opacity-60 cursor-not-allowed" value={user?.email ?? ''} disabled />
+        </div>
+        <div>
+          <label className="label">Rolle</label>
+          <div className="input opacity-60 cursor-not-allowed capitalize">{profile?.role === 'coach' ? 'Coach' : 'Athlet / Klient'}</div>
+        </div>
+      </div>
+
+      {/* Goals & Stats (only for clients) */}
+      {!isCoach && (
+        <div className="card space-y-4">
+          <h2 className="font-semibold text-text-primary">Ziele & Körperdaten</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Startgewicht (kg)</label>
+              <input type="number" step="0.1" className="input" placeholder="75.0" value={settings.startgewicht ?? ''} onChange={e => setSettings(s => ({ ...s, startgewicht: parseFloat(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Zielgewicht (kg)</label>
+              <input type="number" step="0.1" className="input" placeholder="70.0" value={settings.zielgewicht ?? ''} onChange={e => setSettings(s => ({ ...s, zielgewicht: parseFloat(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Körpergröße (cm)</label>
+              <input type="number" className="input" placeholder="180" value={settings.koerpergroesse ?? ''} onChange={e => setSettings(s => ({ ...s, koerpergroesse: parseFloat(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Alter (Jahre)</label>
+              <input type="number" className="input" placeholder="30" value={settings.alter_jahre ?? ''} onChange={e => setSettings(s => ({ ...s, alter_jahre: parseInt(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Kalorienziel (kcal/Tag)</label>
+              <input type="number" className="input" placeholder="2000" value={settings.kalorie_tagesziel ?? ''} onChange={e => setSettings(s => ({ ...s, kalorie_tagesziel: parseInt(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Trainings/Woche (Ziel)</label>
+              <input type="number" className="input" placeholder="4" value={settings.trainings_pro_woche ?? ''} onChange={e => setSettings(s => ({ ...s, trainings_pro_woche: parseInt(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Schlafziel (Stunden)</label>
+              <input type="number" step="0.5" className="input" placeholder="8" value={settings.schlaf_ziel ?? ''} onChange={e => setSettings(s => ({ ...s, schlaf_ziel: parseFloat(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <label className="label">Startdatum Coaching</label>
+              <input type="date" className="input" value={settings.startdatum ?? ''} onChange={e => setSettings(s => ({ ...s, startdatum: e.target.value }))} />
+            </div>
+          </div>
+
+          {bmiVal && (
+            <div className="p-4 bg-bg-elevated rounded-xl border border-border">
+              <div className="text-sm text-text-muted mb-1">BMI (berechnet)</div>
+              <div className="text-2xl font-bold text-text-primary">{bmiVal}</div>
+              <div className="text-sm text-text-secondary">{bmiCategory(bmiVal)}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Invite Codes (Coach only) */}
+      {isCoach && (
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-text-primary flex items-center gap-2">
+              <Key size={18} className="text-primary" /> Einladungscodes
+            </h2>
+            <button onClick={createInviteCode} className="btn-primary flex items-center gap-2 text-sm">
+              <Plus size={16} /> Code erstellen
+            </button>
+          </div>
+          {loading ? (
+            <div className="flex justify-center py-4"><Spinner /></div>
+          ) : inviteCodes.length === 0 ? (
+            <p className="text-sm text-text-muted">Noch keine Codes erstellt.</p>
+          ) : (
+            <div className="space-y-2">
+              {inviteCodes.map(code => (
+                <div key={code.id} className="flex items-center gap-3 p-3 bg-bg-elevated rounded-xl border border-border">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono font-bold text-text-primary tracking-widest">{code.code}</div>
+                    <div className="text-xs text-text-muted mt-0.5">
+                      {code.used_by
+                        ? <span className="text-success">Verwendet</span>
+                        : code.expires_at
+                        ? <span>Läuft ab: {new Date(code.expires_at).toLocaleDateString('de')}</span>
+                        : 'Unbegrenzt gültig'}
+                    </div>
+                  </div>
+                  <button onClick={() => copyCode(code.code)} className="p-2 rounded-lg hover:bg-primary/10 hover:text-primary text-text-muted transition-colors" title="Kopieren">
+                    <Copy size={14} />
+                  </button>
+                  <button onClick={() => deleteCode(code.id)} className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Save Button */}
+      <button
+        onClick={handleSave}
+        className={`btn-primary flex items-center gap-2 ${saved ? 'bg-success hover:bg-success' : ''}`}
+        disabled={saving}
+      >
+        {saving ? <Spinner size={18} /> : <Save size={18} />}
+        {saved ? 'Gespeichert!' : saving ? 'Speichern...' : 'Einstellungen speichern'}
+      </button>
+    </div>
+  )
+}
