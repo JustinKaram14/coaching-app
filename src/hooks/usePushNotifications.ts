@@ -16,6 +16,15 @@ export async function subscribeToPush(userId: string) {
     if (permission !== 'granted') return
 
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+    if (!vapidKey) {
+      console.error('VAPID key missing')
+      return
+    }
+
+    // Unsubscribe any stale subscription (different VAPID key causes AbortError)
+    const existing = await registration.pushManager.getSubscription()
+    if (existing) await existing.unsubscribe()
+
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(vapidKey),
