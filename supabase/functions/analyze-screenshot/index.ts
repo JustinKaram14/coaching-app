@@ -136,7 +136,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.error('Gemini API error:', response.status)
-      return new Response(JSON.stringify({ error: 'AI analysis failed' }), {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: 'Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      return new Response(JSON.stringify({ error: 'KI-Analyse fehlgeschlagen. Bitte versuche es erneut.' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }

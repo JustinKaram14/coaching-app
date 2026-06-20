@@ -104,8 +104,9 @@ export function Nutrition() {
             notizen: n.notizen || f.notizen,
           }))
         }
-      } catch (e) {
-        console.error('Analysis failed:', e)
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Analyse fehlgeschlagen'
+        alert(msg.includes('429') ? 'Zu viele Anfragen – bitte kurz warten und erneut versuchen.' : 'Foto-Analyse fehlgeschlagen. Bitte erneut versuchen.')
       }
       setAnalyzing(false)
     }
