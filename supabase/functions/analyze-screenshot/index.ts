@@ -39,7 +39,7 @@ serve(async (req) => {
     })
   }
 
-  // --- AUTHENTICATION: verify JWT belongs to a valid Supabase user ---
+  // --- AUTH: verify JWT belongs to a valid Supabase user ---
   const authHeader = req.headers.get('Authorization')
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -84,7 +84,7 @@ serve(async (req) => {
   }
 
   if (typeof mimeType !== 'string' || !ALLOWED_MIME_TYPES.has(mimeType)) {
-    return new Response(JSON.stringify({ error: 'Invalid image type. Allowed: jpeg, png, webp, gif, heic' }), {
+    return new Response(JSON.stringify({ error: 'Invalid image type' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
@@ -95,15 +95,14 @@ serve(async (req) => {
     })
   }
 
-  // Limit image size to ~5MB base64 (~3.75MB raw)
   if (imageBase64.length > 5_000_000) {
     return new Response(JSON.stringify({ error: 'Image too large. Maximum 5MB.' }), {
       status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  // --- ANTHROPIC API CALL ---
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  // --- GEMINI API CALL ---
+  const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'AI service not configured' }), {
       status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -111,35 +110,39 @@ serve(async (req) => {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
+
+    const response = await fetch(geminiUrl, {
       method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
-            { type: 'text', text: PROMPTS[context] },
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64,
+              }
+            },
+            { text: PROMPTS[context] }
           ]
-        }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 512,
+          temperature: 0.1,
+        }
       }),
     })
 
     if (!response.ok) {
-      console.error('Anthropic API error:', response.status)
+      console.error('Gemini API error:', response.status)
       return new Response(JSON.stringify({ error: 'AI analysis failed' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     const data = await response.json()
-    const text = data?.content?.[0]?.text ?? ''
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     const result = jsonMatch ? JSON.parse(jsonMatch[0]) : null
 
@@ -147,7 +150,6 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (err) {
-    // Log internally but don't expose to client
     console.error('Edge function error:', err)
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
