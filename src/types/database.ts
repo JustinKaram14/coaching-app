@@ -41,6 +41,10 @@ export interface Database {
           koerpergroesse: number | null
           alter_jahre: number | null
           updated_at: string
+          notif_daily_reminder: boolean | null
+          notif_reminder_time: string | null
+          notif_appointments: boolean | null
+          notif_appointment_minutes: number | null
         }
         Insert: Omit<Database['public']['Tables']['client_settings']['Row'], 'id' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['client_settings']['Insert']>
