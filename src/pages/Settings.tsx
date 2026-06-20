@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bmi, bmiCategory, generateCode } from '../lib/utils'
@@ -188,6 +188,52 @@ export function Settings() {
           )}
         </div>
       )}
+
+      {/* Notification Settings */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <Bell size={18} className="text-primary" /> Benachrichtigungen
+        </h2>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-text-primary">Tägliche Erinnerung</div>
+            <div className="text-xs text-text-muted">Erinnert dich, Ernährung, Training & Schlaf einzutragen</div>
+          </div>
+          <button
+            onClick={() => setSettings(s => ({ ...s, notif_daily_reminder: !s.notif_daily_reminder }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_daily_reminder ? 'bg-primary' : 'bg-bg-elevated border border-border'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.notif_daily_reminder ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {settings.notif_daily_reminder && (
+          <div>
+            <label className="label">Uhrzeit der täglichen Erinnerung</label>
+            <input
+              type="time"
+              className="input"
+              value={settings.notif_reminder_time ?? '20:00'}
+              onChange={e => setSettings(s => ({ ...s, notif_reminder_time: e.target.value }))}
+            />
+            <p className="text-xs text-text-muted mt-1">Hinweis: Zeiten werden in UTC gespeichert. CET = UTC+1, CEST = UTC+2</p>
+          </div>
+        )}
+
+        <div className="border-t border-border pt-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-text-primary">Termin-Erinnerungen</div>
+            <div className="text-xs text-text-muted">Benachrichtigung 1 Stunde vor jedem Termin</div>
+          </div>
+          <button
+            onClick={() => setSettings(s => ({ ...s, notif_appointments: !s.notif_appointments }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_appointments !== false ? 'bg-primary' : 'bg-bg-elevated border border-border'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.notif_appointments !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+      </div>
 
       {/* Save Button */}
       <button

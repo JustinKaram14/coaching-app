@@ -1,8 +1,22 @@
 apply plugin: 'com.android.application'
 
+def keystorePropertiesFile = rootProject.file("app/key.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.coaching.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            storeFile keystorePropertiesFile.exists() ? file(keystoreProperties['storeFile']) : null
+            storePassword keystorePropertiesFile.exists() ? keystoreProperties['storePassword'] : ""
+            keyAlias keystorePropertiesFile.exists() ? keystoreProperties['keyAlias'] : ""
+            keyPassword keystorePropertiesFile.exists() ? keystoreProperties['keyPassword'] : ""
+        }
+    }
     defaultConfig {
         applicationId "com.coaching.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -20,6 +34,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
