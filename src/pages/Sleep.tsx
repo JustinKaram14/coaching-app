@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Moon, Star } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Trash2, Moon, Camera, Sparkles, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, calcSleepHours, todayISO } from '../lib/utils'
@@ -37,6 +37,9 @@ export function Sleep() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [sleepGoal, setSleepGoal] = useState(8)
   const [form, setForm] = useState({ datum: todayISO(), einschlafzeit: '23:00', aufwachzeit: '07:00', schlafqualitaet: '7', notizen: '' })
 
@@ -53,6 +56,34 @@ export function Sleep() {
 
   useEffect(() => { load() }, [user])
 
+  async function analyzePhoto(file: File) {
+    setAnalyzing(true)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1]
+      setPhotoPreview(reader.result as string)
+      try {
+        const { data } = await supabase.functions.invoke('analyze-screenshot', {
+          body: { imageBase64: base64, mimeType: file.type, context: 'sleep' },
+        })
+        if (data?.result) {
+          const r = data.result
+          setForm(f => ({
+            ...f,
+            einschlafzeit: r.einschlafzeit || f.einschlafzeit,
+            aufwachzeit: r.aufwachzeit || f.aufwachzeit,
+            schlafqualitaet: r.schlafqualitaet ? String(Math.min(10, Math.max(1, Math.round(r.schlafqualitaet)))) : f.schlafqualitaet,
+            notizen: r.notizen || f.notizen,
+          }))
+        }
+      } catch (e) {
+        console.error('Analysis failed:', e)
+      }
+      setAnalyzing(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function handleSave() {
     if (!user) return
     setSaving(true)
@@ -66,6 +97,7 @@ export function Sleep() {
     }, { onConflict: 'user_id,datum' })
     await load()
     setOpen(false)
+    setPhotoPreview(null)
     setForm({ datum: todayISO(), einschlafzeit: '23:00', aufwachzeit: '07:00', schlafqualitaet: '7', notizen: '' })
     setSaving(false)
   }
@@ -188,8 +220,48 @@ export function Sleep() {
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Schlaf eintragen">
+      <Modal open={open} onClose={() => { setOpen(false); setPhotoPreview(null) }} title="Schlaf eintragen">
         <div className="space-y-4">
+          {/* Photo AI */}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={e => { if (e.target.files?.[0]) analyzePhoto(e.target.files[0]) }} />
+          <div
+            onClick={() => fileRef.current?.click()}
+            className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
+              ${photoPreview ? 'border-accent/50 bg-accent/5' : 'border-border hover:border-accent/40 hover:bg-accent/5'}`}
+          >
+            {photoPreview ? (
+              <>
+                <img src={photoPreview} alt="Schlaf" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {analyzing ? (
+                    <div className="flex items-center gap-2 text-sm text-accent"><Spinner size={14} /><span>Analysiere Schlafdata...</span></div>
+                  ) : (
+                    <div className="text-sm text-success font-medium flex items-center gap-1.5"><Sparkles size={14} />Schlafzeiten erkannt</div>
+                  )}
+                  <div className="text-xs text-text-muted mt-0.5">Anderes Bild wählen</div>
+                </div>
+                <button onClick={e => { e.stopPropagation(); setPhotoPreview(null) }}
+                  className="p-1 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0">
+                  <X size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                  <Camera size={18} className="text-accent" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-accent" />
+                    Schlaf-App Screenshot analysieren
+                  </div>
+                  <div className="text-xs text-text-muted">Apple Health, Oura, Whoop — Zeiten & Qualität werden automatisch erkannt</div>
+                </div>
+              </>
+            )}
+          </div>
+
           <div>
             <label className="label">Datum</label>
             <input type="date" className="input" value={form.datum} onChange={e => setForm(f => ({ ...f, datum: e.target.value }))} />

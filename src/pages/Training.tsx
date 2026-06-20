@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -82,6 +82,9 @@ export function Training() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [vorlagen, setVorlagen] = useState<any[]>([])
   const [selectedVorlage, setSelectedVorlage] = useState('')
   const [form, setForm] = useState({
@@ -137,6 +140,35 @@ export function Training() {
 
   useEffect(() => { load(); loadVorlagen() }, [user])
 
+  async function analyzePhoto(file: File) {
+    setAnalyzing(true)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1]
+      setPhotoPreview(reader.result as string)
+      try {
+        const { data } = await supabase.functions.invoke('analyze-screenshot', {
+          body: { imageBase64: base64, mimeType: file.type, context: 'training' },
+        })
+        if (data?.result) {
+          const r = data.result
+          setForm(f => ({
+            ...f,
+            dauer_min: r.dauer_min ? String(r.dauer_min) : f.dauer_min,
+            avg_puls: r.avg_puls ? String(r.avg_puls) : f.avg_puls,
+            kalorien_verbrannt: r.kalorien_verbrannt ? String(r.kalorien_verbrannt) : f.kalorien_verbrannt,
+            trainingstyp: r.trainingstyp && TRAINING_TYPES.includes(r.trainingstyp) ? r.trainingstyp : f.trainingstyp,
+            notizen: r.notizen || f.notizen,
+          }))
+        }
+      } catch (e) {
+        console.error('Analysis failed:', e)
+      }
+      setAnalyzing(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
   function toggleExpand(id: string) {
     setEntries(e => e.map(t => t.id === id ? { ...t, expanded: !t.expanded } : t))
   }
@@ -173,6 +205,7 @@ export function Training() {
 
     await load()
     setOpen(false)
+    setPhotoPreview(null)
     setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '' })
     setUebungen([])
     setSaving(false)
@@ -300,8 +333,47 @@ export function Training() {
         ))}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Trainingseinheit eintragen" size="lg">
+      <Modal open={open} onClose={() => { setOpen(false); setPhotoPreview(null) }} title="Trainingseinheit eintragen" size="lg">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {/* Photo AI */}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={e => { if (e.target.files?.[0]) analyzePhoto(e.target.files[0]) }} />
+          <div
+            onClick={() => fileRef.current?.click()}
+            className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
+              ${photoPreview ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-primary/5'}`}
+          >
+            {photoPreview ? (
+              <>
+                <img src={photoPreview} alt="Workout" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {analyzing ? (
+                    <div className="flex items-center gap-2 text-sm text-primary"><Spinner size={14} /><span>Analysiere Workout...</span></div>
+                  ) : (
+                    <div className="text-sm text-success font-medium flex items-center gap-1.5"><Sparkles size={14} />Daten automatisch ausgefüllt</div>
+                  )}
+                  <div className="text-xs text-text-muted mt-0.5">Anderes Bild wählen</div>
+                </div>
+                <button onClick={e => { e.stopPropagation(); setPhotoPreview(null) }}
+                  className="p-1 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0">
+                  <X size={14} />
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Camera size={18} className="text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-accent" />
+                    Apple Watch Screenshot analysieren
+                  </div>
+                  <div className="text-xs text-text-muted">Dauer, Kalorien & Herzfrequenz werden automatisch erkannt</div>
+                </div>
+              </>
+            )}
+          </div>
           {/* Vorlage Selector */}
           {vorlagen.length > 0 && (
             <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
