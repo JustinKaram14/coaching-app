@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bmi, bmiCategory, generateCode } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
+import { subscribeToPush } from '../hooks/usePushNotifications'
 import type { ClientSettings, InviteCode } from '../types/database'
 
 export function Settings() {
@@ -14,6 +15,7 @@ export function Settings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [name, setName] = useState(profile?.name ?? '')
+  const [notifStatus, setNotifStatus] = useState<'idle'|'loading'|'ok'|'denied'|'unsupported'>('idle')
 
   const isCoach = profile?.role === 'coach'
 
@@ -56,6 +58,19 @@ export function Settings() {
       expires_at: expiresAt.toISOString(),
     })
     await load()
+  }
+
+  async function activateNotifications() {
+    if (!user) return
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setNotifStatus('unsupported')
+      return
+    }
+    setNotifStatus('loading')
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') { setNotifStatus('denied'); return }
+    await subscribeToPush(user.id)
+    setNotifStatus('ok')
   }
 
   async function deleteCode(id: string) {
@@ -231,6 +246,24 @@ export function Settings() {
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_appointments !== false ? 'bg-primary' : 'bg-bg-elevated border border-border'}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.notif_appointments !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <div className="text-sm font-medium text-text-primary mb-2">Push-Benachrichtigungen aktivieren</div>
+          <div className="text-xs text-text-muted mb-3">
+            {notifStatus === 'ok' && '✅ Benachrichtigungen sind aktiviert'}
+            {notifStatus === 'denied' && '❌ Berechtigung verweigert — bitte in Browser-Einstellungen erlauben'}
+            {notifStatus === 'unsupported' && '⚠️ Dein Browser unterstützt keine Push-Benachrichtigungen'}
+            {(notifStatus === 'idle' || notifStatus === 'loading') && 'Klicke um Benachrichtigungen zu erlauben. Auf iPhone muss die App zuerst zum Homescreen hinzugefügt werden.'}
+          </div>
+          <button
+            onClick={activateNotifications}
+            disabled={notifStatus === 'loading' || notifStatus === 'ok'}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
+            {notifStatus === 'loading' ? <Spinner size={16} /> : notifStatus === 'ok' ? <CheckCircle size={16} /> : <Bell size={16} />}
+            {notifStatus === 'ok' ? 'Aktiviert' : notifStatus === 'loading' ? 'Wird aktiviert...' : 'Benachrichtigungen aktivieren'}
           </button>
         </div>
       </div>
