@@ -24,8 +24,8 @@ export function Register() {
       setError('Die Passwörter stimmen nicht überein.')
       return
     }
-    if (form.password.length < 8) {
-      setError('Das Passwort muss mindestens 8 Zeichen lang sein.')
+    if (form.password.length < 12) {
+      setError('Das Passwort muss mindestens 12 Zeichen lang sein.')
       return
     }
     setLoading(true)
@@ -100,11 +100,11 @@ export function Register() {
                 <input
                   type={showPw ? 'text' : 'password'}
                   className="input pr-10"
-                  placeholder="Min. 8 Zeichen"
+                  placeholder="Min. 12 Zeichen"
                   value={form.password}
                   onChange={update('password')}
                   required
-                  minLength={8}
+                  minLength={12}
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
