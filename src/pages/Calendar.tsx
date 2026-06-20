@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, ChevronLeft, ChevronRight, Clock, Pencil, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { sendPushToUser } from '../hooks/usePushNotifications'
 import { formatDate, todayISO } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { Spinner } from '../components/ui/Spinner'
@@ -123,6 +124,17 @@ export function Calendar() {
       await supabase.from('kalender_events').insert(dates.map(datum => ({ ...base, datum })))
     } else {
       await supabase.from('kalender_events').insert({ ...base, datum: form.datum })
+    }
+
+    // Notify client about new/updated appointment
+    if (isCoach && base.client_id && base.client_id !== user.id) {
+      const action = editingId ? 'aktualisiert' : 'erstellt'
+      sendPushToUser(
+        base.client_id,
+        `Neuer Termin ${action}`,
+        `${form.titel} am ${form.datum}${form.uhrzeit ? ' um ' + form.uhrzeit : ''}`,
+        'https://justinkaram14.github.io/coaching-app/#/calendar'
+      )
     }
 
     await load()
