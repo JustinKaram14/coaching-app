@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -82,6 +82,7 @@ export function Training() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -173,27 +174,69 @@ export function Training() {
     setEntries(e => e.map(t => t.id === id ? { ...t, expanded: !t.expanded } : t))
   }
 
+  function openEdit(t: TrainingWithExercises) {
+    setEditingId(t.id)
+    setForm({
+      datum: t.datum,
+      trainingstyp: t.trainingstyp ?? 'Kraft',
+      dauer_min: t.dauer_min ? String(t.dauer_min) : '',
+      avg_puls: t.avg_puls ? String(t.avg_puls) : '',
+      kalorien_verbrannt: t.kalorien_verbrannt ? String(t.kalorien_verbrannt) : '',
+      notizen: t.notizen ?? '',
+    })
+    setUebungen(t.uebungen?.map(u => ({
+      uebungsname: u.uebungsname,
+      saetze: u.saetze ? String(u.saetze) : '',
+      wdh: u.wdh ? String(u.wdh) : '',
+      gewicht_kg: u.gewicht_kg ? String(u.gewicht_kg) : '',
+      notizen: u.notizen ?? '',
+    })) ?? [])
+    setPhotoPreview(null)
+    setOpen(true)
+  }
+
+  function closeModal() {
+    setOpen(false)
+    setEditingId(null)
+    setPhotoPreview(null)
+    setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '' })
+    setUebungen([])
+  }
+
   async function handleSave() {
     if (!user) return
     setSaving(true)
-    const count = entries.length
-    const einheit_id = `E-${String(count + 1).padStart(3, '0')}`
-    const { data: training } = await supabase.from('training').insert({
-      user_id: user.id,
+
+    const payload = {
       datum: form.datum,
       trainingstyp: form.trainingstyp || null,
       dauer_min: form.dauer_min ? parseInt(form.dauer_min) : null,
       avg_puls: form.avg_puls ? parseInt(form.avg_puls) : null,
       kalorien_verbrannt: form.kalorien_verbrannt ? parseInt(form.kalorien_verbrannt) : null,
       notizen: form.notizen || null,
-      einheit_id,
-    }).select().single()
+    }
 
-    if (training && uebungen.filter(u => u.uebungsname).length > 0) {
+    let trainingId: string
+
+    if (editingId) {
+      await supabase.from('training').update(payload).eq('id', editingId)
+      trainingId = editingId
+      // Replace exercises: delete old, insert new
+      await supabase.from('uebungen').delete().eq('training_id', editingId)
+    } else {
+      const count = entries.length
+      const einheit_id = `E-${String(count + 1).padStart(3, '0')}`
+      const { data: training } = await supabase.from('training').insert({
+        user_id: user.id, einheit_id, ...payload,
+      }).select().single()
+      trainingId = training!.id
+    }
+
+    if (uebungen.filter(u => u.uebungsname).length > 0) {
       await supabase.from('uebungen').insert(
         uebungen.filter(u => u.uebungsname).map(u => ({
           user_id: user.id,
-          training_id: training.id,
+          training_id: trainingId,
           uebungsname: u.uebungsname,
           saetze: u.saetze ? parseInt(u.saetze) : null,
           wdh: u.wdh ? parseInt(u.wdh) : null,
@@ -204,10 +247,7 @@ export function Training() {
     }
 
     await load()
-    setOpen(false)
-    setPhotoPreview(null)
-    setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '' })
-    setUebungen([])
+    closeModal()
     setSaving(false)
   }
 
@@ -238,7 +278,7 @@ export function Training() {
           <button onClick={() => navigate('/training/vorlagen')} className="btn-secondary flex items-center gap-2">
             <BookOpen size={16} /> Vorlagen
           </button>
-          <button onClick={() => setOpen(true)} className="btn-primary flex items-center gap-2">
+          <button onClick={() => { setEditingId(null); setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '' }); setUebungen([]); setPhotoPreview(null); setOpen(true) }} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> Einheit eintragen
           </button>
         </div>
@@ -308,6 +348,9 @@ export function Training() {
                     {t.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                 )}
+                <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
+                  <Pencil size={16} />
+                </button>
                 <button onClick={() => handleDelete(t.id)} className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
                   <Trash2 size={16} />
                 </button>
@@ -333,7 +376,7 @@ export function Training() {
         ))}
       </div>
 
-      <Modal open={open} onClose={() => { setOpen(false); setPhotoPreview(null) }} title="Trainingseinheit eintragen" size="lg">
+      <Modal open={open} onClose={closeModal} title={editingId ? 'Trainingseinheit bearbeiten' : 'Trainingseinheit eintragen'} size="lg">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           {/* Photo AI */}
           <input ref={fileRef} type="file" accept="image/*" className="hidden"
