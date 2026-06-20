@@ -17,14 +17,20 @@ export async function subscribeToPush(userId: string) {
 
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
     if (!vapidKey) {
-      console.error('VAPID key missing')
+      console.error('[Push] VAPID key missing — VITE_VAPID_PUBLIC_KEY not set in build')
       return
     }
+    console.log('[Push] VAPID key present:', vapidKey.slice(0, 10) + '...')
 
     // Unsubscribe any stale subscription (different VAPID key causes AbortError)
     const existing = await registration.pushManager.getSubscription()
-    if (existing) await existing.unsubscribe()
+    if (existing) {
+      console.log('[Push] Unsubscribing stale subscription:', existing.endpoint.slice(0, 40) + '...')
+      await existing.unsubscribe()
+    }
 
+    console.log('[Push] SW state:', registration.active?.state)
+    console.log('[Push] Calling pushManager.subscribe...')
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(vapidKey),
