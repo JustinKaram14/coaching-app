@@ -107,6 +107,7 @@ export interface Database {
           id: string
           user_id: string
           datum: string
+          mahlzeit: string | null
           kalorien: number | null
           protein_g: number | null
           kohlenhydrate_g: number | null

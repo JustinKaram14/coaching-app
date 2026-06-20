@@ -9,6 +9,16 @@ import { Spinner } from '../components/ui/Spinner'
 import type { ErnaehrungEntry } from '../types/database'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
+const MAHLZEITEN = ['Tagesgesamt', 'Frühstück', 'Mittagessen', 'Abendessen', 'Snack']
+
+const MAHLZEIT_COLORS: Record<string, string> = {
+  Frühstück: '#f59e0b',
+  Mittagessen: '#6366f1',
+  Abendessen: '#8b5cf6',
+  Snack: '#10b981',
+  Tagesgesamt: '#6366f1',
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
@@ -21,19 +31,29 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-function MacroBar({ label, value, goal, color }: { label: string; value: number | null; goal: number | null; color: string }) {
+function MacroBar({ label, value, goal, color }: { label: string; value: number; goal: number | null; color: string }) {
   const pct = value && goal ? Math.min((value / goal) * 100, 100) : 0
   return (
     <div>
       <div className="flex justify-between text-xs mb-1">
         <span className="text-text-secondary">{label}</span>
-        <span className="text-text-primary font-medium">{value ?? 0}g {goal ? `/ ${goal}g` : ''}</span>
+        <span className="text-text-primary font-medium">{value}g {goal ? `/ ${goal}g` : ''}</span>
       </div>
       <div className="h-1.5 bg-bg rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
   )
+}
+
+function sumEntries(entries: ErnaehrungEntry[]) {
+  return {
+    kalorien: entries.reduce((a, e) => a + (e.kalorien ?? 0), 0),
+    protein_g: Math.round(entries.reduce((a, e) => a + (e.protein_g ?? 0), 0) * 10) / 10,
+    kohlenhydrate_g: Math.round(entries.reduce((a, e) => a + (e.kohlenhydrate_g ?? 0), 0) * 10) / 10,
+    fett_g: Math.round(entries.reduce((a, e) => a + (e.fett_g ?? 0), 0) * 10) / 10,
+    wasser_ml: entries.reduce((a, e) => a + (e.wasser_ml ?? 0), 0),
+  }
 }
 
 export function Nutrition() {
@@ -47,17 +67,17 @@ export function Nutrition() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [settings, setSettings] = useState({ kalorie_tagesziel: 2000, protein_ziel: 150, karbs_ziel: 200, fett_ziel: 70 })
   const [form, setForm] = useState({
-    datum: todayISO(), kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', wasser_ml: '', notizen: '',
+    datum: todayISO(), mahlzeit: 'Tagesgesamt', kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', wasser_ml: '', notizen: '',
   })
 
   async function load() {
     if (!user) return
     const [entriesRes, settingsRes] = await Promise.all([
-      supabase.from('ernaehrung').select('*').eq('user_id', user.id).order('datum', { ascending: true }),
-      supabase.from('client_settings').select('kalorie_tagesziel').eq('user_id', user.id).single(),
+      supabase.from('ernaehrung').select('*').eq('user_id', user.id).order('datum', { ascending: true }).order('created_at', { ascending: true }),
+      supabase.from('client_settings').select('kalorie_tagesziel,protein_ziel,karbs_ziel,fett_ziel').eq('user_id', user.id).single(),
     ])
     setEntries(entriesRes.data ?? [])
-    if (settingsRes.data) setSettings(s => ({ ...s, kalorie_tagesziel: settingsRes.data.kalorie_tagesziel ?? 2000 }))
+    if (settingsRes.data) setSettings(s => ({ ...s, ...settingsRes.data }))
     setLoading(false)
   }
 
@@ -68,14 +88,13 @@ export function Nutrition() {
     const reader = new FileReader()
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1]
-      const mimeType = file.type
       setPhotoPreview(reader.result as string)
       try {
-        const { data, error } = await supabase.functions.invoke('analyze-nutrition', {
-          body: { imageBase64: base64, mimeType },
+        const { data } = await supabase.functions.invoke('analyze-screenshot', {
+          body: { imageBase64: base64, mimeType: file.type, context: 'nutrition' },
         })
-        if (data?.nutrition) {
-          const n = data.nutrition
+        if (data?.result) {
+          const n = data.result
           setForm(f => ({
             ...f,
             kalorien: n.kalorien ? String(Math.round(n.kalorien)) : f.kalorien,
@@ -99,17 +118,18 @@ export function Nutrition() {
     await supabase.from('ernaehrung').upsert({
       user_id: user.id,
       datum: form.datum,
+      mahlzeit: form.mahlzeit,
       kalorien: form.kalorien ? parseInt(form.kalorien) : null,
       protein_g: form.protein_g ? parseFloat(form.protein_g) : null,
       kohlenhydrate_g: form.kohlenhydrate_g ? parseFloat(form.kohlenhydrate_g) : null,
       fett_g: form.fett_g ? parseFloat(form.fett_g) : null,
       wasser_ml: form.wasser_ml ? parseInt(form.wasser_ml) : null,
       notizen: form.notizen || null,
-    }, { onConflict: 'user_id,datum' })
+    }, { onConflict: 'user_id,datum,mahlzeit' })
     await load()
     setOpen(false)
     setPhotoPreview(null)
-    setForm({ datum: todayISO(), kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', wasser_ml: '', notizen: '' })
+    setForm({ datum: todayISO(), mahlzeit: 'Tagesgesamt', kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', wasser_ml: '', notizen: '' })
     setSaving(false)
   }
 
@@ -118,19 +138,30 @@ export function Nutrition() {
     setEntries(e => e.filter(x => x.id !== id))
   }
 
-  const today = entries.find(e => e.datum === todayISO())
-  const avgKal = entries.filter(e => e.kalorien).length
-    ? Math.round(entries.filter(e => e.kalorien).reduce((a, b) => a + (b.kalorien ?? 0), 0) / entries.filter(e => e.kalorien).length)
-    : null
+  const todayEntries = entries.filter(e => e.datum === todayISO())
+  const todaySum = sumEntries(todayEntries)
+  const hasToday = todayEntries.length > 0
 
-  const chartData = entries.slice(-21).map(e => ({
-    datum: formatDate(e.datum, 'dd.MM'),
-    kalorien: e.kalorien ?? 0,
-    protein: e.protein_g ?? 0,
+  // Group entries by date for log display
+  const byDate = entries.reduce<Record<string, ErnaehrungEntry[]>>((acc, e) => {
+    if (!acc[e.datum]) acc[e.datum] = []
+    acc[e.datum].push(e)
+    return acc
+  }, {})
+  const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a))
+
+  // Chart: sum per day
+  const chartData = sortedDates.slice(0, 21).reverse().map(datum => ({
+    datum: formatDate(datum, 'dd.MM'),
+    kalorien: sumEntries(byDate[datum]).kalorien,
   }))
 
-  const avgWater = entries.filter(e => e.wasser_ml).length
-    ? Math.round(entries.filter(e => e.wasser_ml).reduce((a, b) => a + (b.wasser_ml ?? 0), 0) / entries.filter(e => e.wasser_ml).length)
+  const allDates = Object.keys(byDate)
+  const avgKal = allDates.length
+    ? Math.round(allDates.reduce((a, d) => a + sumEntries(byDate[d]).kalorien, 0) / allDates.length)
+    : null
+  const avgWater = allDates.filter(d => byDate[d].some(e => e.wasser_ml)).length
+    ? Math.round(allDates.reduce((a, d) => a + sumEntries(byDate[d]).wasser_ml, 0) / allDates.filter(d => byDate[d].some(e => e.wasser_ml)).length)
     : null
 
   return (
@@ -146,33 +177,42 @@ export function Nutrition() {
       </div>
 
       {/* Today's Overview */}
-      {today && (
+      {hasToday && (
         <div className="card bg-gradient-to-br from-primary/10 to-accent/5 border-primary/20">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-text-primary">Heute</h2>
-            <span className="badge bg-success/10 text-success">{today.kalorien ?? 0} / {settings.kalorie_tagesziel} kcal</span>
+            <span className="badge bg-success/10 text-success">{todaySum.kalorien} / {settings.kalorie_tagesziel} kcal</span>
           </div>
           <div className="mb-4">
             <div className="flex justify-between text-xs mb-1.5">
               <span className="text-text-secondary">Kalorien</span>
-              <span className="text-text-primary font-semibold">{Math.round(((today.kalorien ?? 0) / settings.kalorie_tagesziel) * 100)}%</span>
+              <span className="text-text-primary font-semibold">{Math.round((todaySum.kalorien / settings.kalorie_tagesziel) * 100)}%</span>
             </div>
             <div className="h-2 bg-bg rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${Math.min(((today.kalorien ?? 0) / settings.kalorie_tagesziel) * 100, 100)}%` }}
-              />
+              <div className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${Math.min((todaySum.kalorien / settings.kalorie_tagesziel) * 100, 100)}%` }} />
             </div>
           </div>
+          {/* Per-meal breakdown if multiple entries */}
+          {todayEntries.length > 1 && (
+            <div className="flex gap-2 flex-wrap mb-4">
+              {todayEntries.map(e => (
+                <span key={e.id} className="text-xs px-2 py-1 rounded-lg font-medium"
+                  style={{ backgroundColor: `${MAHLZEIT_COLORS[e.mahlzeit ?? 'Tagesgesamt']}20`, color: MAHLZEIT_COLORS[e.mahlzeit ?? 'Tagesgesamt'] }}>
+                  {e.mahlzeit}: {e.kalorien ?? 0} kcal
+                </span>
+              ))}
+            </div>
+          )}
           <div className="space-y-2">
-            <MacroBar label="Protein" value={today.protein_g} goal={settings.protein_ziel} color="#6366f1" />
-            <MacroBar label="Kohlenhydrate" value={today.kohlenhydrate_g} goal={settings.karbs_ziel} color="#f59e0b" />
-            <MacroBar label="Fett" value={today.fett_g} goal={settings.fett_ziel} color="#10b981" />
+            <MacroBar label="Protein" value={todaySum.protein_g} goal={settings.protein_ziel} color="#6366f1" />
+            <MacroBar label="Kohlenhydrate" value={todaySum.kohlenhydrate_g} goal={settings.karbs_ziel} color="#f59e0b" />
+            <MacroBar label="Fett" value={todaySum.fett_g} goal={settings.fett_ziel} color="#10b981" />
           </div>
-          {today.wasser_ml && (
+          {todaySum.wasser_ml > 0 && (
             <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-sm">
               <span className="text-text-secondary">Wasser heute:</span>
-              <span className="font-semibold text-text-primary">{today.wasser_ml} ml</span>
+              <span className="font-semibold text-text-primary">{todaySum.wasser_ml} ml</span>
             </div>
           )}
         </div>
@@ -181,7 +221,7 @@ export function Nutrition() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="card text-center">
-          <div className="text-2xl font-bold text-text-primary">{avgKal ? `${avgKal}` : '--'}</div>
+          <div className="text-2xl font-bold text-text-primary">{avgKal ?? '--'}</div>
           <div className="text-xs text-text-muted mt-1">Ø Kalorien/Tag</div>
         </div>
         <div className="card text-center">
@@ -211,7 +251,7 @@ export function Nutrition() {
         </div>
       )}
 
-      {/* Log Table */}
+      {/* Log — grouped by date */}
       <div className="card">
         <h2 className="section-title mb-4">Ernährungslog</h2>
         {loading ? (
@@ -219,41 +259,46 @@ export function Nutrition() {
         ) : entries.length === 0 ? (
           <EmptyState icon={Apple} title="Noch keine Ernährungseinträge" description="Trage täglich deine Makros und Kalorien ein." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th>
-                  <th className="text-right py-2 px-3 text-text-muted font-medium">Kalorien</th>
-                  <th className="text-right py-2 px-3 text-text-muted font-medium">Protein</th>
-                  <th className="text-right py-2 px-3 text-text-muted font-medium">Karbs</th>
-                  <th className="text-right py-2 px-3 text-text-muted font-medium">Fett</th>
-                  <th className="text-right py-2 px-3 text-text-muted font-medium">Wasser</th>
-                  <th className="py-2 px-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {[...entries].reverse().map(e => (
-                  <tr key={e.id} className="border-b border-border/50 hover:bg-bg-elevated/50 transition-colors">
-                    <td className="py-2.5 px-3 text-text-secondary">{formatDate(e.datum)}</td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span className={`font-semibold ${e.kalorien && e.kalorien <= settings.kalorie_tagesziel ? 'text-success' : 'text-danger'}`}>
-                        {e.kalorien ? `${e.kalorien} kcal` : '--'}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-text-secondary">{e.protein_g ? `${e.protein_g}g` : '--'}</td>
-                    <td className="py-2.5 px-3 text-right text-text-secondary">{e.kohlenhydrate_g ? `${e.kohlenhydrate_g}g` : '--'}</td>
-                    <td className="py-2.5 px-3 text-right text-text-secondary">{e.fett_g ? `${e.fett_g}g` : '--'}</td>
-                    <td className="py-2.5 px-3 text-right text-text-secondary">{e.wasser_ml ? `${e.wasser_ml}ml` : '--'}</td>
-                    <td className="py-2.5 px-3 text-right">
-                      <button onClick={() => handleDelete(e.id)} className="p-1.5 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {sortedDates.map(datum => {
+              const dayEntries = byDate[datum]
+              const daySum = sumEntries(dayEntries)
+              return (
+                <div key={datum}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">{formatDate(datum)}</span>
+                    <span className={`text-xs font-bold ${daySum.kalorien <= settings.kalorie_tagesziel ? 'text-success' : 'text-danger'}`}>
+                      {daySum.kalorien} kcal gesamt
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {dayEntries.map(e => (
+                      <div key={e.id} className="flex items-center gap-3 p-3 bg-bg-elevated rounded-xl border border-border/50">
+                        <div className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: MAHLZEIT_COLORS[e.mahlzeit ?? 'Tagesgesamt'] }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-text-primary">{e.mahlzeit ?? 'Tagesgesamt'}</span>
+                            {e.notizen && <span className="text-xs text-text-muted truncate">{e.notizen}</span>}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-text-secondary flex-wrap">
+                            {e.kalorien && <span>{e.kalorien} kcal</span>}
+                            {e.protein_g && <span>P: {e.protein_g}g</span>}
+                            {e.kohlenhydrate_g && <span>K: {e.kohlenhydrate_g}g</span>}
+                            {e.fett_g && <span>F: {e.fett_g}g</span>}
+                            {e.wasser_ml && <span>💧 {e.wasser_ml}ml</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => handleDelete(e.id)}
+                          className="p-1.5 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -261,39 +306,23 @@ export function Nutrition() {
       <Modal open={open} onClose={() => { setOpen(false); setPhotoPreview(null) }} title="Ernährung eintragen">
         <div className="space-y-4">
           {/* Photo AI Analysis */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={e => { if (e.target.files?.[0]) analyzePhoto(e.target.files[0]) }}
-          />
-          <div
-            onClick={() => fileRef.current?.click()}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={e => { if (e.target.files?.[0]) analyzePhoto(e.target.files[0]) }} />
+          <div onClick={() => fileRef.current?.click()}
             className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
-              ${photoPreview ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-primary/5'}`}
-          >
+              ${photoPreview ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-primary/5'}`}>
             {photoPreview ? (
               <>
                 <img src={photoPreview} alt="Mahlzeit" className="w-14 h-14 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
-                  {analyzing ? (
-                    <div className="flex items-center gap-2 text-sm text-primary">
-                      <Spinner size={14} />
-                      <span>Analysiere mit KI...</span>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-success font-medium flex items-center gap-1.5">
-                      <Sparkles size={14} />
-                      Makros automatisch ausgefüllt
-                    </div>
-                  )}
+                  {analyzing
+                    ? <div className="flex items-center gap-2 text-sm text-primary"><Spinner size={14} /><span>Analysiere mit KI...</span></div>
+                    : <div className="text-sm text-success font-medium flex items-center gap-1.5"><Sparkles size={14} />Makros automatisch ausgefüllt</div>
+                  }
                   <div className="text-xs text-text-muted mt-0.5">Anderes Bild wählen</div>
                 </div>
-                <button
-                  onClick={e => { e.stopPropagation(); setPhotoPreview(null) }}
-                  className="p-1 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0"
-                >
+                <button onClick={e => { e.stopPropagation(); setPhotoPreview(null) }}
+                  className="p-1 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0">
                   <X size={14} />
                 </button>
               </>
@@ -304,8 +333,7 @@ export function Nutrition() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
-                    <Sparkles size={13} className="text-accent" />
-                    KI-Analyse: Foto hochladen
+                    <Sparkles size={13} className="text-accent" /> KI-Analyse: Foto hochladen
                   </div>
                   <div className="text-xs text-text-muted">Mahlzeit, Rezept oder Screenshot — Makros werden automatisch erkannt</div>
                 </div>
@@ -313,38 +341,50 @@ export function Nutrition() {
             )}
           </div>
 
-          <div>
-            <label className="label">Datum</label>
-            <input type="date" className="input" value={form.datum} onChange={e => setForm(f => ({ ...f, datum: e.target.value }))} />
-          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className="label">Datum</label>
+              <input type="date" className="input" value={form.datum} onChange={e => setForm(f => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">Mahlzeit</label>
+              <select className="input" value={form.mahlzeit} onChange={e => setForm(f => ({ ...f, mahlzeit: e.target.value }))}>
+                {MAHLZEITEN.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="label">Kalorien (kcal)</label>
-              <input type="number" className="input" placeholder="2000" value={form.kalorien} onChange={e => setForm(f => ({ ...f, kalorien: e.target.value }))} autoFocus />
+              <input type="number" className="input" placeholder="2000" value={form.kalorien}
+                onChange={e => setForm(f => ({ ...f, kalorien: e.target.value }))} autoFocus />
             </div>
             <div>
               <label className="label">Wasser (ml)</label>
-              <input type="number" className="input" placeholder="2500" value={form.wasser_ml} onChange={e => setForm(f => ({ ...f, wasser_ml: e.target.value }))} />
+              <input type="number" className="input" placeholder="2500" value={form.wasser_ml}
+                onChange={e => setForm(f => ({ ...f, wasser_ml: e.target.value }))} />
             </div>
             <div>
               <label className="label">Protein (g)</label>
-              <input type="number" step="0.1" className="input" placeholder="150" value={form.protein_g} onChange={e => setForm(f => ({ ...f, protein_g: e.target.value }))} />
+              <input type="number" step="0.1" className="input" placeholder="150" value={form.protein_g}
+                onChange={e => setForm(f => ({ ...f, protein_g: e.target.value }))} />
             </div>
             <div>
               <label className="label">Kohlenhydrate (g)</label>
-              <input type="number" step="0.1" className="input" placeholder="200" value={form.kohlenhydrate_g} onChange={e => setForm(f => ({ ...f, kohlenhydrate_g: e.target.value }))} />
+              <input type="number" step="0.1" className="input" placeholder="200" value={form.kohlenhydrate_g}
+                onChange={e => setForm(f => ({ ...f, kohlenhydrate_g: e.target.value }))} />
             </div>
             <div>
               <label className="label">Fett (g)</label>
-              <input type="number" step="0.1" className="input" placeholder="70" value={form.fett_g} onChange={e => setForm(f => ({ ...f, fett_g: e.target.value }))} />
+              <input type="number" step="0.1" className="input" placeholder="70" value={form.fett_g}
+                onChange={e => setForm(f => ({ ...f, fett_g: e.target.value }))} />
             </div>
             <div>
               <label className="label">Notizen</label>
-              <input type="text" className="input" placeholder="Optional" value={form.notizen} onChange={e => setForm(f => ({ ...f, notizen: e.target.value }))} />
+              <input type="text" className="input" placeholder="Optional" value={form.notizen}
+                onChange={e => setForm(f => ({ ...f, notizen: e.target.value }))} />
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setOpen(false)} className="btn-secondary flex-1">Abbrechen</button>
+            <button onClick={() => { setOpen(false); setPhotoPreview(null) }} className="btn-secondary flex-1">Abbrechen</button>
             <button onClick={handleSave} className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={saving}>
               {saving && <Spinner size={16} />}
               Speichern
