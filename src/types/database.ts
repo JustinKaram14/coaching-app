@@ -227,6 +227,24 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['rezepte']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['rezepte']['Insert']>
       }
+      meal_plans: {
+        Row: {
+          id: string
+          user_id: string
+          datum: string
+          mahlzeit: string
+          rezept_id: string | null
+          rezept_name: string
+          portionen: number
+          kalorien: number | null
+          protein_g: number | null
+          kohlenhydrate_g: number | null
+          fett_g: number | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['meal_plans']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['meal_plans']['Insert']>
+      }
     }
   }
 }
@@ -246,3 +264,4 @@ export type FoodLogItem = Database['public']['Tables']['food_log']['Row']
 export type WasserLogEntry = Database['public']['Tables']['wasser_log']['Row']
 export type CoachPlan = Database['public']['Tables']['coach_plans']['Row']
 export type Rezept = Database['public']['Tables']['rezepte']['Row']
+export type MealPlanEntry = Database['public']['Tables']['meal_plans']['Row']
