@@ -26,6 +26,31 @@ function getCorsHeaders(origin: string | null) {
   }
 }
 
+async function pickFlashModel(apiKey: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
+    )
+    if (!res.ok) return 'gemini-2.5-flash'
+    const { models = [] } = await res.json()
+    const candidates = (models as { name: string; supportedGenerationMethods?: string[] }[])
+      .filter(m =>
+        m.name.toLowerCase().includes('flash') &&
+        !m.name.includes('tts') &&
+        !m.name.includes('thinking') &&
+        (m.supportedGenerationMethods ?? []).includes('generateContent')
+      )
+      .sort((a, b) => {
+        const aStable = a.name.includes('preview') ? 0 : 1
+        const bStable = b.name.includes('preview') ? 0 : 1
+        if (aStable !== bStable) return bStable - aStable
+        return b.name.localeCompare(a.name)
+      })
+    if (candidates.length > 0) return candidates[0].name.replace('models/', '')
+  } catch { /* fall through */ }
+  return 'gemini-2.5-flash'
+}
+
 serve(async (req) => {
   const origin = req.headers.get('Origin')
   const corsHeaders = getCorsHeaders(origin)
@@ -130,8 +155,10 @@ serve(async (req) => {
         { text: PROMPTS[context] },
       ]
 
+  const model = await pickFlashModel(apiKey)
+
   try {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
