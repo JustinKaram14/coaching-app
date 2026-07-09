@@ -35,6 +35,15 @@ Extractions-Schema:
         { "uebungsname": string, "saetze": number | null, "wdh": number | null, "gewicht_kg": number | null }
       ]
     }
+  ],
+  "rezepte": [
+    {
+      "name": string,
+      "kalorien": number,
+      "protein_g": number | null,
+      "kohlenhydrate_g": number | null,
+      "fett_g": number | null
+    }
   ]
 }
 
@@ -42,8 +51,9 @@ Regeln:
 - wochentag: 1=Montag, 2=Dienstag, 3=Mittwoch, 4=Donnerstag, 5=Freitag, 6=Samstag, 7=Sonntag
 - wasser_ziel_ml: in Milliliter (3.5L = 3500)
 - trainingstyp: wähle aus Kraft, Cardio, HIIT, Yoga, Stretching, Laufen, Sonstiges
+- rezepte: alle Mahlzeiten, Rezeptvarianten oder Gerichte mit Nährwertangaben aus dem Plan
 - Wenn ein Wert nicht gefunden wird: null
-- trainingsvorlagen: leeres Array [] wenn kein Trainingsplan gefunden`
+- trainingsvorlagen und rezepte: leere Arrays [] wenn nichts gefunden`
 
 serve(async (req) => {
   const origin = req.headers.get('Origin')

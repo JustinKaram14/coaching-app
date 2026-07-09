@@ -360,6 +360,9 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   const [rezepteLoading, setRezepteLoading] = useState(false)
   const [selectedRezept, setSelectedRezept] = useState<Rezept | null>(null)
   const [rezeptPortion, setRezeptPortion] = useState('1')
+  const [showNewRezept, setShowNewRezept] = useState(false)
+  const [newRezept, setNewRezept] = useState({ name: '', kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '' })
+  const [savingRezept, setSavingRezept] = useState(false)
 
   async function lookupBarcode(code: string) {
     setBarcodeLoading(true)
@@ -488,6 +491,24 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     setRezepteLoading(false)
   }
 
+  async function createRezept() {
+    if (!user || !newRezept.name || !newRezept.kalorien) return
+    setSavingRezept(true)
+    const { data } = await supabase.from('rezepte').insert({
+      user_id: user.id,
+      name: newRezept.name,
+      portionen: 1,
+      kalorien: parseInt(newRezept.kalorien),
+      protein_g: parseFloat(newRezept.protein_g) || null,
+      kohlenhydrate_g: parseFloat(newRezept.kohlenhydrate_g) || null,
+      fett_g: parseFloat(newRezept.fett_g) || null,
+    }).select().single()
+    if (data) setRezepte(prev => [data as Rezept, ...prev])
+    setNewRezept({ name: '', kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '' })
+    setShowNewRezept(false)
+    setSavingRezept(false)
+  }
+
   async function handleAdd(item: FoodItemInput) {
     setSaving(true)
     await onAdd(item)
@@ -503,6 +524,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     setTextError('')
     setSelectedRezept(null)
     setRezeptPortion('1')
+    setShowNewRezept(false)
     if (t === 'rezepte' && rezepte.length === 0) loadRezepte()
   }
 
@@ -841,35 +863,90 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                     </div>
                   ) : rezepteLoading ? (
                     <div className="flex justify-center py-10"><Spinner size={28} /></div>
-                  ) : rezepte.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 py-10 text-center">
-                      <BookOpen size={32} className="text-text-muted opacity-40" />
-                      <div className="text-sm text-text-muted">Noch keine Rezepte gespeichert</div>
-                      <div className="text-xs text-text-muted">
-                        Analysiere einen Text im KI-Text Tab und speichere ihn als Rezept.
-                      </div>
-                    </div>
                   ) : (
-                    <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 320 }}>
-                      {rezepte.map(r => (
-                        <button
-                          key={r.id}
-                          onClick={() => { setSelectedRezept(r); setRezeptPortion('1') }}
-                          className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-primary/10 text-left transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-text-primary truncate">{r.name}</div>
-                            <div className="text-xs text-text-muted">pro Portion</div>
+                    <>
+                      {rezepte.length === 0 && !showNewRezept && (
+                        <div className="flex flex-col items-center gap-3 py-8 text-center">
+                          <BookOpen size={32} className="text-text-muted opacity-40" />
+                          <div className="text-sm text-text-muted">Noch keine Rezepte gespeichert</div>
+                          <div className="text-xs text-text-muted">
+                            Analyse im KI-Text Tab oder erstelle manuell.
                           </div>
-                          <div className="text-right text-xs ml-3 shrink-0">
-                            <div className="font-semibold text-text-primary">{r.kalorien} kcal</div>
-                            <div className="text-text-secondary">
-                              P:{r.protein_g ?? 0} K:{r.kohlenhydrate_g ?? 0} F:{r.fett_g ?? 0}
+                        </div>
+                      )}
+                      {rezepte.length > 0 && !showNewRezept && (
+                        <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 260 }}>
+                          {rezepte.map(r => (
+                            <button
+                              key={r.id}
+                              onClick={() => { setSelectedRezept(r); setRezeptPortion('1') }}
+                              className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-primary/10 text-left transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-text-primary truncate">{r.name}</div>
+                                <div className="text-xs text-text-muted">pro Portion</div>
+                              </div>
+                              <div className="text-right text-xs ml-3 shrink-0">
+                                <div className="font-semibold text-text-primary">{r.kalorien} kcal</div>
+                                <div className="text-text-secondary">
+                                  P:{r.protein_g ?? 0} K:{r.kohlenhydrate_g ?? 0} F:{r.fett_g ?? 0}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showNewRezept ? (
+                        <div className="space-y-3 border border-border rounded-xl p-3">
+                          <div className="text-sm font-medium text-text-primary">Neues Rezept</div>
+                          <div>
+                            <label className="label">Name *</label>
+                            <input type="text" className="input" placeholder="z.B. Hähnchen-Reis-Bowl"
+                              value={newRezept.name} onChange={e => setNewRezept(r => ({ ...r, name: e.target.value }))} autoFocus />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="label">Kalorien (kcal) *</label>
+                              <input type="number" className="input" placeholder="500"
+                                value={newRezept.kalorien} onChange={e => setNewRezept(r => ({ ...r, kalorien: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="label">Protein (g)</label>
+                              <input type="number" step="0.1" className="input" placeholder="40"
+                                value={newRezept.protein_g} onChange={e => setNewRezept(r => ({ ...r, protein_g: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="label">Kohlenhydrate (g)</label>
+                              <input type="number" step="0.1" className="input" placeholder="50"
+                                value={newRezept.kohlenhydrate_g} onChange={e => setNewRezept(r => ({ ...r, kohlenhydrate_g: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label className="label">Fett (g)</label>
+                              <input type="number" step="0.1" className="input" placeholder="12"
+                                value={newRezept.fett_g} onChange={e => setNewRezept(r => ({ ...r, fett_g: e.target.value }))} />
                             </div>
                           </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setShowNewRezept(false)} className="btn-secondary flex-1 text-sm">Abbrechen</button>
+                            <button
+                              onClick={createRezept}
+                              disabled={!newRezept.name || !newRezept.kalorien || savingRezept}
+                              className="btn-primary flex-1 flex items-center justify-center gap-1.5 text-sm"
+                            >
+                              {savingRezept ? <Spinner size={14} /> : <Check size={14} />}
+                              Speichern
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowNewRezept(true)}
+                          className="w-full py-2.5 text-xs text-text-muted border border-dashed border-border/50 rounded-xl hover:border-primary/30 hover:text-primary transition-colors"
+                        >
+                          + Neues Rezept erstellen
                         </button>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

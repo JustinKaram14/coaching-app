@@ -25,6 +25,14 @@ interface ExtractedVorlage {
   uebungen: { uebungsname: string; saetze: number | null; wdh: number | null; gewicht_kg: number | null }[]
 }
 
+interface ExtractedRezept {
+  name: string
+  kalorien: number
+  protein_g: number | null
+  kohlenhydrate_g: number | null
+  fett_g: number | null
+}
+
 interface ExtractedPlan {
   kalorie_tagesziel: number | null
   protein_ziel: number | null
@@ -33,6 +41,7 @@ interface ExtractedPlan {
   wasser_ziel_ml: number | null
   schlaf_ziel: number | null
   trainingsvorlagen: ExtractedVorlage[]
+  rezepte: ExtractedRezept[]
 }
 
 const WEEKDAY_LABELS: Record<number, string> = {
@@ -51,6 +60,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
   const [extracted, setExtracted] = useState<ExtractedPlan | null>(null)
   const [edited, setEdited] = useState<ExtractedPlan | null>(null)
   const [replaceVorlagen, setReplaceVorlagen] = useState(true)
+  const [replaceRezepte, setReplaceRezepte] = useState(true)
   const [applying, setApplying] = useState(false)
   const [applyDone, setApplyDone] = useState(false)
   const [expandedVorlage, setExpandedVorlage] = useState<number | null>(null)
@@ -94,6 +104,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
         wasser_ziel_ml: json.result.wasser_ziel_ml ?? null,
         schlaf_ziel: json.result.schlaf_ziel ?? null,
         trainingsvorlagen: json.result.trainingsvorlagen ?? [],
+        rezepte: json.result.rezepte ?? [],
       }
       setExtracted(result)
       setEdited(JSON.parse(JSON.stringify(result)))
@@ -160,6 +171,24 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
       }
     }
 
+    // 5. Import recipes from masterplan
+    if (edited.rezepte && edited.rezepte.length > 0) {
+      if (replaceRezepte) {
+        await supabase.from('rezepte').delete().eq('user_id', clientId)
+      }
+      await supabase.from('rezepte').insert(
+        edited.rezepte.map(r => ({
+          user_id: clientId,
+          name: r.name,
+          portionen: 1,
+          kalorien: r.kalorien,
+          protein_g: r.protein_g,
+          kohlenhydrate_g: r.kohlenhydrate_g,
+          fett_g: r.fett_g,
+        }))
+      )
+    }
+
     // Refresh existing plan
     const { data } = await supabase.from('coach_plans').select('*').eq('client_id', clientId).maybeSingle()
     setExistingPlan(data)
@@ -174,7 +203,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  function updateField(key: keyof Omit<ExtractedPlan, 'trainingsvorlagen'>, value: string) {
+  function updateField(key: keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte'>, value: string) {
     setEdited(e => e ? { ...e, [key]: parseFloat(value) || null } : null)
   }
 
@@ -259,7 +288,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
                 ['fett_ziel', 'Fett (g)'],
                 ['wasser_ziel_ml', 'Wasser (ml/Tag)'],
                 ['schlaf_ziel', 'Schlaf (Stunden)'],
-              ] as [keyof Omit<ExtractedPlan, 'trainingsvorlagen'>, string][]).map(([key, label]) => (
+              ] as [keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte'>, string][]).map(([key, label]) => (
                 <div key={key}>
                   <label className="label text-xs">{label}</label>
                   <input
@@ -316,6 +345,35 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
                         ))}
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recipes from masterplan */}
+          {edited.rezepte && edited.rezepte.length > 0 && (
+            <div className="card space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-text-primary">Rezepte ({edited.rezepte.length})</h3>
+                <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={replaceRezepte}
+                    onChange={e => setReplaceRezepte(e.target.checked)}
+                    className="rounded"
+                  />
+                  Vorhandene ersetzen
+                </label>
+              </div>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {edited.rezepte.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-bg text-sm">
+                    <span className="text-text-primary truncate flex-1 min-w-0 mr-2">{r.name}</span>
+                    <span className="text-text-muted text-xs shrink-0">
+                      {r.kalorien} kcal
+                      {r.protein_g != null ? ` · P:${r.protein_g}g` : ''}
+                    </span>
                   </div>
                 ))}
               </div>
