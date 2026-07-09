@@ -11,9 +11,11 @@ CREATE TABLE IF NOT EXISTS coach_plans (
 
 ALTER TABLE coach_plans ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Coach manages own plans" ON coach_plans;
 CREATE POLICY "Coach manages own plans" ON coach_plans FOR ALL TO authenticated
   USING (coach_id = auth.uid()) WITH CHECK (coach_id = auth.uid());
 
+DROP POLICY IF EXISTS "Client reads own plan" ON coach_plans;
 CREATE POLICY "Client reads own plan" ON coach_plans FOR SELECT TO authenticated
   USING (client_id = auth.uid());
 
@@ -22,6 +24,7 @@ ALTER TABLE client_settings
   ADD COLUMN IF NOT EXISTS wasser_ziel_ml integer DEFAULT 2000;
 
 -- Allow coach to insert training_vorlagen for their clients
+DROP POLICY IF EXISTS "Coach creates templates for clients" ON training_vorlagen;
 CREATE POLICY "Coach creates templates for clients" ON training_vorlagen
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -30,6 +33,7 @@ CREATE POLICY "Coach creates templates for clients" ON training_vorlagen
   );
 
 -- Allow coach to delete training_vorlagen for their clients
+DROP POLICY IF EXISTS "Coach deletes templates for clients" ON training_vorlagen;
 CREATE POLICY "Coach deletes templates for clients" ON training_vorlagen
   FOR DELETE TO authenticated
   USING (
@@ -38,6 +42,7 @@ CREATE POLICY "Coach deletes templates for clients" ON training_vorlagen
   );
 
 -- Allow coach to insert exercises for client training templates
+DROP POLICY IF EXISTS "Coach inserts exercises for client vorlagen" ON vorlagen_uebungen;
 CREATE POLICY "Coach inserts exercises for client vorlagen" ON vorlagen_uebungen
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -50,6 +55,7 @@ CREATE POLICY "Coach inserts exercises for client vorlagen" ON vorlagen_uebungen
   );
 
 -- Allow coach to update client_settings
+DROP POLICY IF EXISTS "Coach updates client settings" ON client_settings;
 CREATE POLICY "Coach updates client settings" ON client_settings
   FOR UPDATE TO authenticated
   USING (
@@ -61,6 +67,7 @@ CREATE POLICY "Coach updates client settings" ON client_settings
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('masterplans', 'masterplans', false) ON CONFLICT DO NOTHING;
 
 -- Storage: coach can upload/read for their clients
+DROP POLICY IF EXISTS "Coach manages masterplan files" ON storage.objects;
 CREATE POLICY "Coach manages masterplan files" ON storage.objects
   FOR ALL TO authenticated
   USING (
@@ -81,6 +88,7 @@ CREATE POLICY "Coach manages masterplan files" ON storage.objects
   );
 
 -- Storage: client can download their own file
+DROP POLICY IF EXISTS "Client reads own masterplan" ON storage.objects;
 CREATE POLICY "Client reads own masterplan" ON storage.objects
   FOR SELECT TO authenticated
   USING (
