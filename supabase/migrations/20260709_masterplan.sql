@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS coach_plans (
 
 ALTER TABLE coach_plans ENABLE ROW LEVEL SECURITY;
 
+CREATE UNIQUE INDEX IF NOT EXISTS coach_plans_client_id_key ON coach_plans (client_id);
+
 DROP POLICY IF EXISTS "Coach manages own plans" ON coach_plans;
 CREATE POLICY "Coach manages own plans" ON coach_plans FOR ALL TO authenticated
   USING (coach_id = auth.uid()) WITH CHECK (coach_id = auth.uid());
