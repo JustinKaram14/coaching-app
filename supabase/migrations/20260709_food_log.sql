@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS food_log (
 
 ALTER TABLE food_log ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own food log" ON food_log;
 CREATE POLICY "Users manage own food log" ON food_log
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS wasser_log (
 
 ALTER TABLE wasser_log ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own water log" ON wasser_log;
 CREATE POLICY "Users manage own water log" ON wasser_log
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
