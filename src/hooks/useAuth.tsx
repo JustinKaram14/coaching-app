@@ -29,9 +29,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .single()
     setProfile(data)
-    // Update last_active silently — used by coach dashboard to show activity
-    supabase.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId)
     import('./usePushNotifications').then(m => m.subscribeToPush(userId))
+  }
+
+  function updateLastActive(userId: string) {
+    supabase.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId)
   }
 
   async function refreshProfile() {
@@ -42,19 +44,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id).finally(() => setLoading(false))
-      else setLoading(false)
+      if (session?.user) {
+        fetchProfile(session.user.id).finally(() => setLoading(false))
+        updateLastActive(session.user.id)
+      } else {
+        setLoading(false)
+      }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
-      else setProfile(null)
+      if (session?.user) {
+        fetchProfile(session.user.id)
+        updateLastActive(session.user.id)
+      } else {
+        setProfile(null)
+      }
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Update last_active when user returns to the tab and every 5 minutes while active
+  useEffect(() => {
+    if (!user) return
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') updateLastActive(user.id)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    const interval = setInterval(() => updateLastActive(user.id), 5 * 60 * 1000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearInterval(interval)
+    }
+  }, [user])
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })

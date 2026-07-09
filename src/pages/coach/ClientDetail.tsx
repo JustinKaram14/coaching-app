@@ -66,11 +66,12 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
     setAnalysisError(null)
     setExtracted(null)
 
-    const arrayBuffer = await pdfFile.arrayBuffer()
-    const bytes = new Uint8Array(arrayBuffer)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
-    const pdfBase64 = btoa(binary)
+    const pdfBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(pdfFile)
+    })
 
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
