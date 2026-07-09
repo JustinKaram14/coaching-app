@@ -33,6 +33,9 @@ export interface Database {
           id: string
           user_id: string
           kalorie_tagesziel: number | null
+          protein_ziel: number | null
+          karbs_ziel: number | null
+          fett_ziel: number | null
           trainings_pro_woche: number | null
           startdatum: string | null
           startgewicht: number | null
@@ -165,6 +168,35 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['kalender_events']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['kalender_events']['Insert']>
       }
+      food_log: {
+        Row: {
+          id: string
+          user_id: string
+          datum: string
+          mahlzeit: string
+          name: string
+          menge_g: number | null
+          kalorien: number | null
+          protein_g: number | null
+          kohlenhydrate_g: number | null
+          fett_g: number | null
+          barcode: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['food_log']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['food_log']['Insert']>
+      }
+      wasser_log: {
+        Row: {
+          id: string
+          user_id: string
+          datum: string
+          menge_ml: number
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['wasser_log']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['wasser_log']['Insert']>
+      }
     }
   }
 }
@@ -180,3 +212,5 @@ export type ErnaehrungEntry = Database['public']['Tables']['ernaehrung']['Row']
 export type Supplement = Database['public']['Tables']['supplements']['Row']
 export type SupplementLog = Database['public']['Tables']['supplement_log']['Row']
 export type KalenderEvent = Database['public']['Tables']['kalender_events']['Row']
+export type FoodLogItem = Database['public']['Tables']['food_log']['Row']
+export type WasserLogEntry = Database['public']['Tables']['wasser_log']['Row']
