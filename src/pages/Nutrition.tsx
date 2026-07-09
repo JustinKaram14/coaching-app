@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Plus, Trash2, Camera, Sparkles, X, Search,
-  ChevronLeft, ChevronRight, Droplets, Check,
+  ChevronLeft, ChevronRight, Droplets, Check, FileText, BookOpen,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { todayISO } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
-import type { FoodLogItem, WasserLogEntry } from '../types/database'
+import type { FoodLogItem, WasserLogEntry, Rezept } from '../types/database'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -325,13 +325,14 @@ function PortionSelector({ product, barcode, onConfirm, onBack }: {
 
 // ─── AddFoodModal ─────────────────────────────────────────────────────────────
 
-type AddTab = 'search' | 'barcode' | 'photo' | 'manual'
+type AddTab = 'search' | 'barcode' | 'photo' | 'text' | 'rezepte' | 'manual'
 
 function AddFoodModal({ meal, onClose, onAdd }: {
   meal: string
   onClose: () => void
   onAdd: (item: FoodItemInput) => Promise<void>
 }) {
+  const { user } = useAuth()
   const [tab, setTab] = useState<AddTab>('search')
   const [selectedProduct, setSelectedProduct] = useState<OFFProduct | null>(null)
   const [selectedBarcode, setSelectedBarcode] = useState<string | undefined>()
@@ -346,6 +347,19 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   const [manual, setManual] = useState({
     name: '', kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', menge_g: '',
   })
+
+  // Text-Analyse state
+  const [textInput, setTextInput] = useState('')
+  const [textResult, setTextResult] = useState<FoodItemInput | null>(null)
+  const [textAnalyzing, setTextAnalyzing] = useState(false)
+  const [textError, setTextError] = useState('')
+  const [textSavedAsRezept, setTextSavedAsRezept] = useState(false)
+
+  // Rezepte state
+  const [rezepte, setRezepte] = useState<Rezept[]>([])
+  const [rezepteLoading, setRezepteLoading] = useState(false)
+  const [selectedRezept, setSelectedRezept] = useState<Rezept | null>(null)
+  const [rezeptPortion, setRezeptPortion] = useState('1')
 
   async function lookupBarcode(code: string) {
     setBarcodeLoading(true)
@@ -418,6 +432,62 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     reader.readAsDataURL(file)
   }
 
+  async function analyzeText() {
+    if (!textInput.trim()) return
+    setTextAnalyzing(true)
+    setTextError('')
+    setTextResult(null)
+    setTextSavedAsRezept(false)
+    try {
+      const { data } = await supabase.functions.invoke('analyze-screenshot', {
+        body: { recipeText: textInput.trim(), context: 'recipe_text' },
+      })
+      if (data?.result) {
+        const r = data.result
+        setTextResult({
+          name: r.name || 'KI-Analyse',
+          kalorien: Math.round(r.kalorien ?? 0),
+          protein_g: Math.round((r.protein_g ?? 0) * 10) / 10,
+          kohlenhydrate_g: Math.round((r.kohlenhydrate_g ?? 0) * 10) / 10,
+          fett_g: Math.round((r.fett_g ?? 0) * 10) / 10,
+          menge_g: null,
+        })
+      } else {
+        setTextError('Analyse fehlgeschlagen. Bitte erneut versuchen.')
+      }
+    } catch {
+      setTextError('Fehler bei der Analyse.')
+    }
+    setTextAnalyzing(false)
+  }
+
+  async function saveAsRezept(item: FoodItemInput) {
+    if (!user) return
+    await supabase.from('rezepte').insert({
+      user_id: user.id,
+      name: item.name,
+      zutaten_text: textInput || null,
+      portionen: 1,
+      kalorien: item.kalorien,
+      protein_g: item.protein_g,
+      kohlenhydrate_g: item.kohlenhydrate_g,
+      fett_g: item.fett_g,
+    })
+    setTextSavedAsRezept(true)
+  }
+
+  async function loadRezepte() {
+    if (!user) return
+    setRezepteLoading(true)
+    const { data } = await supabase
+      .from('rezepte')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    setRezepte((data ?? []) as Rezept[])
+    setRezepteLoading(false)
+  }
+
   async function handleAdd(item: FoodItemInput) {
     setSaving(true)
     await onAdd(item)
@@ -429,12 +499,19 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     setSelectedProduct(null)
     setSelectedBarcode(undefined)
     setBarcodeError('')
+    setTextResult(null)
+    setTextError('')
+    setSelectedRezept(null)
+    setRezeptPortion('1')
+    if (t === 'rezepte' && rezepte.length === 0) loadRezepte()
   }
 
   const TABS: { id: AddTab; emoji: string; label: string }[] = [
     { id: 'search', emoji: '🔍', label: 'Suchen' },
     { id: 'barcode', emoji: '📷', label: 'Barcode' },
     { id: 'photo', emoji: '✨', label: 'KI-Foto' },
+    { id: 'text', emoji: '📝', label: 'KI-Text' },
+    { id: 'rezepte', emoji: '📖', label: 'Rezepte' },
     { id: 'manual', emoji: '✏️', label: 'Manuell' },
   ]
 
@@ -616,6 +693,182 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                           </div>
                         </div>
                       ) : null}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === 'text' && (
+                <div className="space-y-4">
+                  {!textResult ? (
+                    <>
+                      <div>
+                        <label className="label flex items-center gap-1.5">
+                          <FileText size={13} className="text-primary" />
+                          Rezept oder Zutaten einfügen
+                        </label>
+                        <textarea
+                          className="input resize-none"
+                          rows={7}
+                          placeholder={"z.B.:\n200g Hähnchenbrust\n100g Basmati-Reis\n50g Brokkoli\n1 EL Olivenöl\n\noder ganzes Rezept einfügen..."}
+                          value={textInput}
+                          onChange={e => setTextInput(e.target.value)}
+                          autoFocus
+                        />
+                        <div className="text-right text-[11px] text-text-muted mt-1">
+                          {textInput.length} / 10.000
+                        </div>
+                      </div>
+                      {textError && <p className="text-sm text-danger text-center">{textError}</p>}
+                      <button
+                        onClick={analyzeText}
+                        disabled={!textInput.trim() || textAnalyzing}
+                        className="btn-primary w-full flex items-center justify-center gap-2"
+                      >
+                        {textAnalyzing ? (
+                          <><Spinner size={14} /> KI analysiert...</>
+                        ) : (
+                          <><Sparkles size={14} className="text-yellow-300" /> Analysieren</>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-bg-elevated rounded-xl">
+                        <div className="text-sm font-medium text-text-primary mb-2">{textResult.name}</div>
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          {([
+                            { l: 'Kalorien', v: textResult.kalorien, u: 'kcal' },
+                            { l: 'Protein', v: textResult.protein_g, u: 'g' },
+                            { l: 'Karbs', v: textResult.kohlenhydrate_g, u: 'g' },
+                            { l: 'Fett', v: textResult.fett_g, u: 'g' },
+                          ] as const).map(m => (
+                            <div key={m.l}>
+                              <div className="text-sm font-bold text-text-primary">{m.v}</div>
+                              <div className="text-[10px] text-text-muted">{m.u}</div>
+                              <div className="text-[10px] text-text-muted">{m.l}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setTextResult(null); setTextSavedAsRezept(false) }}
+                          className="btn-secondary flex-1 text-sm"
+                        >
+                          Neu
+                        </button>
+                        <button
+                          onClick={() => handleAdd(textResult)}
+                          disabled={saving}
+                          className="btn-primary flex-1 flex items-center justify-center gap-1.5 text-sm"
+                        >
+                          {saving ? <Spinner size={14} /> : <Check size={14} />}
+                          Hinzufügen
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => saveAsRezept(textResult)}
+                        disabled={textSavedAsRezept}
+                        className="w-full text-xs text-center py-2 rounded-xl border border-border hover:border-primary/50 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        {textSavedAsRezept ? '✓ Als Rezept gespeichert' : '+ Als Rezept speichern'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === 'rezepte' && (
+                <div className="space-y-3">
+                  {selectedRezept ? (
+                    <div className="space-y-4">
+                      <div className="p-3 bg-bg-elevated rounded-xl">
+                        <div className="text-sm font-medium text-text-primary mb-1">{selectedRezept.name}</div>
+                        <div className="text-[11px] text-text-muted mb-3">
+                          pro Portion: {selectedRezept.kalorien} kcal ·
+                          P:{selectedRezept.protein_g ?? 0}g ·
+                          K:{selectedRezept.kohlenhydrate_g ?? 0}g ·
+                          F:{selectedRezept.fett_g ?? 0}g
+                        </div>
+                        <label className="label">Portionen</label>
+                        <input
+                          type="number" className="input" min="0.25" step="0.25"
+                          value={rezeptPortion}
+                          onChange={e => setRezeptPortion(e.target.value)}
+                          autoFocus
+                        />
+                        {parseFloat(rezeptPortion) > 0 && (
+                          <div className="grid grid-cols-4 gap-2 text-center mt-3 p-2 bg-bg rounded-xl">
+                            {([
+                              { l: 'Kalorien', v: Math.round(selectedRezept.kalorien * parseFloat(rezeptPortion)), u: 'kcal' },
+                              { l: 'Protein', v: Math.round((selectedRezept.protein_g ?? 0) * parseFloat(rezeptPortion) * 10) / 10, u: 'g' },
+                              { l: 'Karbs', v: Math.round((selectedRezept.kohlenhydrate_g ?? 0) * parseFloat(rezeptPortion) * 10) / 10, u: 'g' },
+                              { l: 'Fett', v: Math.round((selectedRezept.fett_g ?? 0) * parseFloat(rezeptPortion) * 10) / 10, u: 'g' },
+                            ] as const).map(m => (
+                              <div key={m.l}>
+                                <div className="text-sm font-bold text-text-primary">{m.v}</div>
+                                <div className="text-[10px] text-text-muted">{m.u}</div>
+                                <div className="text-[10px] text-text-muted">{m.l}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setSelectedRezept(null)} className="btn-secondary flex-1 text-sm">
+                          Zurück
+                        </button>
+                        <button
+                          onClick={() => {
+                            const p = parseFloat(rezeptPortion) || 1
+                            handleAdd({
+                              name: selectedRezept.name,
+                              kalorien: Math.round(selectedRezept.kalorien * p),
+                              protein_g: Math.round((selectedRezept.protein_g ?? 0) * p * 10) / 10,
+                              kohlenhydrate_g: Math.round((selectedRezept.kohlenhydrate_g ?? 0) * p * 10) / 10,
+                              fett_g: Math.round((selectedRezept.fett_g ?? 0) * p * 10) / 10,
+                              menge_g: null,
+                            })
+                          }}
+                          disabled={!rezeptPortion || saving}
+                          className="btn-primary flex-1 flex items-center justify-center gap-1.5 text-sm"
+                        >
+                          {saving ? <Spinner size={14} /> : <Check size={14} />}
+                          Hinzufügen
+                        </button>
+                      </div>
+                    </div>
+                  ) : rezepteLoading ? (
+                    <div className="flex justify-center py-10"><Spinner size={28} /></div>
+                  ) : rezepte.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-10 text-center">
+                      <BookOpen size={32} className="text-text-muted opacity-40" />
+                      <div className="text-sm text-text-muted">Noch keine Rezepte gespeichert</div>
+                      <div className="text-xs text-text-muted">
+                        Analysiere einen Text im KI-Text Tab und speichere ihn als Rezept.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 320 }}>
+                      {rezepte.map(r => (
+                        <button
+                          key={r.id}
+                          onClick={() => { setSelectedRezept(r); setRezeptPortion('1') }}
+                          className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-primary/10 text-left transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-text-primary truncate">{r.name}</div>
+                            <div className="text-xs text-text-muted">pro Portion</div>
+                          </div>
+                          <div className="text-right text-xs ml-3 shrink-0">
+                            <div className="font-semibold text-text-primary">{r.kalorien} kcal</div>
+                            <div className="text-text-secondary">
+                              P:{r.protein_g ?? 0} K:{r.kohlenhydrate_g ?? 0} F:{r.fett_g ?? 0}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>

@@ -8,12 +8,13 @@ const ALLOWED_ORIGINS = [
 ]
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'])
-const ALLOWED_CONTEXTS = new Set(['nutrition', 'training', 'sleep'])
+const ALLOWED_CONTEXTS = new Set(['nutrition', 'training', 'sleep', 'recipe_text'])
 
 const PROMPTS: Record<string, string> = {
   nutrition: 'Analysiere dieses Bild (Mahlzeit, Rezept, Lebensmitteletikett oder Screenshot). Schätze die Gesamtnährwerte und antworte NUR mit einem JSON-Objekt ohne weiteren Text: {"kalorien": number, "protein_g": number, "kohlenhydrate_g": number, "fett_g": number, "notizen": "kurze Beschreibung der Mahlzeit"}',
   training: 'Analysiere diesen Screenshot einer Trainings-App oder Apple Watch Workout-Zusammenfassung. Extrahiere die Trainingsdaten und antworte NUR mit einem JSON-Objekt ohne weiteren Text. Für trainingstyp wähle einen aus: Kraft, Cardio, HIIT, Yoga, Stretching, Schwimmen, Radfahren, Laufen, Sonstiges. {"dauer_min": number | null, "avg_puls": number | null, "kalorien_verbrannt": number | null, "trainingstyp": string, "notizen": "kurze Beschreibung des Workouts"}',
   sleep: 'Analysiere diesen Screenshot einer Schlaf-App (Apple Health, Oura, Whoop, Garmin o.ä.). Extrahiere die Schlafdaten und antworte NUR mit einem JSON-Objekt ohne weiteren Text. Zeiten im Format HH:MM (24h). Schlafqualität als Zahl 1-10. {"einschlafzeit": "HH:MM" | null, "aufwachzeit": "HH:MM" | null, "schlafqualitaet": number | null, "notizen": "kurze Zusammenfassung"}',
+  recipe_text: 'Analysiere diesen Rezepttext oder diese Zutatenliste und schätze die Nährwerte PRO PORTION. Falls keine Portionszahl angegeben ist, nimm 1 Portion für die Gesamtmenge. Antworte NUR mit einem JSON-Objekt ohne weiteren Text: {"name": "Rezeptname oder Mahlzeitbeschreibung", "kalorien": number, "protein_g": number, "kohlenhydrate_g": number, "fett_g": number, "portionen": number}',
 }
 
 function getCorsHeaders(origin: string | null) {
@@ -66,7 +67,7 @@ serve(async (req) => {
   }
 
   // --- INPUT VALIDATION ---
-  let body: { imageBase64?: unknown; mimeType?: unknown; context?: unknown }
+  let body: { imageBase64?: unknown; mimeType?: unknown; context?: unknown; recipeText?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -75,7 +76,7 @@ serve(async (req) => {
     })
   }
 
-  const { imageBase64, mimeType, context } = body
+  const { imageBase64, mimeType, context, recipeText } = body
 
   if (typeof context !== 'string' || !ALLOWED_CONTEXTS.has(context)) {
     return new Response(JSON.stringify({ error: 'Invalid context' }), {
@@ -83,22 +84,35 @@ serve(async (req) => {
     })
   }
 
-  if (typeof mimeType !== 'string' || !ALLOWED_MIME_TYPES.has(mimeType)) {
-    return new Response(JSON.stringify({ error: 'Invalid image type' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
-  }
+  const isTextContext = context === 'recipe_text'
 
-  if (typeof imageBase64 !== 'string' || imageBase64.length < 100) {
-    return new Response(JSON.stringify({ error: 'Invalid image data' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
-  }
-
-  if (imageBase64.length > 5_000_000) {
-    return new Response(JSON.stringify({ error: 'Image too large. Maximum 5MB.' }), {
-      status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+  if (isTextContext) {
+    if (typeof recipeText !== 'string' || recipeText.trim().length < 5) {
+      return new Response(JSON.stringify({ error: 'Invalid recipe text' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    if (recipeText.length > 10_000) {
+      return new Response(JSON.stringify({ error: 'Text zu lang. Maximum 10.000 Zeichen.' }), {
+        status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+  } else {
+    if (typeof mimeType !== 'string' || !ALLOWED_MIME_TYPES.has(mimeType)) {
+      return new Response(JSON.stringify({ error: 'Invalid image type' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    if (typeof imageBase64 !== 'string' || imageBase64.length < 100) {
+      return new Response(JSON.stringify({ error: 'Invalid image data' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    if (imageBase64.length > 5_000_000) {
+      return new Response(JSON.stringify({ error: 'Image too large. Maximum 5MB.' }), {
+        status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
   }
 
   // --- GEMINI API CALL ---
@@ -109,6 +123,13 @@ serve(async (req) => {
     })
   }
 
+  const geminiParts = isTextContext
+    ? [{ text: `${PROMPTS[context]}\n\nText:\n${recipeText}` }]
+    : [
+        { inline_data: { mime_type: mimeType, data: imageBase64 } },
+        { text: PROMPTS[context] },
+      ]
+
   try {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
 
@@ -116,17 +137,7 @@ serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: imageBase64,
-              }
-            },
-            { text: PROMPTS[context] }
-          ]
-        }],
+        contents: [{ parts: geminiParts }],
         generationConfig: {
           maxOutputTokens: 512,
           temperature: 0.1,

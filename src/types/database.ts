@@ -211,6 +211,22 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['coach_plans']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['coach_plans']['Insert']>
       }
+      rezepte: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          zutaten_text: string | null
+          portionen: number
+          kalorien: number
+          protein_g: number | null
+          kohlenhydrate_g: number | null
+          fett_g: number | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['rezepte']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['rezepte']['Insert']>
+      }
     }
   }
 }
@@ -229,3 +245,4 @@ export type KalenderEvent = Database['public']['Tables']['kalender_events']['Row
 export type FoodLogItem = Database['public']['Tables']['food_log']['Row']
 export type WasserLogEntry = Database['public']['Tables']['wasser_log']['Row']
 export type CoachPlan = Database['public']['Tables']['coach_plans']['Row']
+export type Rezept = Database['public']['Tables']['rezepte']['Row']
