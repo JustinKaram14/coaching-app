@@ -63,6 +63,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
   const [replaceRezepte, setReplaceRezepte] = useState(true)
   const [applying, setApplying] = useState(false)
   const [applyDone, setApplyDone] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
   const [expandedVorlage, setExpandedVorlage] = useState<number | null>(null)
 
   useEffect(() => {
@@ -117,10 +118,17 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
   async function handleApply() {
     if (!edited || !user || !pdfFile) return
     setApplying(true)
+    setApplyError(null)
 
     // 1. Upload PDF to Storage
     const storageKey = `${clientId}/plan.pdf`
-    await supabase.storage.from('masterplans').upload(storageKey, pdfFile, { upsert: true })
+    const { error: uploadError } = await supabase.storage
+      .from('masterplans').upload(storageKey, pdfFile, { upsert: true })
+    if (uploadError) {
+      setApplyError(`PDF-Upload fehlgeschlagen: ${uploadError.message}. Bitte sicherstellen, dass der "masterplans" Bucket in Supabase Storage existiert.`)
+      setApplying(false)
+      return
+    }
 
     // 2. Upsert coach_plans
     await supabase.from('coach_plans').upsert(
@@ -199,8 +207,13 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
 
   async function handleDownload() {
     if (!existingPlan?.pdf_storage_path) return
-    const { data } = await supabase.storage.from('masterplans').createSignedUrl(existingPlan.pdf_storage_path, 3600)
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    const { data, error } = await supabase.storage
+      .from('masterplans').createSignedUrl(existingPlan.pdf_storage_path, 3600)
+    if (error || !data?.signedUrl) {
+      setApplyError(`Download fehlgeschlagen: ${error?.message ?? 'Signed URL konnte nicht erstellt werden'}`)
+      return
+    }
+    window.open(data.signedUrl, '_blank')
   }
 
   function updateField(key: keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte'>, value: string) {
@@ -377,6 +390,13 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Apply error */}
+          {applyError && (
+            <div className="flex items-start gap-2 text-sm text-danger bg-danger/10 rounded-xl px-4 py-3">
+              <X size={16} className="shrink-0 mt-0.5" /> {applyError}
             </div>
           )}
 

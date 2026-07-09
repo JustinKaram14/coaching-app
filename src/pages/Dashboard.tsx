@@ -166,8 +166,13 @@ export function Dashboard() {
           <button
             onClick={async () => {
               if (!masterplan.pdf_storage_path) return
-              const { data } = await supabase.storage.from('masterplans').createSignedUrl(masterplan.pdf_storage_path, 3600)
-              if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+              const { data, error } = await supabase.storage
+                .from('masterplans').createSignedUrl(masterplan.pdf_storage_path, 3600)
+              if (error || !data?.signedUrl) {
+                alert(`Download fehlgeschlagen: ${error?.message ?? 'Unbekannter Fehler'}`)
+                return
+              }
+              window.open(data.signedUrl, '_blank')
             }}
             className="btn-primary flex items-center gap-2 text-sm shrink-0"
           >
