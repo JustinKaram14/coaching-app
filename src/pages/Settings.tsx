@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bmi, bmiCategory, generateCode } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
 import { subscribeToPush } from '../hooks/usePushNotifications'
-import type { ClientSettings, InviteCode } from '../types/database'
+import type { ClientSettings, InviteCode, CoachPlan } from '../types/database'
 
 export function Settings() {
   const { user, profile, refreshProfile } = useAuth()
@@ -18,11 +18,16 @@ export function Settings() {
   const [notifStatus, setNotifStatus] = useState<'idle'|'loading'|'ok'|'denied'|'unsupported'>('idle')
 
   const isCoach = profile?.role === 'coach'
+  const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
 
   async function load() {
     if (!user) return
-    const settingsRes = await supabase.from('client_settings').select('*').eq('user_id', user.id).single()
+    const [settingsRes, planRes] = await Promise.all([
+      supabase.from('client_settings').select('*').eq('user_id', user.id).single(),
+      !isCoach ? supabase.from('coach_plans').select('*').eq('client_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+    ])
     if (settingsRes.data) setSettings(settingsRes.data)
+    setMasterplan(planRes.data ?? null)
     if (isCoach) {
       const codesRes = await supabase.from('invite_codes').select('*').eq('coach_id', user.id).order('created_at', { ascending: false })
       if (codesRes.data) setInviteCodes(codesRes.data as any[])
@@ -147,6 +152,10 @@ export function Settings() {
               <input type="number" step="0.5" className="input" placeholder="8" value={settings.schlaf_ziel ?? ''} onChange={e => setSettings(s => ({ ...s, schlaf_ziel: parseFloat(e.target.value) || undefined }))} />
             </div>
             <div>
+              <label className="label">Wasserziel (ml/Tag)</label>
+              <input type="number" className="input" placeholder="2000" value={settings.wasser_ziel_ml ?? ''} onChange={e => setSettings(s => ({ ...s, wasser_ziel_ml: parseInt(e.target.value) || undefined }))} />
+            </div>
+            <div>
               <label className="label">Startdatum Coaching</label>
               <input type="date" className="input" value={settings.startdatum ?? ''} onChange={e => setSettings(s => ({ ...s, startdatum: e.target.value }))} />
             </div>
@@ -159,6 +168,33 @@ export function Settings() {
               <div className="text-sm text-text-secondary">{bmiCategory(bmiVal)}</div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Masterplan Download (clients only) */}
+      {!isCoach && masterplan && (
+        <div className="card space-y-3">
+          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+            <FileText size={18} className="text-primary" /> Mein Masterplan
+          </h2>
+          <div className="flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-text-primary">{masterplan.pdf_name ?? 'Coaching-Plan'}</div>
+              <div className="text-xs text-text-muted mt-0.5">
+                Erstellt: {masterplan.angewendet_am ? new Date(masterplan.angewendet_am).toLocaleDateString('de') : '—'}
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!masterplan.pdf_storage_path) return
+                const { data } = await supabase.storage.from('masterplans').createSignedUrl(masterplan.pdf_storage_path, 3600)
+                if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+              }}
+              className="btn-primary flex items-center gap-2 text-sm shrink-0"
+            >
+              <Download size={16} /> PDF herunterladen
+            </button>
+          </div>
         </div>
       )}
 

@@ -36,6 +36,7 @@ export interface Database {
           protein_ziel: number | null
           karbs_ziel: number | null
           fett_ziel: number | null
+          wasser_ziel_ml: number | null
           trainings_pro_woche: number | null
           startdatum: string | null
           startgewicht: number | null
@@ -197,6 +198,19 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['wasser_log']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['wasser_log']['Insert']>
       }
+      coach_plans: {
+        Row: {
+          id: string
+          client_id: string
+          coach_id: string
+          pdf_storage_path: string | null
+          pdf_name: string | null
+          angewendet_am: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['coach_plans']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['coach_plans']['Insert']>
+      }
     }
   }
 }
@@ -214,3 +228,4 @@ export type SupplementLog = Database['public']['Tables']['supplement_log']['Row'
 export type KalenderEvent = Database['public']['Tables']['kalender_events']['Row']
 export type FoodLogItem = Database['public']['Tables']['food_log']['Row']
 export type WasserLogEntry = Database['public']['Tables']['wasser_log']['Row']
+export type CoachPlan = Database['public']['Tables']['coach_plans']['Row']

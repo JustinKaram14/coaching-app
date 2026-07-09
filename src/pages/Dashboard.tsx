@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Scale, Dumbbell, Moon, Apple, TrendingUp, TrendingDown, Minus, Target, Flame, Droplets } from 'lucide-react'
+import { Scale, Dumbbell, Moon, Apple, TrendingUp, TrendingDown, Minus, Target, Flame, Droplets, FileText, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, calcSleepHours } from '../lib/utils'
+import type { CoachPlan } from '../types/database'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart,
 } from 'recharts'
@@ -76,21 +77,24 @@ export function Dashboard() {
     avgCalories: null, calorieGoal: null, weightHistory: [], sleepHistory: [],
   })
   const [loading, setLoading] = useState(true)
+  const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
 
   useEffect(() => {
     if (!user) return
     async function load() {
-      const [settingsRes, weightRes, trainingRes, schlafRes] = await Promise.all([
+      const [settingsRes, weightRes, trainingRes, schlafRes, planRes] = await Promise.all([
         supabase.from('client_settings').select('*').eq('user_id', user!.id).single(),
         supabase.from('gewicht').select('*').eq('user_id', user!.id).order('datum', { ascending: true }),
         supabase.from('training').select('*').eq('user_id', user!.id).order('datum', { ascending: false }),
         supabase.from('schlaf').select('*').eq('user_id', user!.id).order('datum', { ascending: true }),
+        supabase.from('coach_plans').select('*').eq('client_id', user!.id).maybeSingle(),
       ])
 
       const weights = weightRes.data ?? []
       const trainings = trainingRes.data ?? []
       const schlaf = schlafRes.data ?? []
       const settings = settingsRes.data
+      setMasterplan(planRes.data ?? null)
 
       const currentWeight = weights.at(-1)?.gewicht ?? null
       const weightChange = weights.length >= 2 ? (weights.at(-1)!.gewicht - weights[0].gewicht) : null
@@ -146,6 +150,31 @@ export function Dashboard() {
         </h1>
         <p className="text-text-secondary mt-1">{formatDate(new Date(), 'EEEE, dd. MMMM yyyy')}</p>
       </div>
+
+      {/* Masterplan Banner */}
+      {masterplan && (
+        <div className="card border border-primary/30 bg-primary/5 flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-primary/10 text-primary shrink-0">
+            <FileText size={22} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-text-primary">Dein Masterplan ist bereit</div>
+            <div className="text-xs text-text-muted mt-0.5">
+              {masterplan.pdf_name ?? 'Personalisierter Coaching-Plan'} · {masterplan.angewendet_am ? formatDate(masterplan.angewendet_am) : ''}
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              if (!masterplan.pdf_storage_path) return
+              const { data } = await supabase.storage.from('masterplans').createSignedUrl(masterplan.pdf_storage_path, 3600)
+              if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+            }}
+            className="btn-primary flex items-center gap-2 text-sm shrink-0"
+          >
+            <Download size={16} /> PDF herunterladen
+          </button>
+        </div>
+      )}
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
