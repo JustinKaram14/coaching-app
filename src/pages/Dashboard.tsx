@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Scale, Dumbbell, Moon, Apple, TrendingUp, TrendingDown, Minus, Target, Flame, Droplets, FileText } from 'lucide-react'
+import { Scale, Dumbbell, Moon, Apple, TrendingUp, TrendingDown, Minus, Target, Flame, Droplets, FileText, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, calcSleepHours } from '../lib/utils'
@@ -78,6 +78,7 @@ export function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
+  const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -94,7 +95,13 @@ export function Dashboard() {
       const trainings = trainingRes.data ?? []
       const schlaf = schlafRes.data ?? []
       const settings = settingsRes.data
-      setMasterplan(planRes.data ?? null)
+      if (planRes.data) {
+        setMasterplan(planRes.data)
+        const seenAt = localStorage.getItem(`masterplan_seen_${user!.id}`)
+        const planAt = planRes.data.angewendet_am ? new Date(planRes.data.angewendet_am).getTime() : 0
+        const dismissed = seenAt ? new Date(seenAt).getTime() : 0
+        setShowBanner(planAt > dismissed)
+      }
 
       const currentWeight = weights.at(-1)?.gewicht ?? null
       const weightChange = weights.length >= 2 ? (weights.at(-1)!.gewicht - weights[0].gewicht) : null
@@ -151,18 +158,28 @@ export function Dashboard() {
         <p className="text-text-secondary mt-1">{formatDate(new Date(), 'EEEE, dd. MMMM yyyy')}</p>
       </div>
 
-      {/* Masterplan Banner */}
-      {masterplan && (
+      {/* Masterplan Banner — nur beim ersten Login nach Plan-Anwendung */}
+      {masterplan && showBanner && (
         <div className="card border border-primary/30 bg-primary/5 flex items-center gap-4">
           <div className="p-3 rounded-xl bg-primary/10 text-primary shrink-0">
             <FileText size={22} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-text-primary">Dein Masterplan ist bereit</div>
+            <div className="font-semibold text-text-primary">Dein Masterplan ist bereit 🎉</div>
             <div className="text-xs text-text-muted mt-0.5">
               {masterplan.pdf_name ?? 'Personalisierter Coaching-Plan'} · {masterplan.angewendet_am ? formatDate(masterplan.angewendet_am) : ''}
             </div>
           </div>
+          <button
+            onClick={() => {
+              setShowBanner(false)
+              localStorage.setItem(`masterplan_seen_${user!.id}`, new Date().toISOString())
+            }}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0"
+            title="Schließen"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
