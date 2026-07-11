@@ -269,6 +269,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
                       ...f, partnerId: e.target.value,
                       partnerAnzeige: partner?.name ?? '',
                       partnerKal: '', partnerPraef: '',
+                      name: f.name.trim() ? f.name : `${f.meineAnzeige || clientName} & ${partner?.name ?? 'Partner'}`,
                     }))
                     if (e.target.value) loadPartnerSettings(e.target.value)
                   }}>
