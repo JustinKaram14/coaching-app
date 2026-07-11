@@ -49,6 +49,7 @@ export interface Database {
           notif_reminder_time: string | null
           notif_appointments: boolean | null
           notif_appointment_minutes: number | null
+          ernaehrungs_notizen: string | null
         }
         Insert: Omit<Database['public']['Tables']['client_settings']['Row'], 'id' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['client_settings']['Insert']>

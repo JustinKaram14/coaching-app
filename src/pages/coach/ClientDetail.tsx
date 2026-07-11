@@ -422,6 +422,8 @@ export function ClientDetail() {
   const [ernaehrung, setErnaehrung] = useState<ErnaehrungEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'overview' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
+  const [notizen, setNotizen] = useState('')
+  const [notizenSaving, setNotizenSaving] = useState(false)
 
   useEffect(() => {
     if (!clientId) return
@@ -436,6 +438,7 @@ export function ClientDetail() {
       ])
       setClient(profileRes.data)
       setSettings(settingsRes.data)
+      setNotizen(settingsRes.data?.ernaehrungs_notizen ?? '')
       setWeights(weightRes.data ?? [])
       setTrainings(trainingRes.data ?? [])
       setSchlaf(schlafRes.data ?? [])
@@ -581,6 +584,38 @@ export function ClientDetail() {
               </ResponsiveContainer>
             </div>
           )}
+
+          {/* Ernährungsnotizen / Präferenzen */}
+          <div className="col-span-2 lg:col-span-4 card space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-text-primary flex items-center gap-2">
+                <Apple size={16} className="text-primary" /> Ernährungsnotizen & Präferenzen
+              </h3>
+              <span className="text-xs text-text-muted">Wird im Haushalt & KI-Planer verwendet</span>
+            </div>
+            <textarea
+              className="input resize-none text-sm w-full"
+              rows={3}
+              placeholder="z.B. Magenprobleme → viel Kiwi, leicht verdaulich. Kein Gluten. Isst gerne deftig und viel Protein..."
+              value={notizen}
+              onChange={e => setNotizen(e.target.value)}
+            />
+            <button
+              onClick={async () => {
+                if (!clientId) return
+                setNotizenSaving(true)
+                await supabase.from('client_settings')
+                  .update({ ernaehrungs_notizen: notizen || null })
+                  .eq('user_id', clientId)
+                setNotizenSaving(false)
+              }}
+              disabled={notizenSaving}
+              className="btn-primary text-sm flex items-center gap-1.5"
+            >
+              {notizenSaving ? <Spinner size={14} /> : <CheckCircle size={14} />}
+              Speichern
+            </button>
+          </div>
         </div>
       )}
 

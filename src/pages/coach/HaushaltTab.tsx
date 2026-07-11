@@ -40,6 +40,22 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
 
   async function load() {
     setLoading(true)
+
+    // Load current client's settings for pre-fill
+    const { data: mySettings } = await supabase
+      .from('client_settings')
+      .select('kalorie_tagesziel, ernaehrungs_notizen')
+      .eq('user_id', clientId)
+      .maybeSingle()
+
+    if (mySettings) {
+      setForm(f => ({
+        ...f,
+        meineKal: mySettings.kalorie_tagesziel ? String(mySettings.kalorie_tagesziel) : '',
+        meinePraef: mySettings.ernaehrungs_notizen ?? '',
+      }))
+    }
+
     // Check if client is already in a haushalt
     const { data: mem } = await supabase
       .from('haushalt_mitglieder')
@@ -54,7 +70,6 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
       ])
 
       if (haushaltRes.data && membersRes.data) {
-        // Enrich with profiles
         const profileIds = membersRes.data.map(m => m.user_id)
         const { data: profiles } = await supabase
           .from('profiles').select('id, name, email').in('id', profileIds)
@@ -77,6 +92,21 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
       .eq('role', 'client').neq('id', clientId).order('name')
     setAllClients((clients ?? []) as Profile[])
     setLoading(false)
+  }
+
+  async function loadPartnerSettings(partnerId: string) {
+    const { data } = await supabase
+      .from('client_settings')
+      .select('kalorie_tagesziel, ernaehrungs_notizen')
+      .eq('user_id', partnerId)
+      .maybeSingle()
+    if (data) {
+      setForm(f => ({
+        ...f,
+        partnerKal: data.kalorie_tagesziel ? String(data.kalorie_tagesziel) : '',
+        partnerPraef: data.ernaehrungs_notizen ?? '',
+      }))
+    }
   }
 
   async function createHaushalt() {
@@ -239,6 +269,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
                       ...f, partnerId: e.target.value,
                       partnerAnzeige: partner?.name ?? '',
                     }))
+                    if (e.target.value) loadPartnerSettings(e.target.value)
                   }}>
                   <option value="">Klienten auswählen…</option>
                   {allClients.map(c => (
