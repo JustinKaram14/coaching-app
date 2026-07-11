@@ -26,6 +26,7 @@ Extractions-Schema:
   "fett_ziel": number | null,
   "wasser_ziel_ml": number | null,
   "schlaf_ziel": number | null,
+  "praeferenzen": string | null,
   "trainingsvorlagen": [
     {
       "name": string,
@@ -42,7 +43,9 @@ Extractions-Schema:
       "kalorien": number,
       "protein_g": number | null,
       "kohlenhydrate_g": number | null,
-      "fett_g": number | null
+      "fett_g": number | null,
+      "zutaten_text": string | null,
+      "kochanleitung": string | null
     }
   ]
 }
@@ -51,18 +54,32 @@ Regeln:
 - wochentag: 1=Montag, 2=Dienstag, 3=Mittwoch, 4=Donnerstag, 5=Freitag, 6=Samstag, 7=Sonntag
 - wasser_ziel_ml: in Milliliter (3.5L = 3500)
 - trainingstyp: wähle aus Kraft, Cardio, HIIT, Yoga, Stretching, Laufen, Sonstiges
-- rezepte: alle Mahlzeiten, Rezeptvarianten oder Gerichte mit Nährwertangaben aus dem Plan
+- rezepte: alle Mahlzeiten, Rezeptvarianten oder Gerichte mit Nährwertangaben aus dem Plan. Für jedes Rezept zusätzlich: zutaten_text = alle Zutaten mit Mengenangaben, eine Zutat pro Zeile (null wenn im Plan nicht aufgelistet); kochanleitung = die Zubereitungsschritte als nummerierter Fließtext, z.B. "1. Zwiebeln schneiden.\n2. Öl erhitzen..." (null wenn im Plan keine Zubereitung beschrieben ist — erfinde niemals Zutaten oder Schritte, die nicht im Dokument stehen)
+- praeferenzen: fasse in 2-4 kurzen Sätzen alle Ernährungsbesonderheiten, Unverträglichkeiten, Abneigungen, Vorlieben oder Hinweise zusammen, die im Plan erwähnt werden (z.B. "Kein Gluten. Isst gerne deftig. Magenprobleme → viel Kiwi."). Wenn nichts dergleichen im Plan steht: null
 - Wenn ein Wert nicht gefunden wird: null
-- trainingsvorlagen und rezepte: leere Arrays [] wenn nichts gefunden`
+- trainingsvorlagen und rezepte: leere Arrays [] wenn nichts gefunden
 
-async function pickFlashModel(apiKey: string): Promise<string> {
+WICHTIG zur Vollständigkeit von trainingsvorlagen:
+- Gehe das gesamte Dokument Seite für Seite durch und identifiziere JEDEN einzelnen Trainingstag (z.B. "Tag 1", "Mo", "Montag", "Oberkörper Push" usw.) — überspringe keinen.
+- Falls der Plan explizit eine Anzahl nennt (z.B. "4-Tages-Split", "4x pro Woche"), MUSS die Anzahl der Objekte im trainingsvorlagen-Array exakt dieser Zahl entsprechen. Zähle am Ende nach, bevor du antwortest.
+- Fasse niemals zwei unterschiedliche Trainingstage zu einem zusammen, auch wenn sie ähnliche Übungen enthalten.
+- Extrahiere JEDE Übung eines Trainingstages vollständig, auch wenn die Liste lang ist — kürze nicht ab.
+
+WICHTIG zur Vollständigkeit von rezepte:
+- Gehe das gesamte Dokument Seite für Seite durch und erfasse JEDES einzelne Rezept, jede Mahlzeiten-Variante und jedes Gericht mit Nährwertangaben — auch wenn es viele sind (z.B. mehrere Frühstücks-, Mittag- oder Abendessen-Varianten). Überspringe keines.
+- Falls der Plan eine Gesamtanzahl nennt (z.B. "13 Mittagessen-Varianten", "16 Abendessen zur Auswahl"), MUSS die Anzahl der Objekte im rezepte-Array exakt dieser Zahl entsprechen. Zähle am Ende nach, bevor du antwortest.
+- Verwechsle nicht zwei ähnliche Varianten miteinander und lasse keine aus, nur weil sie sich ähneln.
+- Halte zutaten_text und kochanleitung so kurz wie möglich (nur Stichpunkte/kurze Sätze), damit auch bei vielen Rezepten die Antwort vollständig bleibt.`
+
+async function pickFlashModel(apiKey: string): Promise<{ name: string; outputTokenLimit: number }> {
+  const fallback = { name: 'gemini-2.5-flash', outputTokenLimit: 8192 }
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
     )
-    if (!res.ok) return 'gemini-2.5-flash'
+    if (!res.ok) return fallback
     const { models = [] } = await res.json()
-    const candidates = (models as { name: string; supportedGenerationMethods?: string[] }[])
+    const candidates = (models as { name: string; supportedGenerationMethods?: string[]; outputTokenLimit?: number }[])
       .filter(m =>
         m.name.toLowerCase().includes('flash') &&
         !m.name.includes('tts') &&
@@ -75,9 +92,12 @@ async function pickFlashModel(apiKey: string): Promise<string> {
         if (aStable !== bStable) return bStable - aStable
         return b.name.localeCompare(a.name)
       })
-    if (candidates.length > 0) return candidates[0].name.replace('models/', '')
+    if (candidates.length > 0) {
+      const best = candidates[0]
+      return { name: best.name.replace('models/', ''), outputTokenLimit: best.outputTokenLimit ?? fallback.outputTokenLimit }
+    }
   } catch { /* fall through */ }
-  return 'gemini-2.5-flash'
+  return fallback
 }
 
 serve(async (req) => {
@@ -177,9 +197,10 @@ serve(async (req) => {
   }
 
   const model = await pickFlashModel(apiKey)
+  const maxOutputTokens = Math.min(model.outputTokenLimit, 32768)
 
   try {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent?key=${apiKey}`
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -197,7 +218,7 @@ serve(async (req) => {
           ],
         }],
         generationConfig: {
-          maxOutputTokens: 4096,
+          maxOutputTokens,
           temperature: 0.1,
         },
       }),
@@ -217,9 +238,23 @@ serve(async (req) => {
     }
 
     const data = await response.json()
+    const finishReason = data?.candidates?.[0]?.finishReason
+    if (finishReason === 'MAX_TOKENS') {
+      return new Response(JSON.stringify({ error: 'Der Plan ist zu umfangreich für eine vollständige Analyse in einem Durchgang. Bitte lade das PDF nochmal hoch (kürzeren Plan verwenden oder Coach kontaktieren).' }), {
+        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
-    const result = jsonMatch ? JSON.parse(jsonMatch[0]) : null
+    let result
+    try {
+      result = jsonMatch ? JSON.parse(jsonMatch[0]) : null
+    } catch {
+      return new Response(JSON.stringify({ error: 'KI-Antwort war unvollständig oder fehlerhaft formatiert. Bitte nochmal analysieren.' }), {
+        status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     if (!result) {
       return new Response(JSON.stringify({ error: 'Konnte keine Daten aus dem PDF extrahieren.' }), {

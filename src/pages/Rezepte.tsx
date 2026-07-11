@@ -133,7 +133,8 @@ function RezeptCard({ r, onDelete, onImageGenerated }: {
   const [expanded, setExpanded] = useState(false)
   const [generatingImg, setGeneratingImg] = useState(false)
 
-  async function generateImage() {
+  async function generateImage(e: React.MouseEvent) {
+    e.stopPropagation()
     setGeneratingImg(true)
     const { data } = await supabase.functions.invoke('generate-recipe-image', {
       body: { rezeptName: r.name, zutaten: r.zutaten_text ?? undefined },
@@ -145,9 +146,14 @@ function RezeptCard({ r, onDelete, onImageGenerated }: {
     setGeneratingImg(false)
   }
 
+  const hasDetails = !!(r.zutaten_text || r.kochanleitung)
+
   return (
     <div className="bg-bg-elevated rounded-xl border border-border overflow-hidden group">
-      <div className="flex items-center gap-3 p-3">
+      <div
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-3 p-3 cursor-pointer"
+      >
         {/* Image / placeholder */}
         {r.bild_url ? (
           <img src={r.bild_url} alt={r.name}
@@ -176,27 +182,40 @@ function RezeptCard({ r, onDelete, onImageGenerated }: {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {r.kochanleitung && (
-            <button onClick={() => setExpanded(e => !e)}
-              className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
-              title="Kochanleitung">
-              <ChefHat size={14} />
-            </button>
-          )}
-          <button onClick={onDelete}
+          {expanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+          <button onClick={e => { e.stopPropagation(); onDelete() }}
             className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100">
             <Trash2 size={14} />
           </button>
         </div>
       </div>
 
-      {/* Kochanleitung expandable */}
-      {expanded && r.kochanleitung && (
-        <div className="px-3 pb-3 border-t border-border">
-          <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mt-3 mb-2">Kochanleitung</div>
-          <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
-            {r.kochanleitung}
-          </div>
+      {/* Details: Zutaten + Kochanleitung */}
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-border space-y-3">
+          {r.zutaten_text && (
+            <div>
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mt-3 mb-1.5 flex items-center gap-1.5">
+                <ShoppingCart size={12} /> Zutaten
+              </div>
+              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
+                {r.zutaten_text}
+              </div>
+            </div>
+          )}
+          {r.kochanleitung && (
+            <div>
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mt-3 mb-1.5 flex items-center gap-1.5">
+                <ChefHat size={12} /> Kochanleitung
+              </div>
+              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
+                {r.kochanleitung}
+              </div>
+            </div>
+          )}
+          {!hasDetails && (
+            <div className="text-xs text-text-muted mt-3">Keine Zutaten oder Kochanleitung hinterlegt.</div>
+          )}
         </div>
       )}
     </div>

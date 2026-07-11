@@ -32,6 +32,8 @@ interface ExtractedRezept {
   protein_g: number | null
   kohlenhydrate_g: number | null
   fett_g: number | null
+  zutaten_text: string | null
+  kochanleitung: string | null
 }
 
 interface ExtractedPlan {
@@ -41,6 +43,7 @@ interface ExtractedPlan {
   fett_ziel: number | null
   wasser_ziel_ml: number | null
   schlaf_ziel: number | null
+  praeferenzen: string | null
   trainingsvorlagen: ExtractedVorlage[]
   rezepte: ExtractedRezept[]
 }
@@ -50,7 +53,7 @@ const WEEKDAY_LABELS: Record<number, string> = {
   5: 'Freitag', 6: 'Samstag', 7: 'Sonntag',
 }
 
-function MasterplanTab({ clientId, settings }: { clientId: string; settings: ClientSettings | null }) {
+function MasterplanTab({ clientId, settings, onApplied }: { clientId: string; settings: ClientSettings | null; onApplied: () => void }) {
   const { user } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [existingPlan, setExistingPlan] = useState<CoachPlan | null>(null)
@@ -105,6 +108,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
         fett_ziel: json.result.fett_ziel ?? null,
         wasser_ziel_ml: json.result.wasser_ziel_ml ?? null,
         schlaf_ziel: json.result.schlaf_ziel ?? null,
+        praeferenzen: json.result.praeferenzen ?? settings?.ernaehrungs_notizen ?? null,
         trainingsvorlagen: json.result.trainingsvorlagen ?? [],
         rezepte: json.result.rezepte ?? [],
       }
@@ -135,6 +139,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
       fett_ziel: edited.fett_ziel ?? undefined,
       wasser_ziel_ml: edited.wasser_ziel_ml ?? undefined,
       schlaf_ziel: edited.schlaf_ziel ?? undefined,
+      ernaehrungs_notizen: edited.praeferenzen?.trim() ? edited.praeferenzen.trim() : undefined,
     }).eq('user_id', clientId)
 
     // 4. Replace training templates if toggled
@@ -184,6 +189,8 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
           protein_g: r.protein_g,
           kohlenhydrate_g: r.kohlenhydrate_g,
           fett_g: r.fett_g,
+          zutaten_text: r.zutaten_text ?? null,
+          kochanleitung: r.kochanleitung ?? null,
         }))
       )
     }
@@ -193,6 +200,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
     setExistingPlan(data)
     setApplyDone(true)
     setApplying(false)
+    onApplied()
     setTimeout(() => setApplyDone(false), 4000)
   }
 
@@ -207,8 +215,12 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
     window.open(data.signedUrl, '_blank')
   }
 
-  function updateField(key: keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte'>, value: string) {
+  function updateField(key: keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte' | 'praeferenzen'>, value: string) {
     setEdited(e => e ? { ...e, [key]: parseFloat(value) || null } : null)
+  }
+
+  function updatePraeferenzen(value: string) {
+    setEdited(e => e ? { ...e, praeferenzen: value } : null)
   }
 
   if (planLoading) return <div className="flex justify-center py-10"><Spinner size={32} /></div>
@@ -292,7 +304,7 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
                 ['fett_ziel', 'Fett (g)'],
                 ['wasser_ziel_ml', 'Wasser (ml/Tag)'],
                 ['schlaf_ziel', 'Schlaf (Stunden)'],
-              ] as [keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte'>, string][]).map(([key, label]) => (
+              ] as [keyof Omit<ExtractedPlan, 'trainingsvorlagen' | 'rezepte' | 'praeferenzen'>, string][]).map(([key, label]) => (
                 <div key={key}>
                   <label className="label text-xs">{label}</label>
                   <input
@@ -304,6 +316,21 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Präferenzen / Ernährungsnotizen (extrahiert) */}
+          <div className="card space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-text-primary">Präferenzen & Besonderheiten (extrahiert)</h3>
+              <span className="text-xs text-text-muted">Wird im Haushalt & KI-Planer verwendet</span>
+            </div>
+            <textarea
+              className="input resize-none text-sm w-full"
+              rows={3}
+              placeholder="z.B. Magenprobleme → viel Kiwi, leicht verdaulich. Kein Gluten. Isst gerne deftig und viel Protein..."
+              value={edited.praeferenzen ?? ''}
+              onChange={e => updatePraeferenzen(e.target.value)}
+            />
           </div>
 
           {/* Training templates */}
@@ -373,7 +400,11 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {edited.rezepte.map((r, i) => (
                   <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-bg text-sm">
-                    <span className="text-text-primary truncate flex-1 min-w-0 mr-2">{r.name}</span>
+                    <span className="text-text-primary truncate flex-1 min-w-0 mr-2">
+                      {r.name}
+                      {r.zutaten_text && <span title="Zutaten vorhanden" className="ml-1.5 text-text-muted">🛒</span>}
+                      {r.kochanleitung && <span title="Kochanleitung vorhanden" className="ml-1 text-text-muted">📖</span>}
+                    </span>
                     <span className="text-text-muted text-xs shrink-0">
                       {r.kalorien} kcal
                       {r.protein_g != null ? ` · P:${r.protein_g}g` : ''}
@@ -424,6 +455,13 @@ export function ClientDetail() {
   const [tab, setTab] = useState<'overview' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
   const [notizen, setNotizen] = useState('')
   const [notizenSaving, setNotizenSaving] = useState(false)
+
+  async function reloadSettings() {
+    if (!clientId) return
+    const { data } = await supabase.from('client_settings').select('*').eq('user_id', clientId).single()
+    setSettings(data)
+    setNotizen(data?.ernaehrungs_notizen ?? '')
+  }
 
   useEffect(() => {
     if (!clientId) return
@@ -701,7 +739,7 @@ export function ClientDetail() {
       )}
 
       {tab === 'masterplan' && clientId && (
-        <MasterplanTab clientId={clientId} settings={settings} />
+        <MasterplanTab clientId={clientId} settings={settings} onApplied={reloadSettings} />
       )}
 
       {tab === 'haushalt' && clientId && (

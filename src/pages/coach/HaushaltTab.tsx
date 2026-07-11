@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Home, Plus, Trash2, Check, X, Edit2, Users } from 'lucide-react'
+import { Home, Plus, Trash2, Check, X, RefreshCw, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Spinner } from '../../components/ui/Spinner'
@@ -18,8 +18,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
   const [allClients, setAllClients] = useState<Profile[]>([])
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editPraef, setEditPraef] = useState('')
+  const [refreshingId, setRefreshingId] = useState<string | null>(null)
 
   // Form state for creating
   const [form, setForm] = useState({
@@ -141,10 +140,20 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
     load()
   }
 
-  async function updatePraeferenzen(mitgliedId: string, praeferenzen: string) {
+  async function refreshFromMasterplan(mitgliedId: string, memberUserId: string) {
+    setRefreshingId(mitgliedId)
+    const { data } = await supabase
+      .from('client_settings')
+      .select('kalorie_tagesziel, ernaehrungs_notizen')
+      .eq('user_id', memberUserId)
+      .maybeSingle()
     await supabase.from('haushalt_mitglieder')
-      .update({ praeferenzen: praeferenzen || null }).eq('id', mitgliedId)
-    setEditingId(null)
+      .update({
+        kalorien_ziel: data?.kalorie_tagesziel ?? null,
+        praeferenzen: data?.ernaehrungs_notizen ?? null,
+      })
+      .eq('id', mitgliedId)
+    setRefreshingId(null)
     load()
   }
 
@@ -194,34 +203,22 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
                   {m.kalorien_ziel && (
                     <span className="text-xs text-text-muted shrink-0">{m.kalorien_ziel} kcal/Tag</span>
                   )}
-                  <button onClick={() => { setEditingId(m.id); setEditPraef(m.praeferenzen ?? '') }}
-                    className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-primary transition-colors shrink-0">
-                    <Edit2 size={14} />
+                  <button onClick={() => refreshFromMasterplan(m.id, m.user_id)}
+                    disabled={refreshingId === m.id}
+                    title="Kalorien & Präferenzen vom Masterplan aktualisieren"
+                    className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-primary transition-colors shrink-0 disabled:opacity-50">
+                    {refreshingId === m.id ? <Spinner size={14} /> : <RefreshCw size={14} />}
                   </button>
                 </div>
 
-                {editingId === m.id ? (
-                  <div className="space-y-2">
-                    <label className="label text-xs">Ernährungspräferenzen</label>
-                    <textarea className="input resize-none text-sm" rows={3}
-                      placeholder="z.B. Magenprobleme → viel Kiwi, leicht verdaulich"
-                      value={editPraef} onChange={e => setEditPraef(e.target.value)} />
-                    <div className="flex gap-2">
-                      <button onClick={() => updatePraeferenzen(m.id, editPraef)} className="btn-primary text-xs flex items-center gap-1">
-                        <Check size={12} /> Speichern
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="btn-secondary text-xs">Abbrechen</button>
-                    </div>
-                  </div>
-                ) : m.praeferenzen ? (
+                {m.praeferenzen ? (
                   <div className="text-xs text-text-secondary bg-bg-elevated rounded-lg px-3 py-2 leading-relaxed">
                     {m.praeferenzen}
                   </div>
                 ) : (
-                  <button onClick={() => { setEditingId(m.id); setEditPraef('') }}
-                    className="text-xs text-text-muted hover:text-primary transition-colors flex items-center gap-1">
-                    <Plus size={11} /> Präferenzen hinzufügen
-                  </button>
+                  <div className="text-xs text-text-muted italic">
+                    Keine Präferenzen im Masterplan hinterlegt
+                  </div>
                 )}
               </div>
             ))}
@@ -250,11 +247,14 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
               <div className="space-y-2">
                 <input className="input text-sm" placeholder="Anzeigename" value={form.meineAnzeige}
                   onChange={e => setForm(f => ({ ...f, meineAnzeige: e.target.value }))} />
-                <input className="input text-sm" type="number" placeholder="Kalorienziel (kcal/Tag)"
-                  value={form.meineKal} onChange={e => setForm(f => ({ ...f, meineKal: e.target.value }))} />
-                <textarea className="input resize-none text-sm" rows={3}
-                  placeholder="Ernährungspräferenzen, Besonderheiten..."
-                  value={form.meinePraef} onChange={e => setForm(f => ({ ...f, meinePraef: e.target.value }))} />
+                <div className="text-xs text-text-muted bg-bg rounded-lg px-3 py-2">
+                  <span className="font-medium text-text-secondary">Kalorienziel: </span>
+                  {form.meineKal ? `${form.meineKal} kcal/Tag` : 'Kein Ziel im Masterplan hinterlegt'}
+                </div>
+                <div className="text-xs text-text-muted bg-bg rounded-lg px-3 py-2 leading-relaxed">
+                  <span className="font-medium text-text-secondary">Präferenzen: </span>
+                  {form.meinePraef || 'Keine Präferenzen im Masterplan hinterlegt'}
+                </div>
               </div>
             </div>
 
@@ -268,6 +268,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
                     setForm(f => ({
                       ...f, partnerId: e.target.value,
                       partnerAnzeige: partner?.name ?? '',
+                      partnerKal: '', partnerPraef: '',
                     }))
                     if (e.target.value) loadPartnerSettings(e.target.value)
                   }}>
@@ -278,14 +279,25 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
                 </select>
                 <input className="input text-sm" placeholder="Anzeigename" value={form.partnerAnzeige}
                   onChange={e => setForm(f => ({ ...f, partnerAnzeige: e.target.value }))} />
-                <input className="input text-sm" type="number" placeholder="Kalorienziel (kcal/Tag)"
-                  value={form.partnerKal} onChange={e => setForm(f => ({ ...f, partnerKal: e.target.value }))} />
-                <textarea className="input resize-none text-sm" rows={3}
-                  placeholder="Ernährungspräferenzen, Besonderheiten..."
-                  value={form.partnerPraef} onChange={e => setForm(f => ({ ...f, partnerPraef: e.target.value }))} />
+                {form.partnerId && (
+                  <>
+                    <div className="text-xs text-text-muted bg-bg rounded-lg px-3 py-2">
+                      <span className="font-medium text-text-secondary">Kalorienziel: </span>
+                      {form.partnerKal ? `${form.partnerKal} kcal/Tag` : 'Kein Ziel im Masterplan hinterlegt'}
+                    </div>
+                    <div className="text-xs text-text-muted bg-bg rounded-lg px-3 py-2 leading-relaxed">
+                      <span className="font-medium text-text-secondary">Präferenzen: </span>
+                      {form.partnerPraef || 'Keine Präferenzen im Masterplan hinterlegt'}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
+
+          <p className="text-xs text-text-muted">
+            Kalorienziel & Präferenzen werden automatisch aus dem jeweiligen Masterplan übernommen. Fehlt etwas, lade zuerst den Masterplan im Tab "Masterplan" hoch.
+          </p>
 
           {allClients.length === 0 && (
             <div className="text-xs text-warning">Keine anderen Klienten vorhanden. Füge zuerst weitere Klienten hinzu.</div>
