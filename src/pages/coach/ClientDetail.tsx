@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Scale, Dumbbell, Moon, Apple, Pill, Target, FileText, Upload, CheckCircle, X, Download, Sparkles, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Scale, Dumbbell, Moon, Apple, Pill, Target, FileText, Upload, CheckCircle, X, Download, Sparkles, RefreshCw, ChevronDown, ChevronUp, Home } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, calcSleepHours } from '../../lib/utils'
 import { Spinner } from '../../components/ui/Spinner'
 import type { Profile, GewichtEntry, TrainingEntry, SchlafEntry, ErnaehrungEntry, ClientSettings, CoachPlan } from '../../types/database'
+import { HaushaltTab } from './HaushaltTab'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 
 const CT = ({ active, payload, label }: any) => {
@@ -120,19 +121,9 @@ function MasterplanTab({ clientId, settings }: { clientId: string; settings: Cli
     setApplying(true)
     setApplyError(null)
 
-    // 1. Upload PDF to Storage
-    const storageKey = `${clientId}/plan.pdf`
-    const { error: uploadError } = await supabase.storage
-      .from('masterplans').upload(storageKey, pdfFile, { upsert: true })
-    if (uploadError) {
-      setApplyError(`PDF-Upload fehlgeschlagen: ${uploadError.message}. Bitte sicherstellen, dass der "masterplans" Bucket in Supabase Storage existiert.`)
-      setApplying(false)
-      return
-    }
-
-    // 2. Upsert coach_plans
+    // 1. Upsert coach_plans (no PDF stored, just metadata)
     await supabase.from('coach_plans').upsert(
-      { client_id: clientId, coach_id: user.id, pdf_storage_path: storageKey, pdf_name: pdfFile.name, angewendet_am: new Date().toISOString() },
+      { client_id: clientId, coach_id: user.id, pdf_storage_path: null, pdf_name: pdfFile.name, angewendet_am: new Date().toISOString() },
       { onConflict: 'client_id' }
     )
 
@@ -430,7 +421,7 @@ export function ClientDetail() {
   const [schlaf, setSchlaf] = useState<SchlafEntry[]>([])
   const [ernaehrung, setErnaehrung] = useState<ErnaehrungEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan'>('overview')
+  const [tab, setTab] = useState<'overview' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
 
   useEffect(() => {
     if (!clientId) return
@@ -476,6 +467,7 @@ export function ClientDetail() {
     { id: 'sleep', label: 'Schlaf' },
     { id: 'nutrition', label: 'Ernährung' },
     { id: 'masterplan', label: 'Masterplan' },
+    { id: 'haushalt', label: 'Haushalt' },
   ] as const
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size={36} /></div>
@@ -675,6 +667,10 @@ export function ClientDetail() {
 
       {tab === 'masterplan' && clientId && (
         <MasterplanTab clientId={clientId} settings={settings} />
+      )}
+
+      {tab === 'haushalt' && clientId && (
+        <HaushaltTab clientId={clientId} clientName={client?.name ?? 'Klient'} />
       )}
     </div>
   )

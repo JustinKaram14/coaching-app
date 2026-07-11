@@ -5,6 +5,7 @@ const ALLOWED_ORIGINS = [
   'https://justinkaram14.github.io',
   'http://localhost:5173',
   'http://localhost:4173',
+  'http://localhost:5174',
 ]
 
 function getCorsHeaders(origin: string | null) {
@@ -55,7 +56,6 @@ serve(async (req) => {
     })
   }
 
-  // Auth
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -75,29 +75,30 @@ serve(async (req) => {
     })
   }
 
-  // Parse body
-  let body: {
-    rezepte?: unknown
-    goals?: unknown
-    tage?: unknown
-    mahlzeitenProTag?: unknown
-    startDatum?: unknown
-    wuensche?: unknown
-  }
-  try {
-    body = await req.json()
-  } catch {
+  let body: Record<string, unknown>
+  try { body = await req.json() }
+  catch {
     return new Response(JSON.stringify({ error: 'Invalid request body' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  const { rezepte, goals, tage, mahlzeitenProTag, startDatum, wuensche } = body
+  const {
+    rezepte, goals, tage, mahlzeitenProTag, startDatum, wuensche,
+    stores, budget, personen, haushalt,
+  } = body
+
+  interface HaushaltMitglied { name: string; kalorien: number; praeferenzen: string }
+  interface HaushaltData { name: string; mitglieder: HaushaltMitglied[] }
+  const haushaltData = haushalt && typeof haushalt === 'object' ? (haushalt as HaushaltData) : null
 
   const numTage = Number(tage) || 5
   const numMahlzeiten = Number(mahlzeitenProTag) || 3
+  const numPersonen = haushaltData ? haushaltData.mitglieder.length : (Number(personen) || 1)
   const startStr = typeof startDatum === 'string' ? startDatum : new Date().toISOString().split('T')[0]
   const wuenscheStr = typeof wuensche === 'string' ? wuensche.trim() : ''
+  const storesArr = Array.isArray(stores) ? (stores as string[]) : []
+  const budgetVal = budget ? `ca. ${budget} €` : 'kein festes Budget'
 
   const goalsObj = (goals ?? {}) as Record<string, number | null>
   const kalorien = goalsObj.kalorien ?? 2000
@@ -107,7 +108,6 @@ serve(async (req) => {
 
   const rezepteArr = Array.isArray(rezepte) ? rezepte : []
 
-  // Build date list
   const dates: { datum: string; tag: string }[] = []
   for (let i = 0; i < numTage; i++) {
     const d = new Date(startStr + 'T12:00:00')
@@ -115,57 +115,165 @@ serve(async (req) => {
     dates.push({ datum: d.toISOString().split('T')[0], tag: DOW[d.getDay()] })
   }
 
-  // Select meal slots based on count
   const allSlots = ['Frühstück', 'Mittagessen', 'Abendessen', 'Snack']
   const slots = allSlots.slice(0, Math.min(numMahlzeiten, 4))
 
   const rezepteJson = rezepteArr.length > 0
     ? JSON.stringify(rezepteArr.map((r: any) => ({
-        id: r.id,
-        name: r.name,
+        id: r.id, name: r.name,
         kalorien_pro_portion: r.kalorien,
         protein_g: r.protein_g,
         kohlenhydrate_g: r.kohlenhydrate_g,
         fett_g: r.fett_g,
         portionen: r.portionen,
+        zutaten: r.zutaten_text ?? null,
       })))
-    : 'Keine Rezepte vorhanden - bitte eigene Rezepte vorschlagen.'
+    : 'Keine Rezepte vorhanden — eigene Rezepte vorschlagen.'
 
-  const zielText = [
-    `- Kalorien: ~${kalorien} kcal/Tag`,
-    protein ? `- Protein: ~${protein}g/Tag` : null,
-    karbs ? `- Kohlenhydrate: ~${karbs}g/Tag` : null,
-    fett ? `- Fett: ~${fett}g/Tag` : null,
-  ].filter(Boolean).join('\n')
+  const storeText = storesArr.length > 0
+    ? `Bevorzugte Einkaufsorte: ${storesArr.join(', ')}. Passe das Sortiment und typische Produkte dieser Märkte an.`
+    : 'Keine Marktpräferenz angegeben.'
 
-  const prompt = `Du bist ein Ernährungsexperte und Meal Prep Coach. Erstelle einen optimalen Meal Plan.
+  let personenBlock: string
+  let aufgabeBlock: string
 
-EINSTELLUNGEN:
-- Dauer: ${numTage} Tage (ab ${startStr})
+  if (haushaltData) {
+    const mitgliederText = haushaltData.mitglieder.map((m, i) =>
+      `  Person ${i + 1}: ${m.name}\n    - Kalorienziel: ~${m.kalorien} kcal/Tag\n    - Präferenzen/Besonderheiten: ${m.praeferenzen || 'keine'}`
+    ).join('\n')
+
+    personenBlock = `HAUSHALT: "${haushaltData.name}" — ${numPersonen} Personen mit INDIVIDUELLEN Präferenzen:
+${mitgliederText}
+- Wöchentliches Budget (gesamt): ${budgetVal}
+- ${storeText}
+- Besondere Wünsche (allgemein): ${wuenscheStr || 'keine'}`
+
+    aufgabeBlock = `AUFGABE (Haushalt-Modus):
+1. Erstelle einen ausgewogenen ${numTage}-Tage Plan für beide Personen
+2. GETEILTE MAHLZEITEN: Falls eine Mahlzeit für beide passt → einen Eintrag ohne Namens-Suffix
+3. PERSONENSPEZIFISCHE MAHLZEITEN: Falls die Präferenzen stark abweichen → separate Einträge mit Name in Klammern im Rezeptnamen, z.B. "Hähnchen-Bowl (${haushaltData.mitglieder[0]?.name ?? 'Person 1'})" und "Lachsnudeln (${haushaltData.mitglieder[1]?.name ?? 'Person 2'})"
+4. Jede Person soll ihr Kalorienziel pro Tag möglichst genau treffen
+5. Die Präferenzen und Besonderheiten jeder Person MÜSSEN berücksichtigt werden
+6. Einkaufsliste: ALLE Zutaten für alle Rezepte aggregieren (geteilte + personenspezifische), nach Supermarkt-Kategorien sortieren, Mengen für alle ${numTage} Tage
+7. Kochanleitung: Schrittweise, konkret, mit Zeit-Angaben — wo nötig Variationen für beide Personen beschreiben. Format: Abschnitte (## Titel) mit nummerierten Schritten`
+  } else {
+    const zielText = [
+      `Kalorien: ~${kalorien * numPersonen} kcal/Tag gesamt (${kalorien} kcal × ${numPersonen} Person${numPersonen > 1 ? 'en' : ''})`,
+      protein ? `Protein: ~${protein * numPersonen}g/Tag` : null,
+      karbs ? `Kohlenhydrate: ~${karbs * numPersonen}g/Tag` : null,
+      fett ? `Fett: ~${fett * numPersonen}g/Tag` : null,
+    ].filter(Boolean).join('\n')
+
+    personenBlock = `EINSTELLUNGEN:
+- Personen: ${numPersonen}
+- Dauer: ${numTage} Tage ab ${startStr}
 - Mahlzeiten pro Tag: ${numMahlzeiten} (${slots.join(', ')})
-- Nährstoffziele:
-${zielText}
-- Besondere Wünsche: ${wuenscheStr || 'keine'}
+- Nährstoffziele (pro Person):
+  ${zielText}
+- Wöchentliches Budget: ${budgetVal}
+- ${storeText}
+- Besondere Wünsche: ${wuenscheStr || 'keine'}`
 
-VERFÜGBARE REZEPTE (bevorzugt einsetzen, exakte IDs und Namen übernehmen):
+    aufgabeBlock = `AUFGABE:
+1. Erstelle einen ausgewogenen ${numTage}-Tage Plan für ${numPersonen} Person${numPersonen > 1 ? 'en' : ''}
+2. Portionen für die korrekte Personenanzahl skalieren
+3. Jeden Tag möglichst nah an ${kalorien * numPersonen} kcal halten
+4. Einkaufsliste: ALLE Zutaten für alle Rezepte des Plans aggregieren und nach Supermarkt-Kategorien sortieren
+5. Mengenangaben für ${numPersonen} Person${numPersonen > 1 ? 'en' : ''} und alle ${numTage} Tage berechnen
+6. Kochanleitung: Schrittweise, konkret, mit Zeit-Angaben. Format: Abschnitte (## Titel) mit nummerierten Schritten`
+  }
+
+  const prompt = `Du bist ein Ernährungsexperte und Meal Prep Coach. Erstelle einen vollständigen Meal Prep Plan mit Einkaufsliste und detaillierter Kochanleitung.
+
+${personenBlock}
+
+VERFÜGBARE REZEPTE (bevorzugt nutzen, exakte Namen + IDs übernehmen):
 ${rezepteJson}
 
-AUFGABE:
-1. Erstelle einen ausgewogenen ${numTage}-Tage Plan
-2. Nutze vorhandene Rezepte mit exakten Namen und IDs; neue Rezepte erhalten rezept_id: null
-3. Passe Portionen so an, dass jeder Tag ~${kalorien} kcal erreicht
-4. Schreibe eine konkrete Meal Prep Anleitung auf Deutsch (was am Prep-Tag vorbereiten)
+${aufgabeBlock}
 
-Antworte NUR mit diesem JSON (kein Text davor/dahinter, kein Markdown):
+Antworte NUR mit diesem JSON (kein Text davor/dahinter, kein Markdown-Block):
 {
-  "tage": [${dates.map(d =>
-    `{"datum":"${d.datum}","tag":"${d.tag}","mahlzeiten":[...],"gesamt_kalorien":0}`
-  ).join(',')}],
-  "meal_prep_guide": "..."
-}
-
-Jede Mahlzeit hat diese Felder:
-{"mahlzeit":"${slots[0]}","rezept_name":"Name","rezept_id":"uuid-oder-null","portionen":1.0,"kalorien":400,"protein_g":30,"kohlenhydrate_g":40,"fett_g":10}`
+  "tage": [
+    {
+      "datum": "YYYY-MM-DD",
+      "tag": "Montag",
+      "mahlzeiten": [
+        {
+          "mahlzeit": "Frühstück",
+          "rezept_name": "Name",
+          "rezept_id": "uuid-oder-null",
+          "portionen": 1.0,
+          "kalorien": 400,
+          "protein_g": 30,
+          "kohlenhydrate_g": 40,
+          "fett_g": 10
+        }
+      ],
+      "gesamt_kalorien": 2000
+    }
+  ],
+  "einkaufsliste": {
+    "kategorien": [
+      {
+        "name": "Gemüse & Obst",
+        "emoji": "🥬",
+        "artikel": [
+          {"menge": "500g", "name": "Brokkoli"},
+          {"menge": "4 Stück", "name": "Bananen"}
+        ]
+      },
+      {
+        "name": "Fleisch & Fisch",
+        "emoji": "🥩",
+        "artikel": [{"menge": "800g", "name": "Hähnchenbrust"}]
+      },
+      {
+        "name": "Milch & Milchprodukte",
+        "emoji": "🥛",
+        "artikel": []
+      },
+      {
+        "name": "Eier",
+        "emoji": "🥚",
+        "artikel": []
+      },
+      {
+        "name": "Nudeln, Reis & Getreide",
+        "emoji": "🌾",
+        "artikel": []
+      },
+      {
+        "name": "Brot & Backwaren",
+        "emoji": "🍞",
+        "artikel": []
+      },
+      {
+        "name": "Konserven & Soßen",
+        "emoji": "🥫",
+        "artikel": []
+      },
+      {
+        "name": "Gewürze & Öle",
+        "emoji": "🧂",
+        "artikel": []
+      },
+      {
+        "name": "Tiefkühlprodukte",
+        "emoji": "❄️",
+        "artikel": []
+      },
+      {
+        "name": "Drogerie",
+        "emoji": "🧴",
+        "artikel": []
+      }
+    ],
+    "budget_gesamt_ca": "48.00",
+    "hinweis": "Preise basieren auf typischen ${storesArr.length > 0 ? storesArr.join('/') : 'Supermarkt'}-Preisen. Aktuelle Angebote können abweichen."
+  },
+  "meal_prep_guide": "## Vorbereitung (X Min.)\\n1. Schritt...\\n\\n## Kochen (X Min.)\\n2. Schritt..."
+}`
 
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) {
@@ -183,7 +291,7 @@ Jede Mahlzeit hat diese Felder:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 4096, temperature: 0.3 },
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.3 },
       }),
     })
 

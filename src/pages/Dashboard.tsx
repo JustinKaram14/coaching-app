@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Scale, Dumbbell, Moon, Apple, TrendingUp, TrendingDown, Minus, Target, Flame, Droplets, FileText, Download } from 'lucide-react'
+import { Scale, Dumbbell, Moon, Apple, TrendingUp, TrendingDown, Minus, Target, Flame, Droplets, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, calcSleepHours } from '../lib/utils'
@@ -163,21 +163,6 @@ export function Dashboard() {
               {masterplan.pdf_name ?? 'Personalisierter Coaching-Plan'} · {masterplan.angewendet_am ? formatDate(masterplan.angewendet_am) : ''}
             </div>
           </div>
-          <button
-            onClick={async () => {
-              if (!masterplan.pdf_storage_path) return
-              const { data, error } = await supabase.storage
-                .from('masterplans').createSignedUrl(masterplan.pdf_storage_path, 3600)
-              if (error || !data?.signedUrl) {
-                alert(`Download fehlgeschlagen: ${error?.message ?? 'Unbekannter Fehler'}`)
-                return
-              }
-              window.open(data.signedUrl, '_blank')
-            }}
-            className="btn-primary flex items-center gap-2 text-sm shrink-0"
-          >
-            <Download size={16} /> PDF herunterladen
-          </button>
         </div>
       )}
 

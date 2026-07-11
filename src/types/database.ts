@@ -217,6 +217,8 @@ export interface Database {
           user_id: string
           name: string
           zutaten_text: string | null
+          kochanleitung: string | null
+          bild_url: string | null
           portionen: number
           kalorien: number
           protein_g: number | null
@@ -226,6 +228,28 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['rezepte']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['rezepte']['Insert']>
+      }
+      haushalte: {
+        Row: {
+          id: string
+          coach_id: string
+          name: string
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['haushalte']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['haushalte']['Insert']>
+      }
+      haushalt_mitglieder: {
+        Row: {
+          id: string
+          haushalt_id: string
+          user_id: string
+          anzeige_name: string
+          kalorien_ziel: number | null
+          praeferenzen: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['haushalt_mitglieder']['Row'], 'id'>
+        Update: Partial<Database['public']['Tables']['haushalt_mitglieder']['Insert']>
       }
       meal_plans: {
         Row: {
@@ -265,3 +289,5 @@ export type WasserLogEntry = Database['public']['Tables']['wasser_log']['Row']
 export type CoachPlan = Database['public']['Tables']['coach_plans']['Row']
 export type Rezept = Database['public']['Tables']['rezepte']['Row']
 export type MealPlanEntry = Database['public']['Tables']['meal_plans']['Row']
+export type Haushalt = Database['public']['Tables']['haushalte']['Row']
+export type HaushaltMitglied = Database['public']['Tables']['haushalt_mitglieder']['Row']

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, Download } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bmi, bmiCategory, generateCode } from '../lib/utils'
@@ -184,21 +184,6 @@ export function Settings() {
                 Erstellt: {masterplan.angewendet_am ? new Date(masterplan.angewendet_am).toLocaleDateString('de') : '—'}
               </div>
             </div>
-            <button
-              onClick={async () => {
-                if (!masterplan.pdf_storage_path) return
-                const { data, error } = await supabase.storage
-                  .from('masterplans').createSignedUrl(masterplan.pdf_storage_path, 3600)
-                if (error || !data?.signedUrl) {
-                  alert(`Download fehlgeschlagen: ${error?.message ?? 'Unbekannter Fehler'}`)
-                  return
-                }
-                window.open(data.signedUrl, '_blank')
-              }}
-              className="btn-primary flex items-center gap-2 text-sm shrink-0"
-            >
-              <Download size={16} /> PDF herunterladen
-            </button>
           </div>
         </div>
       )}
