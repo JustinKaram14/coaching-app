@@ -182,12 +182,16 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
   )
 }
 
-function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated }: {
-  r: Rezept; userId: string; onClose: () => void; onDelete: () => void; onImageGenerated: (id: string, url: string) => void
+function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onInstructionsGenerated }: {
+  r: Rezept; userId: string; onClose: () => void; onDelete: () => void
+  onImageGenerated: (id: string, url: string) => void
+  onInstructionsGenerated: (id: string, kochanleitung: string) => void
 }) {
   const basePort = r.portionen || 1
   const [portionen, setPortionen] = useState(basePort)
   const [generatingImg, setGeneratingImg] = useState(false)
+  const [generatingInstr, setGeneratingInstr] = useState(false)
+  const [localKochanleitung, setLocalKochanleitung] = useState<string | null>(null)
   const [addToPlanOpen, setAddToPlanOpen] = useState(false)
   const [planDatum, setPlanDatum] = useState(todayISO())
   const [planSlot, setPlanSlot] = useState('Mittagessen')
@@ -212,9 +216,28 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated }: {
     setGeneratingImg(false)
   }
 
-  // Auto-generate image when modal opens if none exists yet
+  async function generateInstructions() {
+    setGeneratingInstr(true)
+    const { data } = await supabase.functions.invoke('generate-recipe-instructions', {
+      body: {
+        rezeptName: r.name, zutaten_text: r.zutaten_text,
+        kalorien: r.kalorien, protein_g: r.protein_g,
+        kohlenhydrate_g: r.kohlenhydrate_g, fett_g: r.fett_g,
+        portionen: r.portionen,
+      },
+    })
+    if (data?.kochanleitung) {
+      await supabase.from('rezepte').update({ kochanleitung: data.kochanleitung }).eq('id', r.id)
+      setLocalKochanleitung(data.kochanleitung)
+      onInstructionsGenerated(r.id, data.kochanleitung)
+    }
+    setGeneratingInstr(false)
+  }
+
+  // Auto-generate missing image and instructions when modal opens
   useEffect(() => {
     if (!r.bild_url) generateImage()
+    if (!r.kochanleitung) generateInstructions()
   }, [])
 
   async function addToPlan() {
@@ -312,18 +335,25 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated }: {
           )}
 
           {/* Kochanleitung */}
-          {r.kochanleitung && (
+          {(r.kochanleitung || localKochanleitung || generatingInstr) && (
             <div>
               <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <ChefHat size={12} /> Kochanleitung
+                {generatingInstr && <Spinner size={12} />}
               </div>
-              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed bg-bg-elevated rounded-xl p-3 border border-border">
-                {r.kochanleitung}
-              </div>
+              {generatingInstr ? (
+                <div className="text-sm text-text-muted italic p-3 bg-bg-elevated rounded-xl border border-border">
+                  KI erstellt Kochanleitung…
+                </div>
+              ) : (
+                <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed bg-bg-elevated rounded-xl p-3 border border-border">
+                  {localKochanleitung ?? r.kochanleitung}
+                </div>
+              )}
             </div>
           )}
 
-          {!r.zutaten_text && !r.kochanleitung && (
+          {!r.zutaten_text && !r.kochanleitung && !localKochanleitung && !generatingInstr && (
             <div className="text-sm text-text-muted text-center py-6">
               Keine Zutaten oder Kochanleitung hinterlegt.
             </div>
@@ -1294,6 +1324,8 @@ export function Rezepte() {
   const [search, setSearch] = useState('')
   const [settings, setSettings] = useState<Partial<ClientSettings>>({})
   const [detailRezept, setDetailRezept] = useState<Rezept | null>(null)
+  const [bulkGenerating, setBulkGenerating] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -1314,7 +1346,47 @@ export function Rezepte() {
     setRezepte(r => r.filter(x => x.id !== id))
   }
 
+  async function generateAllMissing() {
+    const incomplete = rezepte.filter(r => !r.bild_url || !r.kochanleitung)
+    if (incomplete.length === 0) return
+    setBulkGenerating(true)
+    setBulkProgress({ done: 0, total: incomplete.length })
+    for (let i = 0; i < incomplete.length; i++) {
+      const r = incomplete[i]
+      setBulkProgress({ done: i, total: incomplete.length })
+      try {
+        if (!r.bild_url) {
+          const { data } = await supabase.functions.invoke('generate-recipe-image', {
+            body: { rezeptName: r.name, zutaten: r.zutaten_text ?? undefined },
+          })
+          if (data?.imageDataUrl) {
+            await supabase.from('rezepte').update({ bild_url: data.imageDataUrl }).eq('id', r.id)
+            setRezepte(prev => prev.map(x => x.id === r.id ? { ...x, bild_url: data.imageDataUrl } : x))
+          }
+        }
+        if (!r.kochanleitung) {
+          const { data } = await supabase.functions.invoke('generate-recipe-instructions', {
+            body: {
+              rezeptName: r.name, zutaten_text: r.zutaten_text,
+              kalorien: r.kalorien, protein_g: r.protein_g,
+              kohlenhydrate_g: r.kohlenhydrate_g, fett_g: r.fett_g,
+              portionen: r.portionen,
+            },
+          })
+          if (data?.kochanleitung) {
+            await supabase.from('rezepte').update({ kochanleitung: data.kochanleitung }).eq('id', r.id)
+            setRezepte(prev => prev.map(x => x.id === r.id ? { ...x, kochanleitung: data.kochanleitung } : x))
+          }
+        }
+      } catch { /* continue */ }
+    }
+    setBulkProgress({ done: incomplete.length, total: incomplete.length })
+    setBulkGenerating(false)
+    setTimeout(() => setBulkProgress(null), 3000)
+  }
+
   const filtered = rezepte.filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+  const missingCount = rezepte.filter(r => !r.bild_url || !r.kochanleitung).length
 
   const tabs = [
     { id: 'rezepte' as Tab, icon: BookOpen, label: 'Rezepte' },
@@ -1354,6 +1426,25 @@ export function Rezepte() {
               <Plus size={16} /><span className="hidden sm:inline">Neues Rezept</span>
             </button>
           </div>
+
+          {/* Bulk generation banner */}
+          {!rezepteLoading && missingCount > 0 && (
+            <div className="flex items-center justify-between bg-bg-elevated rounded-xl border border-border px-4 py-3">
+              <div className="text-sm text-text-secondary">
+                {bulkProgress
+                  ? `KI vervollständigt… ${bulkProgress.done}/${bulkProgress.total}`
+                  : `${missingCount} Rezept${missingCount > 1 ? 'e fehlen' : ' fehlt'} Bild oder Anleitung`}
+              </div>
+              <button
+                onClick={generateAllMissing}
+                disabled={bulkGenerating}
+                className="btn-secondary flex items-center gap-2 text-sm shrink-0"
+              >
+                {bulkGenerating ? <Spinner size={14} /> : <Wand2 size={14} />}
+                {bulkGenerating ? 'Läuft…' : 'Alle vervollständigen'}
+              </button>
+            </div>
+          )}
           {showForm && (
             <NewRezeptForm userId={user.id}
               onSaved={r => { setRezepte(prev => [...prev, r].sort((a, b) => a.name.localeCompare(b.name))); setShowForm(false) }}
@@ -1397,6 +1488,10 @@ export function Rezepte() {
           onImageGenerated={(id, url) => {
             setRezepte(prev => prev.map(x => x.id === id ? { ...x, bild_url: url } : x))
             setDetailRezept(prev => prev ? { ...prev, bild_url: url } : null)
+          }}
+          onInstructionsGenerated={(id, kochanleitung) => {
+            setRezepte(prev => prev.map(x => x.id === id ? { ...x, kochanleitung } : x))
+            setDetailRezept(prev => prev ? { ...prev, kochanleitung } : null)
           }}
         />
       )}
