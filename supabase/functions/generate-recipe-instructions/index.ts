@@ -59,13 +59,13 @@ ${zutaten_text ? `\nZutaten:\n${zutaten_text}` : ''}
 
 Anforderungen:
 - Nummerierte Schritte (1. 2. 3. ...)
+- Ausschließlich Kochschritte — von der Vorbereitung bis das Gericht fertig gekocht ist
 - Exakte Mengenangaben (g, ml, EL, TL, Stück)
 - Exakte Garzeiten in Minuten
-- Exakte Temperaturen in °C (Ober-/Unterhitze oder Umluft angeben)
+- Exakte Temperaturen in °C (Ober-/Unterhitze oder Umluft angeben wo relevant)
 - Schnittgröße bei Gemüse/Fleisch (z.B. "2 cm Würfel", "dünne Scheiben")
 - Konkretes Gar-Kriterium (z.B. "bis Kerntemperatur 75°C", "bis goldbraun", "bissfest")
-- Zeitlich sinnvolle Reihenfolge (parallele Schritte parallel)
-- Letzter Schritt: Aufbewahrung (wie viele Tage im Kühlschrank) und Aufwärmtipp (Mikrowelle Watt + Minuten oder Pfanne)
+- NICHT enthalten: Aufbewahrungshinweise, Kühlschrank-Tipps, Anrichte-Vorschläge, Servier-Empfehlungen
 
 Antworte NUR mit der nummerierten Kochanleitung. Kein Titel, keine Einleitung, kein Kommentar.`
 
