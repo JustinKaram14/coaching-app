@@ -900,7 +900,14 @@ function KochplanView({ guide }: { guide: string }) {
                     ? 'bg-primary text-white rounded-br-sm'
                     : 'bg-bg-elevated text-text-primary rounded-bl-sm border border-border'
                 }`}>
-                  {msg.text}
+                  {msg.role === 'ai' ? (
+                    <span dangerouslySetInnerHTML={{ __html: msg.text
+                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                      .replace(/^\* /gm, '• ')
+                      .replace(/\n/g, '<br/>')
+                    }} />
+                  ) : msg.text}
                 </div>
               </div>
             ))}
