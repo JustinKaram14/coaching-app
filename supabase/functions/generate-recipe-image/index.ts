@@ -44,47 +44,56 @@ serve(async (req) => {
   }
 
   const prompt = `Professional food photography of "${rezeptName}". ${
-    zutaten ? `Main ingredients: ${zutaten.slice(0, 200)}.` : ''
+    zutaten ? `Main ingredients: ${String(zutaten).slice(0, 200)}.` : ''
   } Close-up shot on a clean white plate, natural lighting, appetizing, high resolution, restaurant quality.`
 
-  // Try Imagen 3 first
+  // 1. Try Imagen 3
   try {
-    const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`
-    const imagenRes = await fetch(imagenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: '1:1', safetySetting: 'block_only_high' },
-      }),
-    })
-
-    if (imagenRes.ok) {
-      const imagenData = await imagenRes.json()
-      const b64 = imagenData?.predictions?.[0]?.bytesBase64Encoded
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt }],
+          parameters: { sampleCount: 1, aspectRatio: '1:1' },
+        }),
+      }
+    )
+    if (res.ok) {
+      const json = await res.json()
+      const b64 = json?.predictions?.[0]?.bytesBase64Encoded
       if (b64) {
         return new Response(JSON.stringify({ imageDataUrl: `data:image/jpeg;base64,${b64}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
     }
-  } catch { /* fall through to Gemini flash */ }
+  } catch { /* fall through */ }
 
-  // Fallback: Gemini Flash image generation
-  try {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ['IMAGE'] },
-      }),
-    })
+  // 2. Try Gemini 2.0 Flash image generation (multiple model names in case one is deprecated)
+  const geminiImageModels = [
+    'gemini-2.0-flash-preview-image-generation',
+    'gemini-2.0-flash-exp-image-generation',
+    'gemini-2.0-flash-exp',
+  ]
 
-    if (geminiRes.ok) {
-      const geminiData = await geminiRes.json()
-      const parts = geminiData?.candidates?.[0]?.content?.parts ?? []
+  for (const model of geminiImageModels) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+          }),
+        }
+      )
+      if (!res.ok) continue
+      const json = await res.json()
+      const parts = json?.candidates?.[0]?.content?.parts ?? []
       for (const part of parts) {
         if (part.inlineData?.data) {
           const mime = part.inlineData.mimeType ?? 'image/png'
@@ -93,10 +102,10 @@ serve(async (req) => {
           })
         }
       }
-    }
-  } catch { /* fall through */ }
+    } catch { /* try next model */ }
+  }
 
-  return new Response(JSON.stringify({ error: 'Bildgenerierung fehlgeschlagen' }), {
+  return new Response(JSON.stringify({ error: 'Bildgenerierung fehlgeschlagen — kein Modell verfügbar' }), {
     status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })

@@ -180,7 +180,7 @@ function MasterplanTab({ clientId, settings, onApplied }: { clientId: string; se
       if (replaceRezepte) {
         await supabase.from('rezepte').delete().eq('user_id', clientId)
       }
-      await supabase.from('rezepte').insert(
+      const { data: insertedRezepte } = await supabase.from('rezepte').insert(
         edited.rezepte.map(r => ({
           user_id: clientId,
           name: r.name,
@@ -192,7 +192,23 @@ function MasterplanTab({ clientId, settings, onApplied }: { clientId: string; se
           zutaten_text: r.zutaten_text ?? null,
           kochanleitung: r.kochanleitung ?? null,
         }))
-      )
+      ).select('id, name, zutaten_text')
+
+      // Auto-generate images in background (fire-and-forget, non-blocking)
+      if (insertedRezepte && insertedRezepte.length > 0) {
+        Promise.all(
+          insertedRezepte.map(async (r) => {
+            try {
+              const { data: imgData } = await supabase.functions.invoke('generate-recipe-image', {
+                body: { rezeptName: r.name, zutaten: r.zutaten_text ?? undefined },
+              })
+              if (imgData?.imageDataUrl) {
+                await supabase.from('rezepte').update({ bild_url: imgData.imageDataUrl }).eq('id', r.id)
+              }
+            } catch { /* ignore individual failures */ }
+          })
+        ).catch(() => { /* ignore */ })
+      }
     }
 
     // Refresh existing plan

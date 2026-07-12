@@ -3,7 +3,7 @@ import {
   BookOpen, Plus, Trash2, ChefHat, CalendarDays, Sparkles,
   ChevronLeft, ChevronRight, X, Check, Info, UtensilsCrossed,
   ShoppingCart, Copy, Share2, Send, MessageCircle, Wallet,
-  ChevronDown, ChevronUp, Home, Image, Link, Wand2,
+  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -116,10 +116,9 @@ function MacroRow({ label, value, color }: { label: string; value: number | null
   return <span className={`text-xs ${color}`}>{label} {Math.round(value)}g</span>
 }
 
-function RezeptCard({ r, onDelete, onImageGenerated }: {
-  r: Rezept; onDelete: () => void; onImageGenerated: (id: string, url: string) => void
+function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
+  r: Rezept; onDelete: () => void; onImageGenerated: (id: string, url: string) => void; onOpenDetail: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
   const [generatingImg, setGeneratingImg] = useState(false)
 
   async function generateImage(e: React.MouseEvent) {
@@ -135,15 +134,10 @@ function RezeptCard({ r, onDelete, onImageGenerated }: {
     setGeneratingImg(false)
   }
 
-  const hasDetails = !!(r.zutaten_text || r.kochanleitung)
-
   return (
-    <div className="bg-bg-elevated rounded-xl border border-border overflow-hidden group">
-      <div
-        onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-3 p-3 cursor-pointer"
-      >
-        {/* Image / placeholder */}
+    <div onClick={onOpenDetail}
+      className="bg-bg-elevated rounded-xl border border-border overflow-hidden group cursor-pointer hover:border-primary/40 transition-colors">
+      <div className="flex items-center gap-3 p-3">
         {r.bild_url ? (
           <img src={r.bild_url} alt={r.name}
             className="w-12 h-12 rounded-lg object-cover shrink-0" />
@@ -168,45 +162,218 @@ function RezeptCard({ r, onDelete, onImageGenerated }: {
             <MacroRow label="K" value={r.kohlenhydrate_g} color="text-yellow-400" />
             <MacroRow label="F" value={r.fett_g} color="text-orange-400" />
           </div>
+          {(r.zutaten_text || r.kochanleitung) && (
+            <div className="flex items-center gap-1.5 mt-1">
+              {r.zutaten_text && <span className="text-[10px] bg-bg-card rounded px-1.5 py-0.5 text-text-muted border border-border">🛒 Zutaten</span>}
+              {r.kochanleitung && <span className="text-[10px] bg-bg-card rounded px-1.5 py-0.5 text-text-muted border border-border">📖 Anleitung</span>}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {expanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+          <ChevronLeft size={16} className="text-text-muted rotate-180" />
           <button onClick={e => { e.stopPropagation(); onDelete() }}
             className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100">
             <Trash2 size={14} />
           </button>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Details: Zutaten + Kochanleitung */}
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-border space-y-3">
+function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated }: {
+  r: Rezept; userId: string; onClose: () => void; onDelete: () => void; onImageGenerated: (id: string, url: string) => void
+}) {
+  const basePort = r.portionen || 1
+  const [portionen, setPortionen] = useState(basePort)
+  const [generatingImg, setGeneratingImg] = useState(false)
+  const [addToPlanOpen, setAddToPlanOpen] = useState(false)
+  const [planDatum, setPlanDatum] = useState(todayISO())
+  const [planSlot, setPlanSlot] = useState('Mittagessen')
+  const [adding, setAdding] = useState(false)
+  const [added, setAdded] = useState(false)
+
+  const scale = portionen / basePort
+  const scaledKal = Math.round(r.kalorien * scale)
+  const scaledProt = r.protein_g != null ? parseFloat((r.protein_g * scale).toFixed(1)) : null
+  const scaledKarbs = r.kohlenhydrate_g != null ? parseFloat((r.kohlenhydrate_g * scale).toFixed(1)) : null
+  const scaledFett = r.fett_g != null ? parseFloat((r.fett_g * scale).toFixed(1)) : null
+
+  async function generateImage() {
+    setGeneratingImg(true)
+    const { data } = await supabase.functions.invoke('generate-recipe-image', {
+      body: { rezeptName: r.name, zutaten: r.zutaten_text ?? undefined },
+    })
+    if (data?.imageDataUrl) {
+      await supabase.from('rezepte').update({ bild_url: data.imageDataUrl }).eq('id', r.id)
+      onImageGenerated(r.id, data.imageDataUrl)
+    }
+    setGeneratingImg(false)
+  }
+
+  async function addToPlan() {
+    setAdding(true)
+    await supabase.from('meal_plans').insert({
+      user_id: userId, datum: planDatum, mahlzeit: planSlot,
+      rezept_id: r.id, rezept_name: r.name, portionen,
+      kalorien: scaledKal, protein_g: scaledProt,
+      kohlenhydrate_g: scaledKarbs, fett_g: scaledFett,
+    })
+    setAdding(false)
+    setAdded(true)
+    setTimeout(() => { setAdded(false); setAddToPlanOpen(false) }, 2000)
+  }
+
+  function datumLabel(iso: string): string {
+    if (iso === todayISO()) return 'Heute'
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+    if (iso === toISO(tomorrow)) return 'Morgen'
+    return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-bg-card rounded-t-2xl sm:rounded-2xl border border-border w-full max-w-lg max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-start gap-3 p-4 border-b border-border shrink-0">
+          {r.bild_url ? (
+            <img src={r.bild_url} alt={r.name} className="w-16 h-16 rounded-xl object-cover shrink-0" />
+          ) : (
+            <button onClick={generateImage} disabled={generatingImg}
+              className="w-16 h-16 rounded-xl bg-primary/10 flex flex-col items-center justify-center shrink-0 hover:bg-primary/20 transition-colors">
+              {generatingImg ? <Spinner size={20} /> : <>
+                <Image size={18} className="text-primary/60" />
+                <span className="text-[9px] text-primary/60 mt-0.5">KI Bild</span>
+              </>}
+            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-text-primary text-base">{r.name}</div>
+            <div className="text-sm text-text-muted mt-0.5">
+              {scaledKal} kcal
+              {scaledProt != null && <span className="text-blue-400"> · P {scaledProt}g</span>}
+              {scaledKarbs != null && <span className="text-yellow-400"> · K {scaledKarbs}g</span>}
+              {scaledFett != null && <span className="text-orange-400"> · F {scaledFett}g</span>}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+          {/* Portion adjuster */}
+          <div className="flex items-center gap-3 p-3 bg-bg-elevated rounded-xl border border-border">
+            <span className="text-sm text-text-secondary flex-1">Portionen</span>
+            <button onClick={() => setPortionen(p => Math.max(0.5, parseFloat((p - 0.5).toFixed(1))))}
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-primary/50 transition-colors">
+              <Minus size={14} className="text-text-secondary" />
+            </button>
+            <span className="w-14 text-center font-semibold text-text-primary">
+              {portionen % 1 === 0 ? portionen : portionen.toFixed(1)}
+            </span>
+            <button onClick={() => setPortionen(p => parseFloat((p + 0.5).toFixed(1)))}
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-primary/50 transition-colors">
+              <Plus size={14} className="text-text-secondary" />
+            </button>
+          </div>
+
+          {/* Zutaten */}
           {r.zutaten_text && (
             <div>
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mt-3 mb-1.5 flex items-center gap-1.5">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <ShoppingCart size={12} /> Zutaten
+                {scale !== 1 && (
+                  <span className="text-primary font-medium normal-case tracking-normal ml-1">
+                    (×{scale % 1 === 0 ? scale : scale.toFixed(1)} für {portionen} Port.)
+                  </span>
+                )}
               </div>
-              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
+              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed bg-bg-elevated rounded-xl p-3 border border-border">
                 {r.zutaten_text}
               </div>
+              {scale !== 1 && (
+                <div className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
+                  <Info size={11} className="shrink-0" />
+                  Angaben für {basePort} Portion(en) — alle Mengen mit ×{scale % 1 === 0 ? scale : scale.toFixed(1)} multiplizieren
+                </div>
+              )}
             </div>
           )}
+
+          {/* Kochanleitung */}
           {r.kochanleitung && (
             <div>
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mt-3 mb-1.5 flex items-center gap-1.5">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <ChefHat size={12} /> Kochanleitung
               </div>
-              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
+              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed bg-bg-elevated rounded-xl p-3 border border-border">
                 {r.kochanleitung}
               </div>
             </div>
           )}
-          {!hasDetails && (
-            <div className="text-xs text-text-muted mt-3">Keine Zutaten oder Kochanleitung hinterlegt.</div>
+
+          {!r.zutaten_text && !r.kochanleitung && (
+            <div className="text-sm text-text-muted text-center py-6">
+              Keine Zutaten oder Kochanleitung hinterlegt.
+            </div>
           )}
         </div>
-      )}
+
+        {/* Footer */}
+        <div className="p-4 border-t border-border space-y-3 shrink-0">
+          {!addToPlanOpen ? (
+            <div className="flex gap-2">
+              <button onClick={() => setAddToPlanOpen(true)}
+                className="btn-primary flex items-center gap-2 flex-1 justify-center">
+                <CalendarPlus size={16} /> Zum Wochenplan
+              </button>
+              <button onClick={() => { onDelete(); onClose() }}
+                className="p-2.5 rounded-xl text-danger hover:bg-danger/10 border border-border transition-colors">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-text-primary">Zum Wochenplan hinzufügen</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-text-muted mb-1 block">Tag</label>
+                  <input type="date" className="input text-sm" value={planDatum}
+                    min={todayISO()} onChange={e => setPlanDatum(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-text-muted mb-1 block">Mahlzeit</label>
+                  <select className="input text-sm" value={planSlot} onChange={e => setPlanSlot(e.target.value)}>
+                    {MEAL_SLOTS.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              {added ? (
+                <div className="flex items-center gap-2 text-sm text-success font-medium justify-center py-1">
+                  <Check size={16} /> Hinzugefügt!
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={addToPlan} disabled={adding}
+                    className="btn-primary flex-1 flex items-center gap-2 justify-center">
+                    {adding ? <Spinner size={14} /> : <Check size={14} />}
+                    {adding ? 'Speichern…' : `${datumLabel(planDatum)} · ${planSlot}`}
+                  </button>
+                  <button onClick={() => setAddToPlanOpen(false)} className="btn-secondary shrink-0 px-3">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -763,6 +930,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
   const [startDatum, setStartDatum] = useState(todayISO())
   const [selectedMeals, setSelectedMeals] = useState<string[]>(['Frühstück', 'Mittagessen', 'Abendessen'])
   const [wuensche, setWuensche] = useState('')
+  const [planModus, setPlanModus] = useState<'abwechslungsreich' | 'baukasten'>('abwechslungsreich')
 
   // Result
   const [plan, setPlan] = useState<GeneratedPlan | null>(null)
@@ -815,6 +983,10 @@ function KiPlanerTab({ rezepte, userId, settings }: {
         })),
       } : null
 
+      const bausteinNote = planModus === 'baukasten'
+        ? 'WICHTIG – Baukasten-Prinzip: Plane so, dass möglichst wenige verschiedene Gerichte gekocht werden. Jedes Gericht soll idealerweise 2–3 Tage reichen (gleiche Mahlzeiten an mehreren Tagen). Priorisiere Meal-Prep-taugliche Gerichte, die sich gut vorbereiten und aufwärmen lassen. '
+        : ''
+
       const { data, error: fnErr } = await supabase.functions.invoke('plan-meals', {
         body: {
           rezepte: rezepte.map(r => ({
@@ -826,7 +998,8 @@ function KiPlanerTab({ rezepte, userId, settings }: {
             kalorien, protein: settings.protein_ziel ?? null,
             karbs: settings.karbs_ziel ?? null, fett: settings.fett_ziel ?? null,
           },
-          tage, mahlzeiten: MEAL_SLOTS.filter(s => selectedMeals.includes(s)), startDatum, wuensche,
+          tage, mahlzeiten: MEAL_SLOTS.filter(s => selectedMeals.includes(s)), startDatum,
+          wuensche: bausteinNote + wuensche,
           budget: budget || null,
           personen: haushaltData ? haushaltData.mitglieder.length : 1,
           haushalt: haushaltData,
@@ -1016,6 +1189,27 @@ function KiPlanerTab({ rezepte, userId, settings }: {
         </div>
       )}
 
+      {/* Planungsmodus */}
+      <div className="space-y-2">
+        <label className="label flex items-center gap-1.5"><Layers size={14} /> Planungsart</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setPlanModus('abwechslungsreich')}
+            className={`p-3 rounded-xl text-left border transition-colors ${
+              planModus === 'abwechslungsreich' ? 'bg-primary/10 border-primary' : 'bg-bg-elevated border-border hover:border-primary/40'
+            }`}>
+            <div className={`font-medium text-sm ${planModus === 'abwechslungsreich' ? 'text-text-primary' : 'text-text-secondary'}`}>🔄 Abwechslungsreich</div>
+            <div className="text-xs text-text-muted mt-0.5">Täglich unterschiedliche Gerichte</div>
+          </button>
+          <button onClick={() => setPlanModus('baukasten')}
+            className={`p-3 rounded-xl text-left border transition-colors ${
+              planModus === 'baukasten' ? 'bg-primary/10 border-primary' : 'bg-bg-elevated border-border hover:border-primary/40'
+            }`}>
+            <div className={`font-medium text-sm ${planModus === 'baukasten' ? 'text-text-primary' : 'text-text-secondary'}`}>🧱 Baukasten</div>
+            <div className="text-xs text-text-muted mt-0.5">Wenig kochen, mehrere Tage gleich</div>
+          </button>
+        </div>
+      </div>
+
       {/* Budget */}
       <div className="space-y-2">
         <label className="label flex items-center gap-1.5"><Wallet size={14} /> Wöchentliches Budget <span className="text-text-muted font-normal">(optional)</span></label>
@@ -1097,6 +1291,7 @@ export function Rezepte() {
   const [showForm, setShowForm] = useState(false)
   const [search, setSearch] = useState('')
   const [settings, setSettings] = useState<Partial<ClientSettings>>({})
+  const [detailRezept, setDetailRezept] = useState<Rezept | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -1176,6 +1371,7 @@ export function Rezepte() {
               <div className="space-y-2">
                 {filtered.map(r => (
                   <RezeptCard key={r.id} r={r}
+                    onOpenDetail={() => setDetailRezept(r)}
                     onDelete={() => deleteRezept(r.id)}
                     onImageGenerated={(id, url) =>
                       setRezepte(prev => prev.map(x => x.id === id ? { ...x, bild_url: url } : x))
@@ -1189,6 +1385,19 @@ export function Rezepte() {
 
       {tab === 'wochenplan' && <WochenplanTab rezepte={rezepte} userId={user.id} />}
       {tab === 'ki' && <KiPlanerTab rezepte={rezepte} userId={user.id} settings={settings} />}
+
+      {detailRezept && (
+        <RezeptDetailModal
+          r={detailRezept}
+          userId={user.id}
+          onClose={() => setDetailRezept(null)}
+          onDelete={() => { deleteRezept(detailRezept.id); setDetailRezept(null) }}
+          onImageGenerated={(id, url) => {
+            setRezepte(prev => prev.map(x => x.id === id ? { ...x, bild_url: url } : x))
+            setDetailRezept(prev => prev ? { ...prev, bild_url: url } : null)
+          }}
+        />
+      )}
     </div>
   )
 }
