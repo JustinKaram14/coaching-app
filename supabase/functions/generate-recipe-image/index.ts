@@ -29,13 +29,6 @@ serve(async (req) => {
     })
   }
 
-  const apiKey = Deno.env.get('GEMINI_API_KEY')
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'KI nicht konfiguriert' }), {
-      status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
   const { rezeptName, zutaten } = await req.json()
   if (!rezeptName) {
     return new Response(JSON.stringify({ error: 'rezeptName fehlt' }), {
@@ -43,84 +36,84 @@ serve(async (req) => {
     })
   }
 
-  const prompt = `Professional food photography of "${rezeptName}". ${
-    zutaten ? `Main ingredients: ${String(zutaten).slice(0, 200)}.` : ''
-  } Close-up shot on a clean white plate, natural lighting, appetizing, high resolution, restaurant quality.`
-
-  const errors: string[] = []
-
-  // 1. Gemini 2.0 Flash (stable, most likely to work with standard API key)
-  const geminiModels = [
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-001',
-    'gemini-2.0-flash-exp',
-    'gemini-2.0-flash-preview-image-generation',
-    'gemini-2.0-flash-exp-image-generation',
-  ]
-
-  for (const model of geminiModels) {
+  // 1. Pexels (primary — free API key from pexels.com/api)
+  const pexelsKey = Deno.env.get('PEXELS_API_KEY')
+  if (pexelsKey) {
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
-          }),
-        }
+      const query = encodeURIComponent(`${rezeptName} food dish`)
+      const searchRes = await fetch(
+        `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=square`,
+        { headers: { Authorization: pexelsKey } }
       )
-      const json = await res.json()
-      if (!res.ok) {
-        errors.push(`${model}: HTTP ${res.status} — ${json?.error?.message ?? 'unknown'}`)
-        continue
+      if (searchRes.ok) {
+        const json = await searchRes.json()
+        const photoUrl = json?.photos?.[0]?.src?.medium
+        if (photoUrl) {
+          // Fetch image and convert to base64 to avoid CSP issues with external URLs
+          const imgRes = await fetch(photoUrl)
+          if (imgRes.ok) {
+            const buffer = await imgRes.arrayBuffer()
+            const bytes = new Uint8Array(buffer)
+            let binary = ''
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+            const b64 = btoa(binary)
+            const mime = imgRes.headers.get('content-type') ?? 'image/jpeg'
+            return new Response(JSON.stringify({ imageDataUrl: `data:${mime};base64,${b64}` }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+        }
       }
-      const parts = json?.candidates?.[0]?.content?.parts ?? []
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          const mime = part.inlineData.mimeType ?? 'image/png'
-          return new Response(JSON.stringify({ imageDataUrl: `data:${mime};base64,${part.inlineData.data}` }), {
+    } catch { /* fall through */ }
+  }
+
+  // 2. Gemini image generation (fallback — requires special API access)
+  const apiKey = Deno.env.get('GEMINI_API_KEY')
+  if (apiKey) {
+    const prompt = `Professional food photography of "${rezeptName}". ${
+      zutaten ? `Main ingredients: ${String(zutaten).slice(0, 200)}.` : ''
+    } Close-up shot on a clean white plate, natural lighting, appetizing, high resolution.`
+
+    // Try current image generation model names
+    for (const model of [
+      'gemini-2.0-flash-preview-image-generation',
+      'imagen-3.0-generate-002',
+    ]) {
+      try {
+        const isImagen = model.startsWith('imagen')
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${isImagen ? 'predict' : 'generateContent'}?key=${apiKey}`
+        const body = isImagen
+          ? JSON.stringify({ instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: '1:1' } })
+          : JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'] } })
+
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+        if (!res.ok) continue
+        const json = await res.json()
+
+        if (isImagen) {
+          const b64 = json?.predictions?.[0]?.bytesBase64Encoded
+          if (b64) return new Response(JSON.stringify({ imageDataUrl: `data:image/jpeg;base64,${b64}` }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
+        } else {
+          for (const part of json?.candidates?.[0]?.content?.parts ?? []) {
+            if (part.inlineData?.data) {
+              const mime = part.inlineData.mimeType ?? 'image/png'
+              return new Response(JSON.stringify({ imageDataUrl: `data:${mime};base64,${part.inlineData.data}` }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              })
+            }
+          }
         }
-      }
-      errors.push(`${model}: HTTP ${res.status} OK but no image in response`)
-    } catch (e: unknown) {
-      errors.push(`${model}: ${e instanceof Error ? e.message : String(e)}`)
+      } catch { /* try next */ }
     }
   }
 
-  // 2. Imagen 3 (requires special access — try last)
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: { sampleCount: 1, aspectRatio: '1:1' },
-        }),
-      }
-    )
-    const json = await res.json()
-    if (!res.ok) {
-      errors.push(`imagen-3: HTTP ${res.status} — ${json?.error?.message ?? 'unknown'}`)
-    } else {
-      const b64 = json?.predictions?.[0]?.bytesBase64Encoded
-      if (b64) {
-        return new Response(JSON.stringify({ imageDataUrl: `data:image/jpeg;base64,${b64}` }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-      errors.push('imagen-3: no bytesBase64Encoded in response')
-    }
-  } catch (e: unknown) {
-    errors.push(`imagen-3: ${e instanceof Error ? e.message : String(e)}`)
-  }
+  const hint = !pexelsKey
+    ? 'Tipp: Füge PEXELS_API_KEY als Supabase Secret hinzu (kostenlos auf pexels.com/api) um automatische Rezeptbilder zu aktivieren.'
+    : 'Pexels-Suche hat kein Ergebnis geliefert.'
 
-  return new Response(JSON.stringify({ error: 'Bildgenerierung fehlgeschlagen', details: errors }), {
+  return new Response(JSON.stringify({ error: 'Kein Bild gefunden', hint }), {
     status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })

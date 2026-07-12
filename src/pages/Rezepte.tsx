@@ -212,6 +212,11 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated }: {
     setGeneratingImg(false)
   }
 
+  // Auto-generate image when modal opens if none exists yet
+  useEffect(() => {
+    if (!r.bild_url) generateImage()
+  }, [])
+
   async function addToPlan() {
     setAdding(true)
     await supabase.from('meal_plans').insert({
