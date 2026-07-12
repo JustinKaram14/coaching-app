@@ -89,8 +89,9 @@ serve(async (req) => {
 
   const {
     rezepte, goals, tage, mahlzeiten, startDatum, wuensche,
-    budget, personen, haushalt,
+    budget, personen, haushalt, planModus,
   } = body
+  const isBaukasten = planModus === 'baukasten'
 
   interface HaushaltMitglied { name: string; kalorien: number; praeferenzen: string }
   interface HaushaltData { name: string; mitglieder: HaushaltMitglied[] }
@@ -147,13 +148,19 @@ ${mitgliederText}
 - Wöchentliches Budget (gesamt): ${budgetVal}
 - Besondere Wünsche (allgemein): ${wuenscheStr || 'keine'}`
 
+    const totalKalHaushalt = haushaltData.mitglieder.reduce((s, m) => s + m.kalorien, 0)
     aufgabeBlock = `AUFGABE (Haushalt-Modus):
 1. Erstelle einen ausgewogenen ${numTage}-Tage Plan für beide Personen, NUR mit den Mahlzeiten ${slots.join(', ')}
 2. GETEILTE MAHLZEITEN: Falls eine Mahlzeit für beide passt → einen Eintrag ohne Namens-Suffix
 3. PERSONENSPEZIFISCHE MAHLZEITEN: Falls die Präferenzen stark abweichen → separate Einträge mit Name in Klammern im Rezeptnamen, z.B. "Hähnchen-Bowl (${haushaltData.mitglieder[0]?.name ?? 'Person 1'})" und "Lachsnudeln (${haushaltData.mitglieder[1]?.name ?? 'Person 2'})"
-4. Jede Person soll ihr Kalorienziel pro Tag möglichst genau treffen
+4. KALORIEN — sehr wichtig:
+   - "kalorien" im JSON-Eintrag = Kalorien PRO PERSON PRO PORTION (nicht Gesamthaushalt)
+   - Bei geteilten Mahlzeiten: "portionen" = ${numPersonen} (Anzahl Personen)
+   - "gesamt_kalorien" pro Tag = SUMME beider Personen (${haushaltData.mitglieder.map(m => `${m.name}: ~${m.kalorien} kcal`).join(' + ')} = ~${totalKalHaushalt} kcal/Tag Haushalt-Gesamt)
+   - Jede Person soll über die geplanten Mahlzeiten ${slots.join('+')} zusammen ihr Kalorienziel erreichen
+   - Beispiel: Mittag 700 kcal/Person → kalorien=700, portionen=${numPersonen} → gesamt für dieses Gericht=${700 * numPersonen} kcal Kochbatch
 5. Die Präferenzen und Besonderheiten jeder Person MÜSSEN berücksichtigt werden
-6. Einkaufsliste: ALLE Zutaten für alle Rezepte aggregieren (geteilte + personenspezifische), nach Supermarkt-Kategorien sortieren, Mengen für alle ${numTage} Tage
+6. Einkaufsliste: ALLE Zutaten für alle Rezepte aggregieren (geteilte + personenspezifische), Mengen für ${numPersonen} Personen und alle ${numTage} Tage
 7. Kochanleitung: siehe Vorgaben zu "meal_prep_guide" unten — wo nötig Variationen für beide Personen beschreiben`
   } else {
     const zielText = [
@@ -181,10 +188,19 @@ ${mitgliederText}
 6. Kochanleitung: siehe Vorgaben zu "meal_prep_guide" unten`
   }
 
+  const bausteinBlock = isBaukasten ? `
+BAUKASTEN-PRINZIP — STRIKTE REGELN:
+- Verwende pro Mahlzeitentyp (${slots.join(', ')}) nur 2-3 verschiedene Rezepte für den gesamten ${numTage}-Tage-Plan
+- Jedes Rezept darf MAXIMAL 2 AUFEINANDERFOLGENDE TAGE erscheinen — dann MINDESTENS 1 Tag Pause
+- VERBOTEN: Das gleiche Rezept 3 oder mehr Tage hintereinander (z.B. Mo+Di+Mi = NEIN; Mo+Di OK, Mi anderes Rezept, Do+Fr wieder erstes = OK)
+- Beispiel für 7 Tage Mittag: Rezept A (Mo), Rezept A (Di), Rezept B (Mi), Rezept B (Do), Rezept C (Fr), Rezept A (Sa), Rezept B (So)
+- Ziel: wenige verschiedene Gerichte, klug rotiert, sodass man an 1-2 Tagen vorkochen kann
+- Meal Prep: Die Gerichte müssen aufwärmbar sein und 2-4 Tage im Kühlschrank halten` : ''
+
   const prompt = `Du bist ein Ernährungsexperte und Meal Prep Coach. Erstelle einen vollständigen Meal Prep Plan mit Einkaufsliste und detaillierter Kochanleitung.
 
 ${personenBlock}
-
+${bausteinBlock}
 VERFÜGBARE REZEPTE (bevorzugt nutzen, exakte Namen + IDs übernehmen):
 ${rezepteJson}
 

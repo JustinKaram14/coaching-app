@@ -988,10 +988,6 @@ function KiPlanerTab({ rezepte, userId, settings }: {
         })),
       } : null
 
-      const bausteinNote = planModus === 'baukasten'
-        ? 'WICHTIG – Baukasten-Prinzip: Plane so, dass möglichst wenige verschiedene Gerichte gekocht werden. Jedes Gericht soll idealerweise 2–3 Tage reichen (gleiche Mahlzeiten an mehreren Tagen). Priorisiere Meal-Prep-taugliche Gerichte, die sich gut vorbereiten und aufwärmen lassen. '
-        : ''
-
       const { data, error: fnErr } = await supabase.functions.invoke('plan-meals', {
         body: {
           rezepte: rezepte.map(r => ({
@@ -1004,7 +1000,8 @@ function KiPlanerTab({ rezepte, userId, settings }: {
             karbs: settings.karbs_ziel ?? null, fett: settings.fett_ziel ?? null,
           },
           tage, mahlzeiten: MEAL_SLOTS.filter(s => selectedMeals.includes(s)), startDatum,
-          wuensche: bausteinNote + wuensche,
+          wuensche,
+          planModus,
           budget: budget || null,
           personen: haushaltData ? haushaltData.mitglieder.length : 1,
           haushalt: haushaltData,
