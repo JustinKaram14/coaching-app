@@ -773,7 +773,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
   const [budget, setBudget] = useState('')
   const [tage, setTage] = useState(5)
   const [startDatum, setStartDatum] = useState(todayISO())
-  const [mahlzeitenProTag, setMahlzeitenProTag] = useState(3)
+  const [selectedMeals, setSelectedMeals] = useState<string[]>(['Frühstück', 'Mittagessen', 'Abendessen'])
   const [wuensche, setWuensche] = useState('')
 
   // Result
@@ -814,6 +814,10 @@ function KiPlanerTab({ rezepte, userId, settings }: {
     setSelectedStores(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
   }
 
+  function toggleMeal(slot: string) {
+    setSelectedMeals(s => s.includes(slot) ? s.filter(x => x !== slot) : [...s, slot])
+  }
+
   async function generatePlan() {
     setStep('loading')
     setError('')
@@ -838,7 +842,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
             kalorien, protein: settings.protein_ziel ?? null,
             karbs: settings.karbs_ziel ?? null, fett: settings.fett_ziel ?? null,
           },
-          tage, mahlzeitenProTag, startDatum, wuensche,
+          tage, mahlzeiten: MEAL_SLOTS.filter(s => selectedMeals.includes(s)), startDatum, wuensche,
           stores: selectedStores, budget: budget || null,
           personen: haushaltData ? haushaltData.mitglieder.length : 1,
           haushalt: haushaltData,
@@ -1070,8 +1074,21 @@ function KiPlanerTab({ rezepte, userId, settings }: {
         <input type="date" className="input" value={startDatum} min={todayISO()} onChange={e => setStartDatum(e.target.value)} />
       </div>
       <div className="space-y-2">
-        <label className="label">Mahlzeiten pro Tag?</label>
-        {btnGroup(mahlzeitenProTag, [2, 3, 4], setMahlzeitenProTag)}
+        <label className="label">Welche Mahlzeiten?</label>
+        <div className="flex gap-2 flex-wrap">
+          {MEAL_SLOTS.map(slot => (
+            <button key={slot} onClick={() => toggleMeal(slot)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                selectedMeals.includes(slot) ? 'bg-primary text-white border-primary' : 'bg-bg-elevated text-text-secondary border-border hover:border-primary/50'
+              }`}>
+              {selectedMeals.includes(slot) && <Check size={11} className="inline mr-1" />}
+              {slot}
+            </button>
+          ))}
+        </div>
+        {selectedMeals.length === 0 && (
+          <p className="text-xs text-danger">Wähle mindestens eine Mahlzeit aus.</p>
+        )}
       </div>
 
       {/* Calorie goal info */}
