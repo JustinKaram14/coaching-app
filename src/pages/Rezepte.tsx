@@ -3,7 +3,7 @@ import {
   BookOpen, Plus, Trash2, ChefHat, CalendarDays, Sparkles,
   ChevronLeft, ChevronRight, X, Check, Info, UtensilsCrossed,
   ShoppingCart, Copy, Share2, Send, MessageCircle, Wallet,
-  Store, ChevronDown, ChevronUp, Home, Image, Link, Wand2,
+  ChevronDown, ChevronUp, Home, Image, Link, Wand2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -65,17 +65,6 @@ interface ChatMessage {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MEAL_SLOTS = ['Frühstück', 'Mittagessen', 'Abendessen', 'Snack']
-
-const STORES = [
-  { id: 'Lidl', label: 'Lidl' },
-  { id: 'Kaufland', label: 'Kaufland' },
-  { id: 'Rewe', label: 'Rewe' },
-  { id: 'Aldi', label: 'Aldi' },
-  { id: 'Edeka', label: 'Edeka' },
-  { id: 'Penny', label: 'Penny' },
-  { id: 'dm', label: 'dm' },
-  { id: 'Rossmann', label: 'Rossmann' },
-]
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -609,7 +598,7 @@ function EinkaufslisteView({ liste }: { liste: Einkaufsliste }) {
                     }`} onClick={() => toggle(key)}>
                       {done && <Check size={11} className="text-white" />}
                     </div>
-                    <span className={`text-sm transition-colors ${done ? 'text-text-muted line-through' : 'text-text-primary'}`}>
+                    <span className={`text-sm transition-colors flex-1 ${done ? 'text-text-muted line-through' : 'text-text-primary'}`}>
                       <span className="font-medium">{a.menge}</span> {a.name}
                     </span>
                   </label>
@@ -769,7 +758,6 @@ function KiPlanerTab({ rezepte, userId, settings }: {
   const [fuerHaushalt, setFuerHaushalt] = useState(false)
 
   // Config
-  const [selectedStores, setSelectedStores] = useState<string[]>([])
   const [budget, setBudget] = useState('')
   const [tage, setTage] = useState(5)
   const [startDatum, setStartDatum] = useState(todayISO())
@@ -810,10 +798,6 @@ function KiPlanerTab({ rezepte, userId, settings }: {
     loadHaushalt()
   }, [userId])
 
-  function toggleStore(id: string) {
-    setSelectedStores(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
-  }
-
   function toggleMeal(slot: string) {
     setSelectedMeals(s => s.includes(slot) ? s.filter(x => x !== slot) : [...s, slot])
   }
@@ -843,7 +827,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
             karbs: settings.karbs_ziel ?? null, fett: settings.fett_ziel ?? null,
           },
           tage, mahlzeiten: MEAL_SLOTS.filter(s => selectedMeals.includes(s)), startDatum, wuensche,
-          stores: selectedStores, budget: budget || null,
+          budget: budget || null,
           personen: haushaltData ? haushaltData.mitglieder.length : 1,
           haushalt: haushaltData,
         },
@@ -1031,29 +1015,6 @@ function KiPlanerTab({ rezepte, userId, settings }: {
           )}
         </div>
       )}
-
-      {/* Stores */}
-      <div className="space-y-2">
-        <label className="label flex items-center gap-1.5"><Store size={14} /> Wo kaufst du ein? <span className="text-text-muted font-normal">(optional, Mehrfachauswahl)</span></label>
-        <div className="flex flex-wrap gap-2">
-          {STORES.map(s => (
-            <button key={s.id} onClick={() => toggleStore(s.id)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                selectedStores.includes(s.id)
-                  ? 'bg-primary/20 border-primary text-primary'
-                  : 'bg-bg-elevated border-border text-text-secondary hover:border-primary/50'
-              }`}>
-              {selectedStores.includes(s.id) && <Check size={11} className="inline mr-1" />}
-              {s.label}
-            </button>
-          ))}
-        </div>
-        {selectedStores.length > 0 && (
-          <p className="text-xs text-text-muted">
-            Die KI kennt das typische Sortiment dieser Märkte und plant entsprechend. Live-Angebote sind nicht verfügbar.
-          </p>
-        )}
-      </div>
 
       {/* Budget */}
       <div className="space-y-2">

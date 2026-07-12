@@ -89,7 +89,7 @@ serve(async (req) => {
 
   const {
     rezepte, goals, tage, mahlzeiten, startDatum, wuensche,
-    stores, budget, personen, haushalt,
+    budget, personen, haushalt,
   } = body
 
   interface HaushaltMitglied { name: string; kalorien: number; praeferenzen: string }
@@ -100,7 +100,6 @@ serve(async (req) => {
   const numPersonen = haushaltData ? haushaltData.mitglieder.length : (Number(personen) || 1)
   const startStr = typeof startDatum === 'string' ? startDatum : new Date().toISOString().split('T')[0]
   const wuenscheStr = typeof wuensche === 'string' ? wuensche.trim() : ''
-  const storesArr = Array.isArray(stores) ? (stores as string[]) : []
   const budgetVal = budget ? `ca. ${budget} €` : 'kein festes Budget'
 
   const goalsObj = (goals ?? {}) as Record<string, number | null>
@@ -134,10 +133,6 @@ serve(async (req) => {
       })))
     : 'Keine Rezepte vorhanden — eigene Rezepte vorschlagen.'
 
-  const storeText = storesArr.length > 0
-    ? `Bevorzugte Einkaufsorte: ${storesArr.join(', ')}. Passe das Sortiment und typische Produkte dieser Märkte an.`
-    : 'Keine Marktpräferenz angegeben.'
-
   let personenBlock: string
   let aufgabeBlock: string
 
@@ -150,7 +145,6 @@ serve(async (req) => {
 ${mitgliederText}
 - Mahlzeiten: NUR diese — ${slots.join(', ')}. KEINE anderen Mahlzeiten einplanen, auch wenn sie üblich wären.
 - Wöchentliches Budget (gesamt): ${budgetVal}
-- ${storeText}
 - Besondere Wünsche (allgemein): ${wuenscheStr || 'keine'}`
 
     aufgabeBlock = `AUFGABE (Haushalt-Modus):
@@ -176,7 +170,6 @@ ${mitgliederText}
 - Nährstoffziele (pro Person):
   ${zielText}
 - Wöchentliches Budget: ${budgetVal}
-- ${storeText}
 - Besondere Wünsche: ${wuenscheStr || 'keine'}`
 
     aufgabeBlock = `AUFGABE:
@@ -288,7 +281,7 @@ Antworte NUR mit diesem JSON (kein Text davor/dahinter, kein Markdown-Block):
       }
     ],
     "budget_gesamt_ca": "48.00",
-    "hinweis": "Preise basieren auf typischen ${storesArr.length > 0 ? storesArr.join('/') : 'Supermarkt'}-Preisen. Aktuelle Angebote können abweichen."
+    "hinweis": "Grobe Schätzung basierend auf allgemein bekannten Durchschnittspreisen bei deutschen Supermärkten — keine Live-Preisdaten oder aktuellen Angebote, da die KI keinen Internetzugriff hat. Tatsächliche Preise können abweichen."
   },
   "meal_prep_guide": "## Hähnchen-Bowl (Vorbereitung 15 Min., Kochen 25 Min.)\\n1. Ofen auf 200°C Ober-/Unterhitze vorheizen.\\n2. 500g Hähnchenbrust in 2cm-Würfel schneiden, mit 1 EL Olivenöl, Salz, Pfeffer und 1 TL Paprikapulver in einer Schüssel vermengen.\\n3. Brokkoli (300g) in kleine Röschen teilen, auf einem Backblech verteilen, mit 1 EL Öl beträufeln.\\n4. Hähnchen und Brokkoli getrennt auf 2 Backblechen 20-22 Min. im Ofen garen, bis das Hähnchen innen nicht mehr rosa ist (Kerntemperatur 75°C) und der Brokkoli leicht gebräunt ist.\\n5. Währenddessen 200g Reis nach Packungsanweisung in Salzwasser kochen (ca. 15-18 Min.), abgießen.\\n6. Alles in Meal-Prep-Boxen aufteilen (4 Portionen à 130g Reis, 125g Hähnchen, 75g Brokkoli), 30 Min. abkühlen lassen bevor der Deckel geschlossen wird.\\n7. Im Kühlschrank bis zu 4 Tage haltbar; vor dem Essen 2-3 Min. in der Mikrowelle bei 800W erhitzen."
 }`
