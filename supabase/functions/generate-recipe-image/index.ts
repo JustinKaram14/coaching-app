@@ -47,38 +47,18 @@ serve(async (req) => {
     zutaten ? `Main ingredients: ${String(zutaten).slice(0, 200)}.` : ''
   } Close-up shot on a clean white plate, natural lighting, appetizing, high resolution, restaurant quality.`
 
-  // 1. Try Imagen 3
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: { sampleCount: 1, aspectRatio: '1:1' },
-        }),
-      }
-    )
-    if (res.ok) {
-      const json = await res.json()
-      const b64 = json?.predictions?.[0]?.bytesBase64Encoded
-      if (b64) {
-        return new Response(JSON.stringify({ imageDataUrl: `data:image/jpeg;base64,${b64}` }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-    }
-  } catch { /* fall through */ }
+  const errors: string[] = []
 
-  // 2. Try Gemini 2.0 Flash image generation (multiple model names in case one is deprecated)
-  const geminiImageModels = [
+  // 1. Gemini 2.0 Flash (stable, most likely to work with standard API key)
+  const geminiModels = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash-exp',
     'gemini-2.0-flash-preview-image-generation',
     'gemini-2.0-flash-exp-image-generation',
-    'gemini-2.0-flash-exp',
   ]
 
-  for (const model of geminiImageModels) {
+  for (const model of geminiModels) {
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -91,8 +71,11 @@ serve(async (req) => {
           }),
         }
       )
-      if (!res.ok) continue
       const json = await res.json()
+      if (!res.ok) {
+        errors.push(`${model}: HTTP ${res.status} — ${json?.error?.message ?? 'unknown'}`)
+        continue
+      }
       const parts = json?.candidates?.[0]?.content?.parts ?? []
       for (const part of parts) {
         if (part.inlineData?.data) {
@@ -102,10 +85,42 @@ serve(async (req) => {
           })
         }
       }
-    } catch { /* try next model */ }
+      errors.push(`${model}: HTTP ${res.status} OK but no image in response`)
+    } catch (e: unknown) {
+      errors.push(`${model}: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
-  return new Response(JSON.stringify({ error: 'Bildgenerierung fehlgeschlagen — kein Modell verfügbar' }), {
+  // 2. Imagen 3 (requires special access — try last)
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt }],
+          parameters: { sampleCount: 1, aspectRatio: '1:1' },
+        }),
+      }
+    )
+    const json = await res.json()
+    if (!res.ok) {
+      errors.push(`imagen-3: HTTP ${res.status} — ${json?.error?.message ?? 'unknown'}`)
+    } else {
+      const b64 = json?.predictions?.[0]?.bytesBase64Encoded
+      if (b64) {
+        return new Response(JSON.stringify({ imageDataUrl: `data:image/jpeg;base64,${b64}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      errors.push('imagen-3: no bytesBase64Encoded in response')
+    }
+  } catch (e: unknown) {
+    errors.push(`imagen-3: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  return new Response(JSON.stringify({ error: 'Bildgenerierung fehlgeschlagen', details: errors }), {
     status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })
