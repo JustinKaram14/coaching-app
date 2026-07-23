@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { formatDate, calcSleepHours } from '../lib/utils'
 import type { CoachPlan } from '../types/database'
+import { Anamnese } from './Anamnese'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart,
 } from 'recharts'
@@ -79,6 +80,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
   const [showBanner, setShowBanner] = useState(false)
+  const [showAnamnese, setShowAnamnese] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -95,6 +97,13 @@ export function Dashboard() {
       const trainings = trainingRes.data ?? []
       const schlaf = schlafRes.data ?? []
       const settings = settingsRes.data
+      // Show Anamnese for clients that haven't filled it in yet
+      if (settings) {
+        try {
+          const note = settings.ernaehrungs_notizen ? JSON.parse(settings.ernaehrungs_notizen) : {}
+          if (!note.anamnese_done) setShowAnamnese(true)
+        } catch { setShowAnamnese(true) }
+      }
       if (planRes.data) {
         setMasterplan(planRes.data)
         const seenAt = localStorage.getItem(`masterplan_seen_${user!.id}`)
@@ -146,6 +155,10 @@ export function Dashboard() {
     if (h < 12) return 'Guten Morgen'
     if (h < 18) return 'Guten Tag'
     return 'Guten Abend'
+  }
+
+  if (showAnamnese && user && profile?.role === 'client') {
+    return <Anamnese userId={user.id} onDone={() => setShowAnamnese(false)} />
   }
 
   return (

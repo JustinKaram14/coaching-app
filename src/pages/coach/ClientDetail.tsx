@@ -468,7 +468,7 @@ export function ClientDetail() {
   const [schlaf, setSchlaf] = useState<SchlafEntry[]>([])
   const [ernaehrung, setErnaehrung] = useState<ErnaehrungEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
+  const [tab, setTab] = useState<'overview' | 'anamnese' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
   const [notizen, setNotizen] = useState('')
   const [notizenSaving, setNotizenSaving] = useState(false)
 
@@ -519,6 +519,7 @@ export function ClientDetail() {
 
   const tabs = [
     { id: 'overview', label: 'Übersicht' },
+    { id: 'anamnese', label: 'Anamnese' },
     { id: 'weight', label: 'Gewicht' },
     { id: 'training', label: 'Training' },
     { id: 'sleep', label: 'Schlaf' },
@@ -672,6 +673,63 @@ export function ClientDetail() {
           </div>
         </div>
       )}
+
+      {tab === 'anamnese' && (() => {
+        let anamnese: Record<string, unknown> = {}
+        try { anamnese = settings?.ernaehrungs_notizen ? JSON.parse(settings.ernaehrungs_notizen) : {} } catch {}
+        const hasData = anamnese.anamnese_done && !anamnese.skipped
+        if (!hasData) return (
+          <div className="card text-center py-12 text-text-muted text-sm">
+            Klient hat die Anamnese noch nicht ausgefüllt.
+          </div>
+        )
+        const row = (label: string, value: unknown) => value ? (
+          <div className="grid grid-cols-[160px_1fr] gap-2 py-2 border-b border-border last:border-0">
+            <span className="text-xs text-text-muted font-medium">{label}</span>
+            <span className="text-sm text-text-primary">{Array.isArray(value) ? (value as string[]).join(', ') : String(value)}</span>
+          </div>
+        ) : null
+        return (
+          <div className="space-y-4">
+            <div className="card space-y-1">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Körperdaten</div>
+              {row('Alter', anamnese.alter && `${anamnese.alter} Jahre`)}
+              {row('Geschlecht', anamnese.geschlecht)}
+              {row('Beruf', anamnese.beruf)}
+              {row('Körpergröße', anamnese.koerpergroesse && `${anamnese.koerpergroesse} cm`)}
+              {row('Aktuelles Gewicht', anamnese.koerpergewicht && `${anamnese.koerpergewicht} kg`)}
+              {row('Zielgewicht', anamnese.zielgewicht && `${anamnese.zielgewicht} kg`)}
+              {row('Gewichtsverlauf', anamnese.gewichtsverlauf)}
+            </div>
+            <div className="card space-y-1">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Ziele & Gesundheit</div>
+              {row('Hauptziele', anamnese.ziele)}
+              {row('Zeitraum', anamnese.zeitraum)}
+              {row('Erkrankungen', anamnese.erkrankungen)}
+              {row('Allergien', anamnese.allergien)}
+              {row('Supplements', anamnese.supplements)}
+            </div>
+            <div className="card space-y-1">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Ernährungsgewohnheiten</div>
+              {row('Aktivitätsniveau', anamnese.aktivitaet)}
+              {row('Frühstück', anamnese.fruehstueck)}
+              {row('Mittagessen', anamnese.mittagessen)}
+              {row('Abendessen', anamnese.abendessen)}
+              {row('Snacks', anamnese.snacks)}
+              {row('Alkohol', anamnese.alkohol)}
+              {row('Heißhunger', anamnese.heisshunger)}
+            </div>
+            <div className="card space-y-1">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Mahlzeiten & Timing</div>
+              {row('Mahlzeiten bevorzugt', anamnese.mahlzeiten_typ)}
+              {row('Meal Prep', anamnese.meal_prep)}
+              {row('Intervallfasten', anamnese.intervallfasten)}
+              {row('Proteinquellen', anamnese.proteinquellen)}
+              {row('Smartwatch / Tracker', anamnese.smartwatch)}
+            </div>
+          </div>
+        )
+      })()}
 
       {tab === 'weight' && (
         <div className="card overflow-x-auto">
