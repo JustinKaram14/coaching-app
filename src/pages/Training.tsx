@@ -177,189 +177,162 @@ function getTip(name: string): UebungTip | null {
   return UEBUNG_TIPS[key] ?? null
 }
 
-// ─── Muscle Body Diagram ─────────────────────────────────────────────────────
+// ─── Exercise GIF (free-exercise-db, CC BY-SA 3.0 Everkinetic) ───────────────
 
-function MuskelMap({ active }: { active: string[] }) {
-  const on = (id: string) => active.includes(id)
+// Maps German exercise key → folder name in yuhonas/free-exercise-db
+const EXERCISE_IMGS: Record<string, string> = {
+  'bankdrücken':     'Barbell_Bench_Press_-_Medium_Grip',
+  'kniebeuge':       'Barbell_Full_Squat',
+  'kreuzheben':      'Barbell_Deadlift',
+  'klimmzug':        'Pullups',
+  'pull up':         'Pullups',
+  'wide pull up':    'Wide-Grip_Pullup',
+  'schulterdrücken': 'Barbell_Shoulder_Press',
+  'rudern':          'Bent_Over_Barbell_Row',
+  'bizeps curl':     'Barbell_Curl',
+  'trizepsdrücken':  'Tricep_Dips_Between_Benches',
+  'beinstrecken':    'Leg_Extensions',
+  'beinbeugen':      'Seated_Leg_Curl',
+  'plank':           'Plank',
+  'dips':            'Dips',
+  'seitheben':       'Side_Lateral_Raise',
+  'liegestützen':    'Push_Ups',
+  'laufen':          'Running,_Treadmill',
+  'laufband':        'Running,_Treadmill',
+  'fahrrad':         'Stationary_Bike',
+}
 
-  function mStyle(id: string): React.SVGProps<SVGElement> {
-    return on(id)
-      ? { fill: '#6366f1', opacity: 1, className: 'muscle-active' }
-      : { fill: '#2a2d38', opacity: 0.6 }
-  }
+const GIF_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises'
 
-  const bodyFill = '#1e2130'
-  const skinFill = '#2a2d38'
+function ExerciseGif({ exerciseKey }: { exerciseKey: string }) {
+  const folder = EXERCISE_IMGS[exerciseKey]
+  const [frame, setFrame] = useState(0)
+  const [loaded, setLoaded] = useState([false, false])
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    if (!folder || hasError) return
+    const t = setInterval(() => setFrame(f => (f + 1) % 2), 1400)
+    return () => clearInterval(t)
+  }, [folder, hasError])
+
+  if (!folder || hasError) return null
 
   return (
-    <div className="flex gap-4 justify-center py-2">
-      <style>{`
-        .muscle-active { animation: mPulse 1.8s ease-in-out infinite; }
-        @keyframes mPulse { 0%,100%{opacity:1;filter:drop-shadow(0 0 4px #6366f1aa)} 50%{opacity:0.75;filter:drop-shadow(0 0 8px #6366f1)} }
-      `}</style>
-
-      {/* Front View */}
-      <div className="text-center">
-        <div className="text-[9px] font-medium text-text-muted tracking-widest mb-1.5">VORNE</div>
-        <svg viewBox="0 0 90 208" width="76" height="175">
-          {/* Body outline */}
-          <circle cx="45" cy="13" r="10" fill={skinFill} />
-          <rect x="42" y="22" width="6" height="8" rx="2" fill={skinFill} />
-          <rect x="23" y="30" width="44" height="74" rx="11" fill={bodyFill} />
-          <rect x="9" y="32" width="14" height="36" rx="7" fill={skinFill} />
-          <rect x="67" y="32" width="14" height="36" rx="7" fill={skinFill} />
-          <rect x="10" y="68" width="12" height="26" rx="6" fill={skinFill} />
-          <rect x="68" y="68" width="12" height="26" rx="6" fill={skinFill} />
-          <rect x="23" y="104" width="20" height="52" rx="9" fill={skinFill} />
-          <rect x="47" y="104" width="20" height="52" rx="9" fill={skinFill} />
-          <rect x="25" y="156" width="16" height="44" rx="7" fill={skinFill} />
-          <rect x="49" y="156" width="16" height="44" rx="7" fill={skinFill} />
-
-          {/* Front muscles */}
-          <rect x="25" y="32" width="40" height="30" rx="8" {...mStyle('chest') as any} />
-          <ellipse cx="16" cy="42" rx="9" ry="8" {...mStyle('shoulder') as any} />
-          <ellipse cx="74" cy="42" rx="9" ry="8" {...mStyle('shoulder') as any} />
-          <rect x="10" y="36" width="12" height="26" rx="6" {...mStyle('bicep') as any} />
-          <rect x="68" y="36" width="12" height="26" rx="6" {...mStyle('bicep') as any} />
-          <rect x="28" y="62" width="34" height="40" rx="9" {...mStyle('abs') as any} />
-          <rect x="24" y="106" width="18" height="46" rx="8" {...mStyle('quad') as any} />
-          <rect x="48" y="106" width="18" height="46" rx="8" {...mStyle('quad') as any} />
-          <rect x="26" y="158" width="13" height="36" rx="6" {...mStyle('calf') as any} />
-          <rect x="51" y="158" width="13" height="36" rx="6" {...mStyle('calf') as any} />
-        </svg>
-      </div>
-
-      {/* Back View */}
-      <div className="text-center">
-        <div className="text-[9px] font-medium text-text-muted tracking-widest mb-1.5">HINTEN</div>
-        <svg viewBox="0 0 90 208" width="76" height="175">
-          {/* Body outline */}
-          <circle cx="45" cy="13" r="10" fill={skinFill} />
-          <rect x="42" y="22" width="6" height="8" rx="2" fill={skinFill} />
-          <rect x="23" y="30" width="44" height="74" rx="11" fill={bodyFill} />
-          <rect x="9" y="32" width="14" height="36" rx="7" fill={skinFill} />
-          <rect x="67" y="32" width="14" height="36" rx="7" fill={skinFill} />
-          <rect x="10" y="68" width="12" height="26" rx="6" fill={skinFill} />
-          <rect x="68" y="68" width="12" height="26" rx="6" fill={skinFill} />
-          <rect x="23" y="104" width="20" height="52" rx="9" fill={skinFill} />
-          <rect x="47" y="104" width="20" height="52" rx="9" fill={skinFill} />
-          <rect x="25" y="156" width="16" height="44" rx="7" fill={skinFill} />
-          <rect x="49" y="156" width="16" height="44" rx="7" fill={skinFill} />
-
-          {/* Back muscles */}
-          <rect x="26" y="32" width="38" height="22" rx="7" {...mStyle('trap') as any} />
-          <path d="M10,46 L28,40 L26,82 L8,92 Z" {...mStyle('lat') as any} />
-          <path d="M80,46 L62,40 L64,82 L82,92 Z" {...mStyle('lat') as any} />
-          <rect x="10" y="36" width="12" height="26" rx="6" {...mStyle('tricep') as any} />
-          <rect x="68" y="36" width="12" height="26" rx="6" {...mStyle('tricep') as any} />
-          <rect x="30" y="64" width="30" height="20" rx="6" {...mStyle('lback') as any} />
-          <rect x="24" y="104" width="18" height="26" rx="9" {...mStyle('glute') as any} />
-          <rect x="48" y="104" width="18" height="26" rx="9" {...mStyle('glute') as any} />
-          <rect x="24" y="132" width="18" height="40" rx="8" {...mStyle('ham') as any} />
-          <rect x="48" y="132" width="18" height="40" rx="8" {...mStyle('ham') as any} />
-          <rect x="26" y="174" width="13" height="26" rx="6" {...mStyle('calf') as any} />
-          <rect x="51" y="174" width="13" height="26" rx="6" {...mStyle('calf') as any} />
-        </svg>
-      </div>
+    <div className="relative w-full rounded-xl overflow-hidden bg-bg-elevated" style={{ aspectRatio: '4/3' }}>
+      {[0, 1].map(i => (
+        <img
+          key={i}
+          src={`${GIF_BASE}/${folder}/${i}.jpg`}
+          alt=""
+          onLoad={() => setLoaded(l => { const n = [...l]; n[i] = true; return n })}
+          onError={() => setHasError(true)}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{
+            opacity: frame === i && loaded[i] ? 1 : 0,
+            transition: 'opacity 0.6s ease',
+          }}
+        />
+      ))}
+      {!loaded[0] && !hasError && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Exercise Tip Modal ───────────────────────────────────────────────────────
 
+const MUSKEL_LABELS: Record<string, string> = {
+  chest: 'Brust', shoulder: 'Schultern', bicep: 'Bizeps', tricep: 'Trizeps',
+  trap: 'Trapez', lat: 'Latissimus', lback: 'Unterer Rücken', abs: 'Core',
+  quad: 'Quadrizeps', ham: 'Hamstrings', glute: 'Gesäß', calf: 'Waden',
+}
+
 function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }) {
   const tip = getTip(name)
+  const key = name.toLowerCase().trim()
   const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' richtige Ausführung Technik')}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
         className="bg-bg-card rounded-2xl border border-border w-full max-w-sm overflow-y-auto"
-        style={{ maxHeight: '88vh' }}
+        style={{ maxHeight: '90vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-5 pb-3">
+        <div className="flex items-start justify-between p-5 pb-4">
           <div>
             <div className="font-bold text-text-primary capitalize text-base">{name}</div>
             {tip && (
               <>
                 <div className="text-xs text-primary font-medium mt-0.5">{tip.muskel}</div>
-                <div className="text-xs text-text-muted mt-0.5">{tip.sekundaer}</div>
+                <div className="text-xs text-text-muted">{tip.sekundaer}</div>
               </>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0"><X size={16} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0 ml-3"><X size={16} /></button>
         </div>
 
-        {tip ? (
-          <div className="px-5 pb-5 space-y-5">
-            {/* Muscle Diagram */}
-            <div className="bg-bg-elevated rounded-xl p-3">
-              <MuskelMap active={tip.muskeln} />
-              <div className="flex flex-wrap gap-1.5 justify-center mt-2">
-                {tip.muskeln.map(m => {
-                  const labels: Record<string, string> = {
-                    chest: 'Brust', shoulder: 'Schultern', bicep: 'Bizeps', tricep: 'Trizeps',
-                    trap: 'Trapez', lat: 'Latissimus', lback: 'Unterer Rücken', abs: 'Core',
-                    quad: 'Quadrizeps', ham: 'Hamstrings', glute: 'Gesäß', calf: 'Waden',
-                  }
-                  return (
-                    <span key={m} className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
-                      {labels[m] ?? m}
-                    </span>
-                  )
-                })}
+        <div className="px-5 pb-6 space-y-5">
+          {/* GIF Animation */}
+          <ExerciseGif exerciseKey={key} />
+
+          {tip ? (
+            <>
+              {/* Muscle chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {tip.muskeln.map(m => (
+                  <span key={m} className="text-[11px] px-2.5 py-1 rounded-full bg-primary/20 text-primary font-medium">
+                    {MUSKEL_LABELS[m] ?? m}
+                  </span>
+                ))}
               </div>
-            </div>
 
-            {/* Warum */}
-            <div>
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Warum diese Übung?</div>
-              <p className="text-sm text-text-secondary leading-relaxed">{tip.warum}</p>
-            </div>
+              {/* Warum */}
+              <div>
+                <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Warum diese Übung?</div>
+                <p className="text-sm text-text-secondary leading-relaxed">{tip.warum}</p>
+              </div>
 
-            {/* Ausführung */}
-            <div>
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
-              <ul className="space-y-2">
-                {tip.tipps.map((t, i) => (
-                  <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
-                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {/* Ausführung */}
+              <div>
+                <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
+                <ul className="space-y-2">
+                  {tip.tipps.map((t, i) => (
+                    <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
+                      <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* Häufige Fehler */}
-            <div>
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Häufige Fehler</div>
-              <ul className="space-y-1.5">
-                {tip.fehler.map((f, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-text-secondary">
-                    <span className="text-danger shrink-0 mt-0.5">✕</span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* YouTube Link */}
-            <a href={ytUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 text-sm text-text-secondary hover:text-primary transition-colors">
-              <span className="text-base">▶</span> Videodemonstration ansehen
-            </a>
-          </div>
-        ) : (
-          <div className="px-5 pb-5 space-y-3">
+              {/* Fehler */}
+              <div>
+                <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Häufige Fehler</div>
+                <ul className="space-y-1.5">
+                  {tip.fehler.map((f, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-text-secondary">
+                      <span className="text-danger shrink-0">✕</span>{f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : (
             <p className="text-sm text-text-muted">Für <span className="text-text-primary font-medium">"{name}"</span> sind noch keine Tipps hinterlegt.</p>
-            <a href={ytUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-primary/50 text-sm text-text-secondary hover:text-primary transition-colors">
-              <span className="text-base">▶</span> Videodemonstration ansehen
-            </a>
-          </div>
-        )}
+          )}
+
+          {/* YouTube */}
+          <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 text-sm text-text-secondary hover:text-primary transition-colors">
+            <span>▶</span> Videodemonstration ansehen
+          </a>
+        </div>
       </div>
     </div>
   )
