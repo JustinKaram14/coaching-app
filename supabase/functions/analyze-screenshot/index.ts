@@ -10,8 +10,14 @@ const ALLOWED_ORIGINS = [
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'])
 const ALLOWED_CONTEXTS = new Set(['nutrition', 'training', 'sleep', 'recipe_text'])
 
+function nutritionPrompt(hint?: string): string {
+  const base = 'Analysiere dieses Bild (Mahlzeit, Rezept, Lebensmitteletikett oder Screenshot). Schätze die Gesamtnährwerte und antworte NUR mit einem JSON-Objekt ohne weiteren Text: {"kalorien": number, "protein_g": number, "kohlenhydrate_g": number, "fett_g": number, "notizen": "kurze Beschreibung der Mahlzeit"}'
+  if (hint) return `Wichtiger Hinweis des Nutzers: Das Essen ist tatsächlich "${hint}". Schätze die Nährwerte basierend auf diesem Hinweis (nicht auf dem optischen Eindruck). ${base}`
+  return base
+}
+
 const PROMPTS: Record<string, string> = {
-  nutrition: 'Analysiere dieses Bild (Mahlzeit, Rezept, Lebensmitteletikett oder Screenshot). Schätze die Gesamtnährwerte und antworte NUR mit einem JSON-Objekt ohne weiteren Text: {"kalorien": number, "protein_g": number, "kohlenhydrate_g": number, "fett_g": number, "notizen": "kurze Beschreibung der Mahlzeit"}',
+  nutrition: nutritionPrompt(),
   training: 'Analysiere diesen Screenshot einer Trainings-App oder Apple Watch Workout-Zusammenfassung. Extrahiere die Trainingsdaten und antworte NUR mit einem JSON-Objekt ohne weiteren Text. Für trainingstyp wähle einen aus: Kraft, Cardio, HIIT, Yoga, Stretching, Schwimmen, Radfahren, Laufen, Sonstiges. {"dauer_min": number | null, "avg_puls": number | null, "kalorien_verbrannt": number | null, "trainingstyp": string, "notizen": "kurze Beschreibung des Workouts"}',
   sleep: 'Analysiere diesen Screenshot einer Schlaf-App (Apple Health, Oura, Whoop, Garmin o.ä.). Extrahiere die Schlafdaten und antworte NUR mit einem JSON-Objekt ohne weiteren Text. Zeiten im Format HH:MM (24h). Schlafqualität als Zahl 1-10. {"einschlafzeit": "HH:MM" | null, "aufwachzeit": "HH:MM" | null, "schlafqualitaet": number | null, "notizen": "kurze Zusammenfassung"}',
   recipe_text: 'Analysiere diesen Rezepttext oder diese Zutatenliste und schätze die Nährwerte PRO PORTION. Falls keine Portionszahl angegeben ist, nimm 1 Portion für die Gesamtmenge. Antworte NUR mit einem JSON-Objekt ohne weiteren Text: {"name": "Rezeptname oder Mahlzeitbeschreibung", "kalorien": number, "protein_g": number, "kohlenhydrate_g": number, "fett_g": number, "portionen": number}',
@@ -92,7 +98,7 @@ serve(async (req) => {
   }
 
   // --- INPUT VALIDATION ---
-  let body: { imageBase64?: unknown; mimeType?: unknown; context?: unknown; recipeText?: unknown }
+  let body: { imageBase64?: unknown; mimeType?: unknown; context?: unknown; recipeText?: unknown; hint?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -101,7 +107,7 @@ serve(async (req) => {
     })
   }
 
-  const { imageBase64, mimeType, context, recipeText } = body
+  const { imageBase64, mimeType, context, recipeText, hint } = body
 
   if (typeof context !== 'string' || !ALLOWED_CONTEXTS.has(context)) {
     return new Response(JSON.stringify({ error: 'Invalid context' }), {
@@ -148,11 +154,14 @@ serve(async (req) => {
     })
   }
 
+  const nutritionHint = context === 'nutrition' && typeof hint === 'string' && hint.trim() ? hint.trim() : undefined
+  const prompt = context === 'nutrition' ? nutritionPrompt(nutritionHint) : PROMPTS[context]
+
   const geminiParts = isTextContext
-    ? [{ text: `${PROMPTS[context]}\n\nText:\n${recipeText}` }]
+    ? [{ text: `${prompt}\n\nText:\n${recipeText}` }]
     : [
         { inline_data: { mime_type: mimeType, data: imageBase64 } },
-        { text: PROMPTS[context] },
+        { text: prompt },
       ]
 
   const model = await pickFlashModel(apiKey)

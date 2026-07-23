@@ -432,7 +432,9 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   const [analyzing, setAnalyzing] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [aiResult, setAiResult] = useState<FoodItemInput | null>(null)
+  const [aiCorrection, setAiCorrection] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
+  const photoFileRef = useRef<File | null>(null)
   const [manual, setManual] = useState({
     name: '', kalorien: '', protein_g: '', kohlenhydrate_g: '', fett_g: '', menge_g: '',
   })
@@ -495,16 +497,19 @@ function AddFoodModal({ meal, onClose, onAdd }: {
       .catch(() => setBarcodeError('Scan fehlgeschlagen. Bitte manuell eingeben.'))
   }
 
-  async function analyzePhoto(file: File) {
+  async function analyzePhoto(file: File, hint?: string) {
+    photoFileRef.current = file
     setAnalyzing(true)
+    setAiResult(null)
+    setAiCorrection('')
     const reader = new FileReader()
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1]
-      setPhotoPreview(reader.result as string)
+      if (!hint) setPhotoPreview(reader.result as string)
       try {
-        const { data } = await supabase.functions.invoke('analyze-screenshot', {
-          body: { imageBase64: base64, mimeType: file.type, context: 'nutrition' },
-        })
+        const body: Record<string, unknown> = { imageBase64: base64, mimeType: file.type, context: 'nutrition' }
+        if (hint) body.hint = hint
+        const { data } = await supabase.functions.invoke('analyze-screenshot', { body })
         if (data?.result) {
           const r = data.result
           setAiResult({
@@ -515,6 +520,8 @@ function AddFoodModal({ meal, onClose, onAdd }: {
             fett_g: Math.round((r.fett_g ?? 0) * 10) / 10,
             menge_g: null,
           })
+        } else {
+          setBarcodeError('KI konnte die Mahlzeit nicht erkennen.')
         }
       } catch {
         setBarcodeError('KI-Analyse fehlgeschlagen.')
@@ -522,6 +529,12 @@ function AddFoodModal({ meal, onClose, onAdd }: {
       setAnalyzing(false)
     }
     reader.readAsDataURL(file)
+  }
+
+  function correctAnalysis() {
+    if (photoFileRef.current && aiCorrection.trim()) {
+      analyzePhoto(photoFileRef.current, aiCorrection.trim())
+    }
   }
 
   async function analyzeText() {
@@ -773,29 +786,56 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                         </div>
                       ) : aiResult ? (
                         <div className="space-y-3">
-                          <div className="p-3 bg-bg-elevated rounded-xl">
-                            <div className="text-sm font-medium text-text-primary mb-2">{aiResult.name}</div>
-                            <div className="grid grid-cols-4 gap-2 text-center">
+                          {/* Macro result card */}
+                          <div className="p-3 bg-bg-elevated rounded-xl space-y-3">
+                            <div className="text-xs text-text-muted flex items-center gap-1">
+                              <Sparkles size={11} className="text-yellow-400" />
+                              KI hat erkannt:
+                            </div>
+                            <div className="text-sm font-semibold text-text-primary">{aiResult.name}</div>
+                            <div className="grid grid-cols-2 gap-2">
                               {([
-                                { l: 'Kalorien', v: aiResult.kalorien, u: 'kcal' },
-                                { l: 'Protein', v: aiResult.protein_g, u: 'g' },
-                                { l: 'Karbs', v: aiResult.kohlenhydrate_g, u: 'g' },
-                                { l: 'Fett', v: aiResult.fett_g, u: 'g' },
+                                { l: 'Kalorien', v: aiResult.kalorien, u: 'kcal', color: 'text-orange-400' },
+                                { l: 'Protein', v: aiResult.protein_g, u: 'g', color: 'text-blue-400' },
+                                { l: 'Kohlenhydrate', v: aiResult.kohlenhydrate_g, u: 'g', color: 'text-yellow-400' },
+                                { l: 'Fett', v: aiResult.fett_g, u: 'g', color: 'text-green-400' },
                               ] as const).map(m => (
-                                <div key={m.l}>
-                                  <div className="text-sm font-bold text-text-primary">{m.v}</div>
-                                  <div className="text-[10px] text-text-muted">{m.u}</div>
-                                  <div className="text-[10px] text-text-muted">{m.l}</div>
+                                <div key={m.l} className="flex items-center justify-between bg-bg-card rounded-lg px-3 py-2">
+                                  <span className="text-xs text-text-muted">{m.l}</span>
+                                  <span className={`text-sm font-bold ${m.color}`}>{m.v} {m.u}</span>
                                 </div>
                               ))}
                             </div>
                           </div>
+
+                          {/* Correction text box */}
+                          <div className="space-y-2">
+                            <div className="text-xs text-text-muted">Falsch erkannt? Korrigieren:</div>
+                            <div className="flex gap-2">
+                              <input
+                                className="input flex-1 text-sm"
+                                placeholder='z.B. "Lachs mit Reis"'
+                                value={aiCorrection}
+                                onChange={e => setAiCorrection(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && correctAnalysis()}
+                              />
+                              <button
+                                onClick={correctAnalysis}
+                                disabled={!aiCorrection.trim() || analyzing}
+                                className="btn-secondary px-3 text-sm flex items-center gap-1.5 shrink-0"
+                              >
+                                <Sparkles size={13} className="text-yellow-400" />
+                                Neu
+                              </button>
+                            </div>
+                          </div>
+
                           <div className="flex gap-2">
                             <button
-                              onClick={() => { setPhotoPreview(null); setAiResult(null) }}
+                              onClick={() => { setPhotoPreview(null); setAiResult(null); setAiCorrection(''); photoFileRef.current = null }}
                               className="btn-secondary flex-1 text-sm"
                             >
-                              Neu
+                              Verwerfen
                             </button>
                             <button
                               onClick={() => handleAdd(aiResult)}
