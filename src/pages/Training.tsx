@@ -474,10 +474,12 @@ async function fetchWorkoutXExercise(name: string): Promise<WorkoutXExercise | n
       { headers: { 'X-WorkoutX-Key': WX_KEY } }
     )
     if (!res.ok) { exerciseCache.set(searchTerm, null); return null }
-    const data = await res.json()
-    if (!Array.isArray(data) || data.length === 0) { exerciseCache.set(searchTerm, null); return null }
+    const json = await res.json()
+    // API returns { total, count, data: [...] } wrapper
+    const data: unknown[] = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : [])
+    if (data.length === 0) { exerciseCache.set(searchTerm, null); return null }
     // API may return keys in camelCase or ALL_CAPS — normalise both
-    const r = data[0]
+    const r = data[0] as Record<string, unknown>
     const ex: WorkoutXExercise = {
       id: r.id ?? r.ID ?? '',
       name: r.name ?? r.NAME ?? '',
