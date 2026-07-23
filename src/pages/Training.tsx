@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil, HelpCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -27,11 +27,40 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
+const UEBUNG_TIPS: Record<string, { muskel: string; tipps: string[] }> = {
+  'bankdrücken': { muskel: 'Brust, Trizeps, Schultern', tipps: ['Schulterblätter fest zusammenziehen und in Bank drücken', 'Stange auf Brustwarzen-Höhe absenken', 'Füße flach auf dem Boden halten', 'Ellenbogen ca. 45-75° vom Körper'] },
+  'kniebeuge': { muskel: 'Quadrizeps, Gesäß, Rücken', tipps: ['Knie zeigen in Richtung Zehen', 'Rücken gerade halten, Blick nach vorne', 'Tief genug gehen – Oberschenkel mindestens parallel', 'Gewicht auf der ganzen Fußsohle'] },
+  'kreuzheben': { muskel: 'Rücken, Gesäß, Beine', tipps: ['Rücken gerade, Brust raus', 'Stange nah am Körper führen', 'Hüfte und Knie gleichzeitig strecken', 'Schulterblätter einziehen zu Beginn'] },
+  'klimmzug': { muskel: 'Rücken (Latissimus), Bizeps', tipps: ['Schulterblätter einziehen bevor du hochziehst', 'Brust zur Stange führen', 'Kontrolliert absenken (3-4 Sek.)', 'Ellenbogen führen nach unten-hinten'] },
+  'pull up': { muskel: 'Rücken (Latissimus), Bizeps', tipps: ['Schulterblätter einziehen bevor du hochziehst', 'Brust zur Stange führen', 'Kontrolliert absenken (3-4 Sek.)', 'Ellenbogen führen nach unten-hinten'] },
+  'wide pull up': { muskel: 'Rücken (Latissimus, breite Schicht)', tipps: ['Griffbreite: 1,5× Schulterbreite', 'Schulterblätter aktiv einziehen', 'Oberkörper leicht nach hinten lehnen', 'Pause oben – Rücken anspannen'] },
+  'schulterdrücken': { muskel: 'Schultern (Deltamuskel), Trizeps', tipps: ['Stange vor dem Kopf drücken (nicht dahinter)', 'Kern anspannen, kein Hohlkreuz', 'Ellenbogen leicht vor der Stange', 'Vollständige Streckung oben'] },
+  'rudern': { muskel: 'Rücken, Bizeps, hintere Schulter', tipps: ['Oberkörper ca. 45° nach vorne geneigt', 'Ellenbogen eng am Körper', 'Schulterblätter zum Ende zusammenkneifen', 'Stange zum Bauch, nicht zur Brust'] },
+  'bizeps curl': { muskel: 'Bizeps', tipps: ['Ellenbogen bleibt am Körper fixiert', 'Volle Bewegungsamplitude nutzen', 'Oben kurz halten und anspannen', 'Langsam absenken (2-3 Sek.)'] },
+  'trizepsdrücken': { muskel: 'Trizeps', tipps: ['Ellenbogen zeigen nach vorne/oben', 'Nur der Unterarm bewegt sich', 'Volle Streckung unten', 'Kein Schwung einsetzen'] },
+  'beinstrecken': { muskel: 'Quadrizeps', tipps: ['Volle Streckung – Knie komplett durchdrücken', 'Oben kurz anspannen', 'Langsam absenken', 'Füße neutral oder leicht nach außen'] },
+  'beinbeugen': { muskel: 'Hamstrings (Rückseite Oberschenkel)', tipps: ['Hüfte bleibt auf der Maschine', 'Volle Beugung anstreben', 'Langsam strecken (exzentrische Phase)', 'Fersen aktiv einrollen'] },
+  'laufen': { muskel: 'Herz-Kreislauf, Beine', tipps: ['Puls in gewünschter Herzfrequenzzone halten', 'Aufrechte Körperhaltung', 'Schrittfrequenz: 170-180 Schritte/Min empfohlen', 'Weich auftreten – Mittelfuß bevorzugt'] },
+  'laufband': { muskel: 'Herz-Kreislauf, Beine', tipps: ['Neigung von 1-2% simuliert Outdoor-Laufen', 'Nicht am Handlauf festhalten', 'Puls im Zielbereich (60-80% max)', 'Warmup 3-5 Min langsam starten'] },
+  'fahrrad': { muskel: 'Beine, Herz-Kreislauf', tipps: ['Sattel auf Hüfthöhe einstellen', 'Knie leicht gebeugt in unterer Position', 'Gleichmäßige Trittfrequenz (80-100 RPM)', 'Oberkörper entspannt'] },
+  'plank': { muskel: 'Core, Stabilisation', tipps: ['Körper bildet eine gerade Linie', 'Gesäß nicht hochstrecken oder durchhängen', 'Blick auf den Boden', 'Bauch und Gesäß aktiv anspannen'] },
+  'dips': { muskel: 'Trizeps, Brust, Schultern', tipps: ['Körper leicht nach vorne neigen = mehr Brust', 'Aufrecht = mehr Trizeps', 'Tiefe: Bis Ellenbogen 90°', 'Schultern nicht hochziehen'] },
+  'seitheben': { muskel: 'Schultern (seitlicher Deltamuskel)', tipps: ['Leicht gebeugte Ellenbogen', 'Arme seitlich bis Schulterhöhe heben', 'Daumen leicht nach unten (innere Rotation)', 'Kein Schwung – sehr langsam!'] },
+  'liegestützen': { muskel: 'Brust, Trizeps, Schultern', tipps: ['Körper gerade wie ein Brett halten', 'Ellenbogen ca. 45° vom Körper', 'Brust berührt fast den Boden', 'Vollständige Streckung oben'] },
+}
+
+function getTip(name: string) {
+  const key = name.toLowerCase().trim()
+  return UEBUNG_TIPS[key] ?? null
+}
+
 type UebungFormEntry = { uebungsname: string; saetze: string; wdh: string; gewicht_kg: string; notizen: string }
 function UebungForm({ entries, onChange }: {
   entries: UebungFormEntry[]
   onChange: (entries: UebungFormEntry[]) => void
 }) {
+  const [tipFor, setTipFor] = useState<string | null>(null)
+
   function add() {
     onChange([...entries, { uebungsname: '', saetze: '', wdh: '', gewicht_kg: '', notizen: '' }])
   }
@@ -44,12 +73,45 @@ function UebungForm({ entries, onChange }: {
     onChange(next)
   }
 
+  const activeTip = tipFor ? getTip(tipFor) : null
+
   return (
     <div className="space-y-3">
+      {/* Exercise tip modal */}
+      {tipFor && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setTipFor(null)}>
+          <div className="bg-bg-card rounded-2xl border border-border w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-text-primary capitalize">{tipFor}</div>
+                {activeTip && <div className="text-xs text-primary mt-0.5">{activeTip.muskel}</div>}
+              </div>
+              <button onClick={() => setTipFor(null)} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted"><X size={16} /></button>
+            </div>
+            {activeTip ? (
+              <ul className="space-y-2">
+                {activeTip.tipps.map((t, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
+                    <span className="text-primary font-bold shrink-0">{i + 1}.</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-text-muted">Für diese Übung sind noch keine Tipps hinterlegt. Gib den Übungsnamen vollständig ein für Hinweise.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {entries.map((e, i) => (
         <div key={i} className="p-3 bg-bg-elevated rounded-lg space-y-2">
           <div className="flex gap-2">
             <input className="input flex-1 text-sm py-2" placeholder="Übungsname" value={e.uebungsname} onChange={ev => update(i, 'uebungsname', ev.target.value)} />
+            <button onClick={() => setTipFor(e.uebungsname || null)} title="Tipps anzeigen"
+              className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
+              <HelpCircle size={14} />
+            </button>
             <button onClick={() => remove(i)} className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted"><Trash2 size={14} /></button>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -89,7 +151,7 @@ export function Training() {
   const [vorlagen, setVorlagen] = useState<any[]>([])
   const [selectedVorlage, setSelectedVorlage] = useState('')
   const [form, setForm] = useState({
-    datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '',
+    datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '',
   })
   const [uebungen, setUebungen] = useState<{ uebungsname: string; saetze: string; wdh: string; gewicht_kg: string; notizen: string }[]>([])
 
@@ -155,7 +217,8 @@ export function Training() {
           const r = data.result
           setForm(f => ({
             ...f,
-            dauer_min: r.dauer_min ? String(r.dauer_min) : f.dauer_min,
+            dauer_h: r.dauer_min ? String(Math.floor(r.dauer_min / 60)) : f.dauer_h,
+            dauer_m: r.dauer_min ? String(r.dauer_min % 60) : f.dauer_m,
             avg_puls: r.avg_puls ? String(r.avg_puls) : f.avg_puls,
             kalorien_verbrannt: r.kalorien_verbrannt ? String(r.kalorien_verbrannt) : f.kalorien_verbrannt,
             trainingstyp: r.trainingstyp && TRAINING_TYPES.includes(r.trainingstyp) ? r.trainingstyp : f.trainingstyp,
@@ -180,7 +243,8 @@ export function Training() {
     setForm({
       datum: t.datum,
       trainingstyp: t.trainingstyp ?? 'Kraft',
-      dauer_min: t.dauer_min ? String(t.dauer_min) : '',
+      dauer_h: t.dauer_min ? String(Math.floor(t.dauer_min / 60)) : '0',
+      dauer_m: t.dauer_min ? String(t.dauer_min % 60) : '0',
       avg_puls: t.avg_puls ? String(t.avg_puls) : '',
       kalorien_verbrannt: t.kalorien_verbrannt ? String(t.kalorien_verbrannt) : '',
       notizen: t.notizen ?? '',
@@ -200,18 +264,19 @@ export function Training() {
     setOpen(false)
     setEditingId(null)
     setPhotoPreview(null)
-    setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '' })
+    setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '' })
     setUebungen([])
   }
 
   async function handleSave() {
     if (!user) return
     setSaving(true)
+    const totalMin = (parseInt(form.dauer_h || '0') * 60) + parseInt(form.dauer_m || '0')
 
     const payload = {
       datum: form.datum,
       trainingstyp: form.trainingstyp || null,
-      dauer_min: form.dauer_min ? parseInt(form.dauer_min) : null,
+      dauer_min: totalMin > 0 ? totalMin : null,
       avg_puls: form.avg_puls ? parseInt(form.avg_puls) : null,
       kalorien_verbrannt: form.kalorien_verbrannt ? parseInt(form.kalorien_verbrannt) : null,
       notizen: form.notizen || null,
@@ -279,7 +344,7 @@ export function Training() {
           <button onClick={() => navigate('/training/vorlagen')} className="btn-secondary flex items-center gap-2">
             <BookOpen size={16} /> Vorlagen
           </button>
-          <button onClick={() => { setEditingId(null); setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_min: '', avg_puls: '', kalorien_verbrannt: '', notizen: '' }); setUebungen([]); setPhotoPreview(null); setOpen(true) }} className="btn-primary flex items-center gap-2">
+          <button onClick={() => { setEditingId(null); setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '' }); setUebungen([]); setPhotoPreview(null); setOpen(true) }} className="btn-primary flex items-center gap-2">
             <Plus size={18} /> Einheit eintragen
           </button>
         </div>
@@ -338,7 +403,7 @@ export function Training() {
                   <span className="text-xs text-text-muted">{formatDate(t.datum)}</span>
                 </div>
                 <div className="flex items-center gap-4 mt-1 text-xs text-text-secondary">
-                  {t.dauer_min && <span className="flex items-center gap-1"><Timer size={12} /> {t.dauer_min} min</span>}
+                  {t.dauer_min && <span className="flex items-center gap-1"><Timer size={12} /> {t.dauer_min >= 60 ? `${Math.floor(t.dauer_min / 60)}h ${t.dauer_min % 60 > 0 ? `${t.dauer_min % 60}min` : ''}`.trim() : `${t.dauer_min} min`}</span>}
                   {t.avg_puls && <span className="flex items-center gap-1"><Activity size={12} /> {t.avg_puls} bpm</span>}
                   {t.kalorien_verbrannt && <span className="flex items-center gap-1"><Flame size={12} /> {t.kalorien_verbrannt} kcal</span>}
                 </div>
@@ -448,16 +513,45 @@ export function Training() {
               </select>
             </div>
             <div>
-              <label className="label">Dauer (Minuten)</label>
-              <input type="number" className="input" placeholder="60" value={form.dauer_min} onChange={e => setForm(f => ({ ...f, dauer_min: e.target.value }))} />
+              <label className="label">Dauer</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input type="number" min="0" max="23" className="input pr-8" placeholder="0" value={form.dauer_h} onChange={e => setForm(f => ({ ...f, dauer_h: e.target.value }))} />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-text-muted pointer-events-none">h</span>
+                </div>
+                <div className="relative flex-1">
+                  <input type="number" min="0" max="59" className="input pr-10" placeholder="0" value={form.dauer_m} onChange={e => setForm(f => ({ ...f, dauer_m: e.target.value }))} />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-text-muted pointer-events-none">min</span>
+                </div>
+              </div>
             </div>
             <div>
               <label className="label">Ø Puls (bpm)</label>
               <input type="number" className="input" placeholder="140" value={form.avg_puls} onChange={e => setForm(f => ({ ...f, avg_puls: e.target.value }))} />
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="label">Kalorien verbrannt</label>
               <input type="number" className="input" placeholder="450" value={form.kalorien_verbrannt} onChange={e => setForm(f => ({ ...f, kalorien_verbrannt: e.target.value }))} />
+              {!form.avg_puls && !form.kalorien_verbrannt && (
+                <button type="button" onClick={() => {
+                  const totalMin = (parseInt(form.dauer_h || '0') * 60) + parseInt(form.dauer_m || '0')
+                  const kcalPerMin: Record<string, number> = {
+                    'Kraft': 6, 'Cardio': 9, 'HIIT': 12, 'Laufen': 10,
+                    'Radfahren': 7, 'Schwimmen': 8, 'Yoga': 3, 'Stretching': 2, 'Sonstiges': 6,
+                  }
+                  const pulsMap: Record<string, number> = {
+                    'Kraft': 110, 'Cardio': 145, 'HIIT': 165, 'Laufen': 150,
+                    'Radfahren': 135, 'Schwimmen': 130, 'Yoga': 85, 'Stretching': 75, 'Sonstiges': 120,
+                  }
+                  const rate = kcalPerMin[form.trainingstyp] ?? 6
+                  const kcal = totalMin > 0 ? Math.round(totalMin * rate) : 0
+                  const puls = pulsMap[form.trainingstyp] ?? 120
+                  setForm(f => ({ ...f, kalorien_verbrannt: kcal > 0 ? String(kcal) : f.kalorien_verbrannt, avg_puls: String(puls) }))
+                }}
+                  className="mt-1.5 text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
+                  <Sparkles size={11} /> Von KI schätzen lassen
+                </button>
+              )}
             </div>
             <div>
               <label className="label">Notizen</label>
