@@ -170,42 +170,285 @@ const UEBUNG_TIPS: Record<string, UebungTip> = {
     tipps: ['Körper wie ein Brett: gerade Linie von Kopf bis Ferse', 'Ellenbogen ca. 45° vom Körper', 'Brust berührt fast den Boden', 'Vollständige Streckung am Ende'],
     fehler: ['Hüfte hängt durch oder ist hochgestreckt', 'Nur halbe Bewegungsamplitude', 'Ellenbogen komplett seitwärts aufspreizen'],
   },
+  'latzug': {
+    muskel: 'Latissimus (breiter Rückenmuskel)', sekundaer: 'Bizeps · Trapez · hintere Schulter',
+    warum: 'Latzug ist die beste Maschinenalternative zu Klimmzügen – ideal für Anfänger und zum gezielten Aufbau des Latissimus. Er erzeugt die charakteristische V-Form des Rückens.',
+    muskeln: ['lat', 'bicep', 'trap'],
+    tipps: ['Schulterblätter vor dem Ziehen aktiv einziehen', 'Stange zum Schlüsselbein ziehen – nicht zum Bauch', 'Oberkörper leicht nach hinten lehnen', 'Ellenbogen führen nach unten-außen', 'Kontrolliert zur Ausgangsposition strecken (3 Sek.)'],
+    fehler: ['Stange hinter den Kopf ziehen (Nackenstress)', 'Zu viel Schwung mit dem Oberkörper', 'Schulterblätter nicht aktivieren vor dem Zug'],
+  },
+  'rückenstrecker': {
+    muskel: 'Rückenstrecker (Erector Spinae)', sekundaer: 'Gesäß · Hamstrings',
+    warum: 'Rückenstrecker stärken die tiefe Rückenmuskulatur, die für eine gesunde Wirbelsäule, gute Körperhaltung und sichere Ausführung bei Kreuzheben und Kniebeugen essenziell ist.',
+    muskeln: ['lback', 'glute', 'ham'],
+    tipps: ['Nur bis zur Körperlinie strecken – nicht überstrecken', 'Langsam absenken (2–3 Sek.)', 'Kopf in neutraler Verlängerung der Wirbelsäule', 'Gesäß und Rücken kontrolliert anspannen', 'Optional: Zusatzgewicht auf der Brust für mehr Intensität'],
+    fehler: ['Zu stark überstrecken (Lendenwirbel belastet)', 'Zu schnell und schwungvoll', 'Kopf nach hinten reißen'],
+  },
+  'beinpresse': {
+    muskel: 'Quadrizeps · Gesäß (Gluteus)', sekundaer: 'Hamstrings · Waden',
+    warum: 'Beinpresse ermöglicht schweres Beintraining ohne Balanceanforderung – ideal für Masseaufbau. Schont dabei den unteren Rücken im Vergleich zur Kniebeuge.',
+    muskeln: ['quad', 'glute', 'ham'],
+    tipps: ['Füße schulterbreit, mittig auf der Platte', 'Knie beugen bis 90° – nicht weiter', 'Knie zeigen immer in Richtung Zehen', 'Knie nie vollständig einrasten – immer leicht gebeugt lassen', 'Langsam absenken, explosiv drücken'],
+    fehler: ['Knie über 90° beugen (Kniegelenk überlastet)', 'Knie nach innen fallen lassen', 'Vollständig in die Streckung einrasten'],
+  },
+  'wadenheben': {
+    muskel: 'Waden (Gastrocnemius, Soleus)', sekundaer: 'Tibialis anterior',
+    warum: 'Wadenheben kräftigt die oft vernachlässigte Wadenmuskulatur, verbessert Sprung- und Laufleistung und verhindert Verletzungen am Sprunggelenk.',
+    muskeln: ['calf'],
+    tipps: ['Volle Amplitude: ganz absenken, ganz hochdrücken', 'Oben kurz halten und Waden anspannen (1–2 Sek.)', 'Langsam absenken für maximale Dehnung', 'Auf Erhöhung stehen für volle Bewegungsamplitude', 'Variante mit gebeugtem Knie für Soleus'],
+    fehler: ['Zu kurze Amplitude', 'Zu schnell und federnd', 'Hüfte oder Knie mitbewegen'],
+  },
+  'hip thrust': {
+    muskel: 'Gesäß (Gluteus Maximus)', sekundaer: 'Hamstrings · Rückenstrecker · Adduktoren',
+    warum: 'Hip Thrust ist DIE Übung für maximale Gesäßentwicklung. Studien zeigen eine stärkere Gluteus-Aktivierung als bei Kniebeugen oder Kreuzheben.',
+    muskeln: ['glute', 'ham', 'lback'],
+    tipps: ['Oberer Rücken auf Bankrand stützen', 'Füße hüftbreit, Knie 90° in der oberen Position', 'Hüfte komplett durchdrücken und Gesäß fest anspannen', 'Oben kurz halten (1–2 Sek.)', 'Langsam absenken ohne Boden zu berühren'],
+    fehler: ['Nicht vollständig oben strecken', 'Füße zu weit oder zu nah positionieren', 'Unteren Rücken überstrecken statt Hüfte drücken'],
+  },
+  'ausfallschritt': {
+    muskel: 'Quadrizeps · Gesäß', sekundaer: 'Hamstrings · Core · Adduktoren',
+    warum: 'Ausfallschritte trainieren jeden Oberschenkel einzeln, decken Muskelungleichgewichte auf und verbessern Gleichgewicht und Koordination bei hoher Gesäßaktivierung.',
+    muskeln: ['quad', 'glute', 'ham', 'abs'],
+    tipps: ['Rumpf aufrecht halten', 'Vorderes Knie nicht über den Zeh hinausbeugen', 'Hinteres Knie fast den Boden berühren', 'Aus der Ferse des Vorderbeins hochdrücken', 'Schrittweite groß genug – etwa Hüftbreite'],
+    fehler: ['Oberkörper zu weit vorbeugen', 'Knie nach innen einknicken', 'Schrittweite zu klein'],
+  },
+  'schrägbankdrücken': {
+    muskel: 'Obere Brust (Pectoralis, Klavikularbündel)', sekundaer: 'Vordere Schulter · Trizeps',
+    warum: 'Schrägbankdrücken betont speziell den oberen Brustbereich und gibt der Brust Fülle und Definition im oberen Bereich – essenziell für eine vollständig entwickelte Brust.',
+    muskeln: ['chest', 'shoulder', 'tricep'],
+    tipps: ['Neigung 30–45° (steiler = mehr Schulter, weniger Brust)', 'Schulterblätter fest einziehen wie beim normalen Bankdrücken', 'Stange zur oberen Brust führen', 'Ellenbogen ca. 60° vom Körper', 'Vollständige Streckung oben'],
+    fehler: ['Neigung über 60° – Schulter dominiert zu stark', 'Schultern hochziehen', 'Inkonsistente Stangenbahn'],
+  },
+  'butterfly': {
+    muskel: 'Brust (Pectoralis Major)', sekundaer: 'Vordere Schulter',
+    warum: 'Butterfly/Pec-Deck isoliert die Brust ohne Trizeps-Beteiligung – ideal für maximale Brust-Isolation und den "Peak-Pump". Perfekt als Finisher nach Drückübungen.',
+    muskeln: ['chest', 'shoulder'],
+    tipps: ['Rücken fest an der Lehne, keine Hohlkreuz', 'Arme leicht gebeugt – Ellenbogen nie vollständig strecken', 'Bewegung kommt aus der Brust, nicht den Schultern', 'Vorne kurz gegeneinanderdrücken und anspannen', 'Weit öffnen für maximale Dehnung'],
+    fehler: ['Ellenbogen vollständig strecken (Schultergelenk belastet)', 'Schultern nach vorne rollen', 'Zu viel Gewicht mit Schwung'],
+  },
+  'crunch': {
+    muskel: 'Bauch (Rectus Abdominis)', sekundaer: 'Schräge Bauchmuskulatur',
+    warum: 'Crunch isoliert den geraden Bauchmuskel mit weniger Hüftbeuger-Beteiligung als Sit-Ups – direktere und sichere Bauchmuskel-Aktivierung.',
+    muskeln: ['abs'],
+    tipps: ['Lendenwirbel bleiben am Boden – nur Schultern heben', 'Hände locker an die Schläfen, nicht am Kopf ziehen', 'Kinn leicht zur Brust', 'Oben kurz halten und anspannen', 'Langsam absenken ohne Schultern abzulegen'],
+    fehler: ['Am Kopf ziehen (Nackenprobleme)', 'Hüfte mit hochreißen', 'Zu schnell und unkontrolliert'],
+  },
+  'sit-up': {
+    muskel: 'Bauch (Rectus Abdominis)', sekundaer: 'Hüftbeuger · Schräge Bauchmuskulatur',
+    warum: 'Sit-Ups trainieren den geraden Bauchmuskel durch volle Bewegungsamplitude und sind eine klassische Core-Übung für Stabilität und Rumpfkraft.',
+    muskeln: ['abs'],
+    tipps: ['Füße fixiert oder frei je nach Variante', 'Hände locker an den Schläfen – nicht hinter dem Kopf', 'Langsam absenken (2–3 Sek.)', 'Oben kurz halten und anspannen', 'Gleichmäßig atmen'],
+    fehler: ['Am Kopf ziehen', 'Zu schnell und schwungvoll', 'Hohlkreuz beim Ablegen'],
+  },
+  'face pull': {
+    muskel: 'Hintere Schulter (Posteriorer Deltoid)', sekundaer: 'Rotatorenmanschette · Trapez · Rhomboid',
+    warum: 'Face Pull ist eine der wichtigsten Gesundheitsübungen für Schultern. Stärkt die Rotatorenmanschette und korrigiert Haltungsschäden durch zu viel Drücken.',
+    muskeln: ['shoulder', 'trap'],
+    tipps: ['Kabel auf Augenhöhe oder leicht darüber', 'Seil zu Ohren/Wangen ziehen – nicht zur Stirn', 'Ellenbogen nach außen-oben führen', 'Außenrotation am Ende der Bewegung', 'Leichtes Gewicht – Qualität wichtiger als Quantität'],
+    fehler: ['Zu schwer – Nacken/Trapez übernimmt', 'Ellenbogen fallen lassen', 'Kabel zu tief ansetzen'],
+  },
+  'trizeps pushdown': {
+    muskel: 'Trizeps (Brachii)', sekundaer: 'Unterarmstrecker',
+    warum: 'Kabel-Trizepsdrücken hält konstanten Widerstand über die gesamte Bewegung und ist besonders gut für den langen Trizepskopf – ideale Isolationsübung für Arm-Definition.',
+    muskeln: ['tricep'],
+    tipps: ['Ellenbogen fix an den Seiten – kein Bewegen', 'Nur der Unterarm bewegt sich', 'Volle Streckung am Ende durchdrücken', 'Langsam zurückführen (2–3 Sek.)', 'Handgelenk neutral – kein Abbiegen'],
+    fehler: ['Ellenbogen wegschwingen', 'Oberkörper nach vorne beugen', 'Nicht vollständig strecken'],
+  },
+  'hammer curl': {
+    muskel: 'Bizeps (Brachialis)', sekundaer: 'Unterarmmuskeln · Bizeps Brachii',
+    warum: 'Hammer Curls mit neutralem Griff trainieren besonders den Brachialis unter dem Bizeps – macht den Arm insgesamt dicker und "hebt" den Bizeps optisch an.',
+    muskeln: ['bicep'],
+    tipps: ['Neutraler Griff – Daumen zeigen nach oben', 'Ellenbogen fix am Körper halten', 'Volle Amplitude: ganz strecken, ganz beugen', 'Oben kurz halten', 'Beide Arme gleichzeitig oder alternierend'],
+    fehler: ['Schwingen mit dem Körper', 'Griff drehen (wird dann normaler Curl)', 'Zu schnell absenken'],
+  },
+  'rumänisches kreuzheben': {
+    muskel: 'Hamstrings · Gesäß', sekundaer: 'Rückenstrecker · Waden',
+    warum: 'RDL ist die beste Übung speziell für die Hamstrings. Durch die Hüftbeugung mit fast gestreckten Beinen wird die Rückseite des Oberschenkels maximal gedehnt und belastet.',
+    muskeln: ['ham', 'glute', 'lback'],
+    tipps: ['Knie leicht gebeugt und konstant halten', 'Rücken gerade – Hüfte nach hinten schieben', 'Stange eng am Körper führen', 'Absenken bis starke Dehnung in Hamstrings spürbar ist', 'Aus der Hüfte aufrichten, nicht aus dem Rücken'],
+    fehler: ['Knie zu stark beugen – wird zur Kniebeuge', 'Rundrücken beim Absenken', 'Stange vom Körper wegschwingen'],
+  },
+  'bulgarian split squat': {
+    muskel: 'Quadrizeps · Gesäß', sekundaer: 'Hamstrings · Core · Gleichgewicht',
+    warum: 'Bulgarische Kniebeuge ist eine der härtesten und effektivsten Beinübungen. Trainiert jeden Oberschenkel einzeln mit sehr hoher Gesäß- und Quad-Aktivierung.',
+    muskeln: ['quad', 'glute', 'ham'],
+    tipps: ['Hinterer Fuß auf Bank oder Ablage', 'Vorderer Fuß weit genug vor – Knie nicht über den Zeh', 'Oberkörper aufrecht oder leicht vorgebeugt', 'Langsam absenken (3–4 Sek.)', 'Aus der Ferse des Vorderbeins aufstehen'],
+    fehler: ['Vorderer Fuß zu nah an der Bank', 'Knie nach innen einknicken', 'Hüfte dreht oder kippt seitlich'],
+  },
+  'kabelrudern': {
+    muskel: 'Oberer Rücken (Rhomboid, Trapez)', sekundaer: 'Latissimus · Bizeps · hintere Schulter',
+    warum: 'Kabelrudern hält konstanten Widerstand über die gesamte Bewegung und ist ideal für Rückendicke und Schultergesundheit als Gegenstück zu Drückübungen.',
+    muskeln: ['lat', 'trap', 'bicep', 'shoulder'],
+    tipps: ['Oberkörper leicht nach vorne geneigt, Rücken gerade', 'Ellenbogen eng am Körper führen', 'Griff zum Bauch ziehen', 'Am Ende Schulterblätter kräftig zusammenkneifen', 'Langsam strecken – exzentrische Phase nutzen'],
+    fehler: ['Rücken rund – Bandscheiben belastet', 'Mit dem Rücken Schwung holen', 'Griff zu weit oben zur Brust ziehen'],
+  },
+  'rudermaschine': {
+    muskel: 'Rücken · Herz-Kreislauf', sekundaer: 'Bizeps · Core · Beine · Schultern',
+    warum: 'Rudermaschine ist eines der effektivsten Ganzkörper-Cardiogeräte – aktiviert gleichzeitig ca. 86% der Muskulatur und trainiert Ausdauer und Kraft.',
+    muskeln: ['lat', 'trap', 'bicep', 'quad', 'abs'],
+    tipps: ['Zugphasen-Reihenfolge: Beine – Rücken – Arme', 'Beine und Rücken machen 60–70% der Arbeit', 'Rücken leicht nach hinten lehnen am Ende des Zugs', 'Griff locker – keine Verkrampfung', 'Gleichmäßiges Tempo: 22–28 Züge/Min für Ausdauer'],
+    fehler: ['Mit dem Rücken ziehen statt Beine nutzen', 'Rundrücken', 'Zu hohe Zugrate mit zu wenig Widerstand'],
+  },
+  'crosstrainer': {
+    muskel: 'Herz-Kreislauf-System', sekundaer: 'Quadrizeps · Hamstrings · Gesäß · Arme',
+    warum: 'Crosstrainer bietet gelenkschonendes Ganzkörper-Cardio. Durch aktive Armbewegung werden Ober- und Unterkörper gleichzeitig trainiert.',
+    muskeln: ['quad', 'ham', 'glute'],
+    tipps: ['Aufrechte Körperhaltung, leicht nach vorne lehnen', 'Arme aktiv einsetzen – Schub und Zug wechseln', 'Gleichmäßiger Rhythmus, Puls im Zielbereich', 'Widerstand variieren für unterschiedliche Intensität', 'Vorwärts = mehr Quadrizeps, rückwärts = mehr Gesäß'],
+    fehler: ['Arme passiv hängen lassen', 'Zu leichter Widerstand ohne Herausforderung', 'An den Griffen hängen statt aufrecht stehen'],
+  },
+  'seilspringen': {
+    muskel: 'Herz-Kreislauf-System · Koordination', sekundaer: 'Waden · Schultern · Core',
+    warum: 'Springseil ist eines der effektivsten Cardio-Tools – verbrennt bis zu 10 kcal/min, verbessert Koordination, Rhythmus und Fußstabilität.',
+    muskeln: ['calf', 'shoulder'],
+    tipps: ['Auf den Fußballen landen – nicht auf den Fersen', 'Ellenbogen nah am Körper, Handgelenke drehen das Seil', 'Kleiner Sprung reicht – nur wenige Zentimeter hoch', 'Aufrechte Haltung, Blick geradeaus', 'Langsam anfangen und Rhythmus entwickeln'],
+    fehler: ['Zu hohe Sprünge (belasten Knie und Gelenke)', 'Mit ganzen Armen schwingen statt Handgelenke', 'Auf den Fersen landen'],
+  },
+  'beinheben': {
+    muskel: 'Unterer Bauch (Rectus Abdominis)', sekundaer: 'Hüftbeuger · Core',
+    warum: 'Beinheben aktiviert besonders den unteren Teil des Bauchmuskels, der durch normale Crunches kaum erreicht wird – außerdem Hüftbeuger und Core-Stabilität.',
+    muskeln: ['abs'],
+    tipps: ['Lendenwirbel fest auf die Bank/Matte drücken', 'Beine gestreckt oder leicht gebeugt', 'Langsam absenken ohne den Boden zu berühren', 'Kontrollierte Bewegung – kein Schwung', 'Hängende Variante an der Klimmzugstange für mehr Intensität'],
+    fehler: ['Hohlkreuz beim Absenken', 'Mit Schwung und Hüfte schaukeln', 'Zu schnell und unkontrolliert'],
+  },
+  'russian twist': {
+    muskel: 'Schräge Bauchmuskulatur (Obliques)', sekundaer: 'Gerader Bauchmuskel · Hüftbeuger',
+    warum: 'Russian Twist trainiert die schräge Bauchmuskulatur, die für Rotation, Stabilität und eine definierte Taille verantwortlich ist.',
+    muskeln: ['abs'],
+    tipps: ['Rücken leicht nach hinten geneigt (45°)', 'Füße leicht angehoben für mehr Intensität', 'Rotation kommt aus dem Rumpf – Arme pendeln nicht einfach', 'Jede Seite gleichmäßig abwechseln', 'Mit Zusatzgewicht für mehr Intensität'],
+    fehler: ['Arme pendeln statt Rumpf rotieren', 'Zu weit nach hinten lehnen', 'Zu schnell ohne Kontrolle'],
+  },
+  'arnold press': {
+    muskel: 'Schultern (Deltoid, alle 3 Köpfe)', sekundaer: 'Trizeps · Trapez',
+    warum: 'Arnold Press mit Rotationsbewegung aktiviert alle drei Schulterköpfe gleichzeitig – entwickelt Schultern rundum und gibt mehr Volumen als normales Schulterdrücken.',
+    muskeln: ['shoulder', 'tricep', 'trap'],
+    tipps: ['Start: Handflächen zeigen zu dir, Ellenbogen vorne unten', 'Beim Drücken nach außen rotieren', 'Oben: Handflächen zeigen nach vorne wie beim normalen Press', 'Kontrollierte Rotation in beide Richtungen', 'Nicht zu schwer – Technik hat Vorrang'],
+    fehler: ['Rotation vernachlässigen – wird normaler Schulterpress', 'Zu viel Schwung', 'Starkes Hohlkreuz'],
+  },
+  'goblet squat': {
+    muskel: 'Quadrizeps · Gesäß', sekundaer: 'Core · Adduktoren · oberer Rücken',
+    warum: 'Goblet Squat ist die perfekte Kniebeuge für Anfänger und ideal zum Mobilitätstraining. Der Gegengewicht fördert aufrechte Körperhaltung und tiefere Hocke.',
+    muskeln: ['quad', 'glute', 'abs'],
+    tipps: ['Kettlebell/Hantel vor der Brust halten', 'Füße schulterbreit, Zehen leicht nach außen', 'Tief in die Hocke – so tief wie möglich', 'Knie drücken nach außen über die Zehen', 'Brust hoch, Rücken gerade'],
+    fehler: ['Nicht tief genug gehen', 'Knie nach innen fallen lassen', 'Oberkörper zu weit vorbeugen'],
+  },
+}
+
+// Alias-Mapping: alternative Namen → kanonischer Schlüssel in UEBUNG_TIPS
+const ALIASES: Record<string, string> = {
+  'lat pulldown': 'latzug', 'lat-pulldown': 'latzug', 'latziehen': 'latzug', 'latpulldown': 'latzug',
+  'hyperextension': 'rückenstrecker', 'hyperextensions': 'rückenstrecker', 'rückenextension': 'rückenstrecker',
+  'leg press': 'beinpresse', 'legpress': 'beinpresse', 'bein presse': 'beinpresse',
+  'calf raise': 'wadenheben', 'calf raises': 'wadenheben', 'wadenpressen': 'wadenheben', 'standing calf raise': 'wadenheben',
+  'beckenheben': 'hip thrust', 'gesäßbrücke': 'hip thrust', 'brücke': 'hip thrust', 'glute bridge': 'hip thrust',
+  'lunge': 'ausfallschritt', 'lunges': 'ausfallschritt', 'ausfallschritte': 'ausfallschritt',
+  'incline bench': 'schrägbankdrücken', 'incline press': 'schrägbankdrücken', 'schrägbank': 'schrägbankdrücken',
+  'pec deck': 'butterfly', 'fliegende': 'butterfly', 'kabel butterfly': 'butterfly', 'chest fly': 'butterfly',
+  'sit up': 'sit-up', 'situp': 'sit-up', 'sit ups': 'sit-up', 'situps': 'sit-up',
+  'bauchcrunch': 'crunch', 'bauchpresse': 'crunch',
+  'face-pull': 'face pull', 'facepull': 'face pull', 'gesichtszug': 'face pull',
+  'trizeps-pushdown': 'trizeps pushdown', 'kabel trizeps': 'trizeps pushdown', 'cable pushdown': 'trizeps pushdown', 'trizeps kabelzug': 'trizeps pushdown',
+  'rdl': 'rumänisches kreuzheben', 'romanian deadlift': 'rumänisches kreuzheben', 'rumänisches kh': 'rumänisches kreuzheben',
+  'bulgarische kniebeuge': 'bulgarian split squat', 'split squat': 'bulgarian split squat',
+  'kabelrudern': 'kabelrudern', 'sitzrudern': 'kabelrudern', 'cable row': 'kabelrudern', 'rudermaschine sitzend': 'kabelrudern',
+  'rowing': 'rudermaschine', 'rowing machine': 'rudermaschine', 'ruderergometer': 'rudermaschine',
+  'ellipsentrainer': 'crosstrainer', 'elliptical': 'crosstrainer',
+  'rope jumping': 'seilspringen', 'jump rope': 'seilspringen', 'seil': 'seilspringen', 'skipping': 'seilspringen',
+  'leg raise': 'beinheben', 'leg raises': 'beinheben', 'hanging leg raise': 'beinheben',
+  'russian twists': 'russian twist',
+  'arnold drücken': 'arnold press',
+  'squat': 'kniebeuge', 'back squat': 'kniebeuge',
+  'deadlift': 'kreuzheben', 'conventional deadlift': 'kreuzheben',
+  'bench press': 'bankdrücken', 'flachbank': 'bankdrücken',
+  'overhead press': 'schulterdrücken', 'military press': 'schulterdrücken', 'ohp': 'schulterdrücken',
+  'barbell row': 'rudern', 'bent over row': 'rudern', 'pendelrudern': 'rudern',
+  'curl': 'bizeps curl', 'bizepscurl': 'bizeps curl', 'langhantelcurl': 'bizeps curl',
+  'trizeps': 'trizepsdrücken', 'skull crusher': 'trizepsdrücken',
+  'leg extension': 'beinstrecken', 'leg extensions': 'beinstrecken',
+  'leg curl': 'beinbeugen', 'leg curls': 'beinbeugen', 'lying leg curl': 'beinbeugen',
+  'treadmill': 'laufband', 'laufen band': 'laufband',
+  'fahrradergometer': 'fahrrad', 'bike': 'fahrrad', 'stationary bike': 'fahrrad',
+  'seitliche erhebung': 'seitheben', 'lateral raise': 'seitheben',
+  'push up': 'liegestützen', 'push ups': 'liegestützen', 'pushup': 'liegestützen',
+  'chin up': 'klimmzug', 'chinup': 'klimmzug', 'pull-up': 'klimmzug',
 }
 
 function getTip(name: string): UebungTip | null {
   const key = name.toLowerCase().trim()
-  return UEBUNG_TIPS[key] ?? null
+  if (UEBUNG_TIPS[key]) return UEBUNG_TIPS[key]
+  const alias = ALIASES[key]
+  if (alias && UEBUNG_TIPS[alias]) return UEBUNG_TIPS[alias]
+  // Partial/fuzzy: any dict key contained in input or vice versa
+  const fuzzy = Object.keys(UEBUNG_TIPS).find(k => key.includes(k) || k.includes(key))
+  if (fuzzy) return UEBUNG_TIPS[fuzzy]
+  const fuzzyAlias = Object.entries(ALIASES).find(([a]) => key.includes(a) || a.includes(key))
+  if (fuzzyAlias) return UEBUNG_TIPS[fuzzyAlias[1]]
+  return null
 }
 
 // ─── Exercise GIF (free-exercise-db, CC BY-SA 3.0 Everkinetic) ───────────────
 
 // Maps German exercise key → folder name in yuhonas/free-exercise-db
 const EXERCISE_IMGS: Record<string, string> = {
-  'bankdrücken':     'Barbell_Bench_Press_-_Medium_Grip',
-  'kniebeuge':       'Barbell_Full_Squat',
-  'kreuzheben':      'Barbell_Deadlift',
-  'klimmzug':        'Pullups',
-  'pull up':         'Pullups',
-  'wide pull up':    'Wide-Grip_Pullup',
-  'schulterdrücken': 'Barbell_Shoulder_Press',
-  'rudern':          'Bent_Over_Barbell_Row',
-  'bizeps curl':     'Barbell_Curl',
-  'trizepsdrücken':  'Tricep_Dips_Between_Benches',
-  'beinstrecken':    'Leg_Extensions',
-  'beinbeugen':      'Seated_Leg_Curl',
-  'plank':           'Plank',
-  'dips':            'Dips',
-  'seitheben':       'Side_Lateral_Raise',
-  'liegestützen':    'Push_Ups',
-  'laufen':          'Running,_Treadmill',
-  'laufband':        'Running,_Treadmill',
-  'fahrrad':         'Stationary_Bike',
+  'bankdrücken':              'Barbell_Bench_Press_-_Medium_Grip',
+  'kniebeuge':                'Barbell_Full_Squat',
+  'kreuzheben':               'Barbell_Deadlift',
+  'klimmzug':                 'Pullups',
+  'pull up':                  'Pullups',
+  'wide pull up':             'Wide-Grip_Pullup',
+  'schulterdrücken':          'Barbell_Shoulder_Press',
+  'rudern':                   'Bent_Over_Barbell_Row',
+  'bizeps curl':              'Barbell_Curl',
+  'trizepsdrücken':           'Tricep_Dips_Between_Benches',
+  'beinstrecken':             'Leg_Extensions',
+  'beinbeugen':               'Seated_Leg_Curl',
+  'plank':                    'Plank',
+  'dips':                     'Dips',
+  'seitheben':                'Side_Lateral_Raise',
+  'liegestützen':             'Push_Ups',
+  'laufen':                   'Running,_Treadmill',
+  'laufband':                 'Running,_Treadmill',
+  'fahrrad':                  'Stationary_Bike',
+  'latzug':                   'Lat_Pulldown',
+  'rückenstrecker':           'Hyperextensions_-_Back',
+  'beinpresse':               'Leg_Press',
+  'wadenheben':               'Standing_Calf_Raises',
+  'hip thrust':               'Barbell_Hip_Thrust',
+  'ausfallschritt':           'Barbell_Lunge',
+  'schrägbankdrücken':        'Barbell_Incline_Bench_Press_-_Medium_Grip',
+  'butterfly':                'Peck_Deck_Butterfly',
+  'crunch':                   'Crunch',
+  'sit-up':                   'Sit-up',
+  'trizeps pushdown':         'Tricep_Pushdown',
+  'hammer curl':              'Hammer_Curls',
+  'rumänisches kreuzheben':   'Romanian_Deadlift',
+  'bulgarian split squat':    'Dumbbell_Bulgarian_Split_Squat',
+  'kabelrudern':              'Seated_Cable_Rows',
+  'rudermaschine':            'Rowing,_Stationary',
+  'crosstrainer':             'Stationary_Bike',
+  'beinheben':                'Hanging_Leg_Raise',
+  'russian twist':            'Russian_Twist',
+  'goblet squat':             'Dumbbell_Goblet_Squat',
+  'arnold press':             'Arnold_Dumbbell_Press',
+  'face pull':                'Face_Pull',
 }
 
 const GIF_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises'
 
-function ExerciseGif({ exerciseKey }: { exerciseKey: string }) {
-  const folder = EXERCISE_IMGS[exerciseKey]
+function resolveExerciseImgKey(name: string): string | null {
+  const key = name.toLowerCase().trim()
+  if (EXERCISE_IMGS[key]) return key
+  const alias = ALIASES[key]
+  if (alias && EXERCISE_IMGS[alias]) return alias
+  const fuzzy = Object.keys(EXERCISE_IMGS).find(k => key.includes(k) || k.includes(key))
+  if (fuzzy) return fuzzy
+  const fuzzyAlias = Object.entries(ALIASES).find(([a]) => key.includes(a) || a.includes(key))
+  if (fuzzyAlias && EXERCISE_IMGS[fuzzyAlias[1]]) return fuzzyAlias[1]
+  return null
+}
+
+function ExerciseGif({ exerciseName }: { exerciseName: string }) {
+  const resolvedKey = resolveExerciseImgKey(exerciseName)
+  const folder = resolvedKey ? EXERCISE_IMGS[resolvedKey] : null
   const [frame, setFrame] = useState(0)
   const [loaded, setLoaded] = useState([false, false])
   const [hasError, setHasError] = useState(false)
@@ -279,7 +522,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
 
         <div className="px-5 pb-6 space-y-5">
           {/* GIF Animation */}
-          <ExerciseGif exerciseKey={key} />
+          <ExerciseGif exerciseName={name} />
 
           {tip ? (
             <>
