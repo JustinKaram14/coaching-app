@@ -61,6 +61,7 @@ export interface Database {
           datum: string
           gewicht: number
           notizen: string | null
+          foto_url: string | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['gewicht']['Row'], 'id' | 'created_at'>

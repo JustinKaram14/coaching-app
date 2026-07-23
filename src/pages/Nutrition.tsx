@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Plus, Trash2, Camera, Sparkles, X, Search,
-  ChevronLeft, ChevronRight, Droplets, Check, FileText, BookOpen,
+  ChevronLeft, ChevronRight, Droplets, Check, FileText, BookOpen, ScanLine,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -255,6 +255,94 @@ function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
   )
 }
 
+// ─── LiveBarcodeScanner ───────────────────────────────────────────────────────
+
+function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const scanningRef = useRef(true)
+  const [camError, setCamError] = useState('')
+  const [hint, setHint] = useState('Barcode in den Rahmen halten…')
+  const hasDetector = 'BarcodeDetector' in window
+
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
+      .then(stream => {
+        streamRef.current = stream
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
+      })
+      .catch(() => setCamError('Kamera-Zugriff verweigert. Bitte Berechtigung in den Browser-Einstellungen erlauben.'))
+    return () => { scanningRef.current = false; streamRef.current?.getTracks().forEach(t => t.stop()) }
+  }, [])
+
+  useEffect(() => {
+    if (!hasDetector || !videoRef.current) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const detector = new (window as any).BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] })
+    let animId: number
+    async function tick() {
+      if (!scanningRef.current || !videoRef.current || videoRef.current.readyState < 2) {
+        if (scanningRef.current) animId = requestAnimationFrame(tick)
+        return
+      }
+      try {
+        const codes = await detector.detect(videoRef.current)
+        if (codes.length > 0) { scanningRef.current = false; onDetected(codes[0].rawValue); return }
+      } catch { /* continue */ }
+      if (scanningRef.current) animId = setTimeout(() => { animId = requestAnimationFrame(tick) }, 250) as unknown as number
+    }
+    animId = requestAnimationFrame(tick)
+    return () => { cancelAnimationFrame(animId); clearTimeout(animId) }
+  }, [hasDetector, onDetected])
+
+  useEffect(() => {
+    if (!hasDetector) setHint('Live-Scan nicht unterstützt — Nummer manuell eingeben.')
+  }, [hasDetector])
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="flex items-center justify-between px-4 pt-safe pt-4 pb-3">
+        <span className="text-white font-semibold text-sm">Barcode scannen</span>
+        <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white"><X size={18} /></button>
+      </div>
+
+      <div className="relative flex-1 overflow-hidden">
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+        {/* Scan frame overlay */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="relative w-72 h-44">
+            <div className="absolute inset-0 border-2 border-white/20 rounded-xl" />
+            {/* Corner markers */}
+            {[['top-0 left-0','border-t-2 border-l-2 rounded-tl-xl'],
+              ['top-0 right-0','border-t-2 border-r-2 rounded-tr-xl'],
+              ['bottom-0 left-0','border-b-2 border-l-2 rounded-bl-xl'],
+              ['bottom-0 right-0','border-b-2 border-r-2 rounded-br-xl'],
+            ].map(([pos, cls]) => (
+              <div key={pos} className={`absolute w-8 h-8 border-primary ${pos} ${cls}`} />
+            ))}
+            {/* Scan line animation */}
+            <div className="absolute left-2 right-2 h-0.5 bg-primary/80 animate-scanline" />
+          </div>
+        </div>
+        {camError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6 text-center">
+            <p className="text-white text-sm">{camError}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 py-4 bg-black/80 text-center">
+        <div className="flex items-center justify-center gap-2 text-white/70 text-sm mb-1">
+          <ScanLine size={14} /> {hint}
+        </div>
+        {!hasDetector && (
+          <p className="text-xs text-white/50 mt-1">Tipp: Chrome/Edge auf Android unterstützt Live-Scan.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── PortionSelector ─────────────────────────────────────────────────────────
 
 function PortionSelector({ product, barcode, onConfirm, onBack }: {
@@ -339,6 +427,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   const [barcodeInput, setBarcodeInput] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [barcodeError, setBarcodeError] = useState('')
+  const [showLiveScanner, setShowLiveScanner] = useState(false)
   const [saving, setSaving] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -590,6 +679,12 @@ function AddFoodModal({ meal, onClose, onAdd }: {
 
               {tab === 'barcode' && (
                 <div className="space-y-4">
+                  {showLiveScanner && (
+                    <LiveBarcodeScanner
+                      onDetected={code => { setShowLiveScanner(false); lookupBarcode(code) }}
+                      onClose={() => setShowLiveScanner(false)}
+                    />
+                  )}
                   {barcodeLoading ? (
                     <div className="flex flex-col items-center gap-3 py-8">
                       <Spinner />
@@ -597,23 +692,21 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                     </div>
                   ) : (
                     <>
-                      <label className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Camera size={22} className="text-primary" />
+                      <button
+                        onClick={() => setShowLiveScanner(true)}
+                        className="w-full flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                      >
+                        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                          <ScanLine size={26} className="text-primary" />
                         </div>
                         <div className="text-center">
-                          <div className="font-medium text-text-primary text-sm">Barcode fotografieren</div>
-                          <div className="text-xs text-text-muted mt-0.5">Kamera auf Produktbarcode richten</div>
+                          <div className="font-medium text-text-primary text-sm">Live-Kamera starten</div>
+                          <div className="text-xs text-text-muted mt-0.5">Barcode in Echtzeit scannen</div>
                         </div>
-                        <input
-                          type="file" accept="image/*" className="hidden"
-                          capture="environment"
-                          onChange={e => { const f = e.target.files?.[0]; if (f) handleCameraCapture(f) }}
-                        />
-                      </label>
+                      </button>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-px bg-border" />
-                        <span className="text-xs text-text-muted whitespace-nowrap">oder manuell eingeben</span>
+                        <span className="text-xs text-text-muted whitespace-nowrap">oder Nummer eingeben</span>
                         <div className="flex-1 h-px bg-border" />
                       </div>
                       <div className="flex gap-2">
