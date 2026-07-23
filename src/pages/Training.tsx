@@ -475,7 +475,19 @@ async function fetchWorkoutXExercise(name: string): Promise<WorkoutXExercise | n
     )
     if (!res.ok) { exerciseCache.set(searchTerm, null); return null }
     const data = await res.json()
-    const ex = Array.isArray(data) && data.length > 0 ? (data[0] as WorkoutXExercise) : null
+    if (!Array.isArray(data) || data.length === 0) { exerciseCache.set(searchTerm, null); return null }
+    // API may return keys in camelCase or ALL_CAPS — normalise both
+    const r = data[0]
+    const ex: WorkoutXExercise = {
+      id: r.id ?? r.ID ?? '',
+      name: r.name ?? r.NAME ?? '',
+      gifUrl: r.gifUrl ?? r.gifURL ?? r.GIFURL ?? '',
+      bodyPart: r.bodyPart ?? r.BODYPART,
+      target: r.target ?? r.TARGET,
+      equipment: r.equipment ?? r.EQUIPMENT,
+      instructions: r.instructions ?? r.INSTRUCTIONS,
+      secondaryMuscles: r.secondaryMuscles ?? r.SECONDARYMUSCLES,
+    }
     exerciseCache.set(searchTerm, ex)
     return ex
   } catch {
