@@ -387,103 +387,101 @@ function getTip(name: string): UebungTip | null {
 
 // ─── Exercise GIF (free-exercise-db, CC BY-SA 3.0 Everkinetic) ───────────────
 
-// Maps German exercise key → folder name in yuhonas/free-exercise-db
-const EXERCISE_IMGS: Record<string, string> = {
-  'bankdrücken':              'Barbell_Bench_Press_-_Medium_Grip',
-  'kniebeuge':                'Barbell_Full_Squat',
-  'kreuzheben':               'Barbell_Deadlift',
-  'klimmzug':                 'Pullups',
-  'pull up':                  'Pullups',
-  'wide pull up':             'Wide-Grip_Pullup',
-  'schulterdrücken':          'Barbell_Shoulder_Press',
-  'rudern':                   'Bent_Over_Barbell_Row',
-  'bizeps curl':              'Barbell_Curl',
-  'trizepsdrücken':           'Tricep_Dips_Between_Benches',
-  'beinstrecken':             'Leg_Extensions',
-  'beinbeugen':               'Seated_Leg_Curl',
-  'plank':                    'Plank',
-  'dips':                     'Dips',
-  'seitheben':                'Side_Lateral_Raise',
-  'liegestützen':             'Push_Ups',
-  'laufen':                   'Running,_Treadmill',
-  'laufband':                 'Running,_Treadmill',
-  'fahrrad':                  'Stationary_Bike',
-  'latzug':                   'Lat_Pulldown',
-  'rückenstrecker':           'Hyperextensions_-_Back',
-  'beinpresse':               'Leg_Press',
-  'wadenheben':               'Standing_Calf_Raises',
-  'hip thrust':               'Barbell_Hip_Thrust',
-  'ausfallschritt':           'Barbell_Lunge',
-  'schrägbankdrücken':        'Barbell_Incline_Bench_Press_-_Medium_Grip',
-  'butterfly':                'Peck_Deck_Butterfly',
-  'crunch':                   'Crunch',
-  'sit-up':                   'Sit-up',
-  'trizeps pushdown':         'Tricep_Pushdown',
-  'hammer curl':              'Hammer_Curls',
-  'rumänisches kreuzheben':   'Romanian_Deadlift',
-  'bulgarian split squat':    'Dumbbell_Bulgarian_Split_Squat',
-  'kabelrudern':              'Seated_Cable_Rows',
-  'rudermaschine':            'Rowing,_Stationary',
-  'crosstrainer':             'Stationary_Bike',
-  'beinheben':                'Hanging_Leg_Raise',
-  'russian twist':            'Russian_Twist',
-  'goblet squat':             'Dumbbell_Goblet_Squat',
-  'arnold press':             'Arnold_Dumbbell_Press',
-  'face pull':                'Face_Pull',
+// ─── WorkoutX Exercise API ────────────────────────────────────────────────────
+
+interface WorkoutXExercise {
+  id: string
+  name: string
+  gifUrl: string
+  bodyPart?: string
+  target?: string
+  equipment?: string
+  instructions?: string[]
+  secondaryMuscles?: string[]
 }
 
-const GIF_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises'
+// German canonical key → English search term for WorkoutX /exercises/name/:name
+const WORKOUTX_SEARCH: Record<string, string> = {
+  'bankdrücken': 'barbell bench press',
+  'kniebeuge': 'barbell squat',
+  'kreuzheben': 'barbell deadlift',
+  'klimmzug': 'pullups',
+  'pull up': 'pullups',
+  'wide pull up': 'wide grip pullup',
+  'schulterdrücken': 'barbell shoulder press',
+  'rudern': 'bent over barbell row',
+  'bizeps curl': 'barbell curl',
+  'trizepsdrücken': 'tricep dips between benches',
+  'beinstrecken': 'leg extensions',
+  'beinbeugen': 'seated leg curl',
+  'plank': 'plank',
+  'dips': 'dips',
+  'seitheben': 'side lateral raise',
+  'liegestützen': 'push ups',
+  'laufen': 'treadmill',
+  'laufband': 'treadmill',
+  'fahrrad': 'stationary bike',
+  'latzug': 'lat pulldown',
+  'rückenstrecker': 'hyperextension',
+  'beinpresse': 'leg press',
+  'wadenheben': 'standing calf raise',
+  'hip thrust': 'barbell hip thrust',
+  'ausfallschritt': 'barbell lunge',
+  'schrägbankdrücken': 'barbell incline bench press',
+  'butterfly': 'peck deck fly',
+  'crunch': 'crunch',
+  'sit-up': 'sit up',
+  'face pull': 'face pull',
+  'trizeps pushdown': 'tricep pushdown',
+  'hammer curl': 'hammer curl',
+  'rumänisches kreuzheben': 'romanian deadlift',
+  'bulgarian split squat': 'bulgarian split squat',
+  'kabelrudern': 'seated cable row',
+  'rudermaschine': 'rowing stationary',
+  'crosstrainer': 'stationary bike',
+  'beinheben': 'hanging leg raise',
+  'russian twist': 'russian twist',
+  'goblet squat': 'goblet squat',
+  'arnold press': 'arnold dumbbell press',
+  'ausfallschritte': 'barbell lunge',
+}
 
-function resolveExerciseImgKey(name: string): string | null {
+const exerciseCache = new Map<string, WorkoutXExercise | null>()
+const WX_KEY = import.meta.env.VITE_WORKOUTX_API_KEY as string
+
+function resolveCanonicalKey(name: string): string | null {
   const key = name.toLowerCase().trim()
-  if (EXERCISE_IMGS[key]) return key
+  if (UEBUNG_TIPS[key]) return key
   const alias = ALIASES[key]
-  if (alias && EXERCISE_IMGS[alias]) return alias
-  const fuzzy = Object.keys(EXERCISE_IMGS).find(k => key.includes(k) || k.includes(key))
+  if (alias) return alias
+  const fuzzy = Object.keys(UEBUNG_TIPS).find(k => key.includes(k) || k.includes(key))
   if (fuzzy) return fuzzy
   const fuzzyAlias = Object.entries(ALIASES).find(([a]) => key.includes(a) || a.includes(key))
-  if (fuzzyAlias && EXERCISE_IMGS[fuzzyAlias[1]]) return fuzzyAlias[1]
-  return null
+  return fuzzyAlias ? fuzzyAlias[1] : null
 }
 
-function ExerciseGif({ exerciseName }: { exerciseName: string }) {
-  const resolvedKey = resolveExerciseImgKey(exerciseName)
-  const folder = resolvedKey ? EXERCISE_IMGS[resolvedKey] : null
-  const [frame, setFrame] = useState(0)
-  const [loaded, setLoaded] = useState([false, false])
-  const [hasError, setHasError] = useState(false)
+async function fetchWorkoutXExercise(name: string): Promise<WorkoutXExercise | null> {
+  const canonical = resolveCanonicalKey(name)
+  const searchTerm = canonical
+    ? (WORKOUTX_SEARCH[canonical] ?? canonical)
+    : name.toLowerCase().trim()
 
-  useEffect(() => {
-    if (!folder || hasError) return
-    const t = setInterval(() => setFrame(f => (f + 1) % 2), 1400)
-    return () => clearInterval(t)
-  }, [folder, hasError])
+  if (exerciseCache.has(searchTerm)) return exerciseCache.get(searchTerm)!
 
-  if (!folder || hasError) return null
-
-  return (
-    <div className="relative w-full rounded-xl overflow-hidden bg-bg-elevated" style={{ aspectRatio: '4/3' }}>
-      {[0, 1].map(i => (
-        <img
-          key={i}
-          src={`${GIF_BASE}/${folder}/${i}.jpg`}
-          alt=""
-          onLoad={() => setLoaded(l => { const n = [...l]; n[i] = true; return n })}
-          onError={() => setHasError(true)}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{
-            opacity: frame === i && loaded[i] ? 1 : 0,
-            transition: 'opacity 0.6s ease',
-          }}
-        />
-      ))}
-      {!loaded[0] && !hasError && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-    </div>
-  )
+  try {
+    const res = await fetch(
+      `https://api.workoutxapp.com/v1/exercises/name/${encodeURIComponent(searchTerm)}?lang=de`,
+      { headers: { 'X-WorkoutX-Key': WX_KEY } }
+    )
+    if (!res.ok) { exerciseCache.set(searchTerm, null); return null }
+    const data = await res.json()
+    const ex = Array.isArray(data) && data.length > 0 ? (data[0] as WorkoutXExercise) : null
+    exerciseCache.set(searchTerm, ex)
+    return ex
+  } catch {
+    exerciseCache.set(searchTerm, null)
+    return null
+  }
 }
 
 // ─── Exercise Tip Modal ───────────────────────────────────────────────────────
@@ -496,8 +494,18 @@ const MUSKEL_LABELS: Record<string, string> = {
 
 function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }) {
   const tip = getTip(name)
-  const key = name.toLowerCase().trim()
+  const [apiEx, setApiEx] = useState<WorkoutXExercise | null>(null)
+  const [apiLoading, setApiLoading] = useState(true)
   const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' richtige Ausführung Technik')}`
+
+  useEffect(() => {
+    setApiLoading(true)
+    setApiEx(null)
+    fetchWorkoutXExercise(name).then(ex => {
+      setApiEx(ex)
+      setApiLoading(false)
+    })
+  }, [name])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
@@ -510,19 +518,31 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
         <div className="flex items-start justify-between p-5 pb-4">
           <div>
             <div className="font-bold text-text-primary capitalize text-base">{name}</div>
-            {tip && (
+            {tip ? (
               <>
                 <div className="text-xs text-primary font-medium mt-0.5">{tip.muskel}</div>
                 <div className="text-xs text-text-muted">{tip.sekundaer}</div>
               </>
-            )}
+            ) : apiEx?.target ? (
+              <div className="text-xs text-primary font-medium mt-0.5 capitalize">
+                {apiEx.target}{apiEx.bodyPart ? ` · ${apiEx.bodyPart}` : ''}
+              </div>
+            ) : null}
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0 ml-3"><X size={16} /></button>
         </div>
 
         <div className="px-5 pb-6 space-y-5">
-          {/* GIF Animation */}
-          <ExerciseGif exerciseName={name} />
+          {/* GIF from WorkoutX API */}
+          {apiLoading ? (
+            <div className="w-full rounded-xl bg-bg-elevated flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : apiEx?.gifUrl ? (
+            <div className="w-full rounded-xl overflow-hidden bg-bg-elevated" style={{ aspectRatio: '4/3' }}>
+              <img src={apiEx.gifUrl} alt="" className="w-full h-full object-cover" />
+            </div>
+          ) : null}
 
           {tip ? (
             <>
@@ -566,9 +586,21 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 </ul>
               </div>
             </>
-          ) : (
+          ) : apiEx?.instructions && apiEx.instructions.length > 0 ? (
+            <div>
+              <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
+              <ul className="space-y-2">
+                {apiEx.instructions.map((step, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : !apiLoading ? (
             <p className="text-sm text-text-muted">Für <span className="text-text-primary font-medium">"{name}"</span> sind noch keine Tipps hinterlegt.</p>
-          )}
+          ) : null}
 
           {/* YouTube */}
           <a href={ytUrl} target="_blank" rel="noopener noreferrer"
