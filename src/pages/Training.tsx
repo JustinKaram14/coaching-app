@@ -27,32 +27,345 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-const UEBUNG_TIPS: Record<string, { muskel: string; tipps: string[] }> = {
-  'bankdrücken': { muskel: 'Brust, Trizeps, Schultern', tipps: ['Schulterblätter fest zusammenziehen und in Bank drücken', 'Stange auf Brustwarzen-Höhe absenken', 'Füße flach auf dem Boden halten', 'Ellenbogen ca. 45-75° vom Körper'] },
-  'kniebeuge': { muskel: 'Quadrizeps, Gesäß, Rücken', tipps: ['Knie zeigen in Richtung Zehen', 'Rücken gerade halten, Blick nach vorne', 'Tief genug gehen – Oberschenkel mindestens parallel', 'Gewicht auf der ganzen Fußsohle'] },
-  'kreuzheben': { muskel: 'Rücken, Gesäß, Beine', tipps: ['Rücken gerade, Brust raus', 'Stange nah am Körper führen', 'Hüfte und Knie gleichzeitig strecken', 'Schulterblätter einziehen zu Beginn'] },
-  'klimmzug': { muskel: 'Rücken (Latissimus), Bizeps', tipps: ['Schulterblätter einziehen bevor du hochziehst', 'Brust zur Stange führen', 'Kontrolliert absenken (3-4 Sek.)', 'Ellenbogen führen nach unten-hinten'] },
-  'pull up': { muskel: 'Rücken (Latissimus), Bizeps', tipps: ['Schulterblätter einziehen bevor du hochziehst', 'Brust zur Stange führen', 'Kontrolliert absenken (3-4 Sek.)', 'Ellenbogen führen nach unten-hinten'] },
-  'wide pull up': { muskel: 'Rücken (Latissimus, breite Schicht)', tipps: ['Griffbreite: 1,5× Schulterbreite', 'Schulterblätter aktiv einziehen', 'Oberkörper leicht nach hinten lehnen', 'Pause oben – Rücken anspannen'] },
-  'schulterdrücken': { muskel: 'Schultern (Deltamuskel), Trizeps', tipps: ['Stange vor dem Kopf drücken (nicht dahinter)', 'Kern anspannen, kein Hohlkreuz', 'Ellenbogen leicht vor der Stange', 'Vollständige Streckung oben'] },
-  'rudern': { muskel: 'Rücken, Bizeps, hintere Schulter', tipps: ['Oberkörper ca. 45° nach vorne geneigt', 'Ellenbogen eng am Körper', 'Schulterblätter zum Ende zusammenkneifen', 'Stange zum Bauch, nicht zur Brust'] },
-  'bizeps curl': { muskel: 'Bizeps', tipps: ['Ellenbogen bleibt am Körper fixiert', 'Volle Bewegungsamplitude nutzen', 'Oben kurz halten und anspannen', 'Langsam absenken (2-3 Sek.)'] },
-  'trizepsdrücken': { muskel: 'Trizeps', tipps: ['Ellenbogen zeigen nach vorne/oben', 'Nur der Unterarm bewegt sich', 'Volle Streckung unten', 'Kein Schwung einsetzen'] },
-  'beinstrecken': { muskel: 'Quadrizeps', tipps: ['Volle Streckung – Knie komplett durchdrücken', 'Oben kurz anspannen', 'Langsam absenken', 'Füße neutral oder leicht nach außen'] },
-  'beinbeugen': { muskel: 'Hamstrings (Rückseite Oberschenkel)', tipps: ['Hüfte bleibt auf der Maschine', 'Volle Beugung anstreben', 'Langsam strecken (exzentrische Phase)', 'Fersen aktiv einrollen'] },
-  'laufen': { muskel: 'Herz-Kreislauf, Beine', tipps: ['Puls in gewünschter Herzfrequenzzone halten', 'Aufrechte Körperhaltung', 'Schrittfrequenz: 170-180 Schritte/Min empfohlen', 'Weich auftreten – Mittelfuß bevorzugt'] },
-  'laufband': { muskel: 'Herz-Kreislauf, Beine', tipps: ['Neigung von 1-2% simuliert Outdoor-Laufen', 'Nicht am Handlauf festhalten', 'Puls im Zielbereich (60-80% max)', 'Warmup 3-5 Min langsam starten'] },
-  'fahrrad': { muskel: 'Beine, Herz-Kreislauf', tipps: ['Sattel auf Hüfthöhe einstellen', 'Knie leicht gebeugt in unterer Position', 'Gleichmäßige Trittfrequenz (80-100 RPM)', 'Oberkörper entspannt'] },
-  'plank': { muskel: 'Core, Stabilisation', tipps: ['Körper bildet eine gerade Linie', 'Gesäß nicht hochstrecken oder durchhängen', 'Blick auf den Boden', 'Bauch und Gesäß aktiv anspannen'] },
-  'dips': { muskel: 'Trizeps, Brust, Schultern', tipps: ['Körper leicht nach vorne neigen = mehr Brust', 'Aufrecht = mehr Trizeps', 'Tiefe: Bis Ellenbogen 90°', 'Schultern nicht hochziehen'] },
-  'seitheben': { muskel: 'Schultern (seitlicher Deltamuskel)', tipps: ['Leicht gebeugte Ellenbogen', 'Arme seitlich bis Schulterhöhe heben', 'Daumen leicht nach unten (innere Rotation)', 'Kein Schwung – sehr langsam!'] },
-  'liegestützen': { muskel: 'Brust, Trizeps, Schultern', tipps: ['Körper gerade wie ein Brett halten', 'Ellenbogen ca. 45° vom Körper', 'Brust berührt fast den Boden', 'Vollständige Streckung oben'] },
+interface UebungTip {
+  muskel: string
+  sekundaer: string
+  warum: string
+  muskeln: string[]
+  tipps: string[]
+  fehler: string[]
 }
 
-function getTip(name: string) {
+const UEBUNG_TIPS: Record<string, UebungTip> = {
+  'bankdrücken': {
+    muskel: 'Brust (Pectoralis)', sekundaer: 'Trizeps · Vordere Schulter',
+    warum: 'Die effektivste Übung für Brustaufbau und Oberkörperkraft. Aktiviert gleichzeitig Brust, Schultern und Trizeps – ideal für Masse und Maximalkraft.',
+    muskeln: ['chest', 'tricep', 'shoulder'],
+    tipps: ['Schulterblätter zusammenziehen und in die Bank drücken', 'Rücken leicht gewölbt, Füße flach am Boden', 'Griffbreite: Oberarm 90° zur Stange', 'Stange zur unteren Brust führen (Brustwarzen-Linie)', 'Ellenbogen 45–75° vom Körper – nicht komplett aufspreizen'],
+    fehler: ['Schultern hochziehen (Verletzungsrisiko)', 'Ellenbogen zu weit aufspreizen (Schulter-Impingement)', 'Stange unkontrolliert fallen lassen', 'Füße in die Luft strecken (Stabilitätsverlust)'],
+  },
+  'kniebeuge': {
+    muskel: 'Quadrizeps · Gesäß (Gluteus)', sekundaer: 'Hamstrings · Core · Rückenstrecker',
+    warum: 'Die „Königin der Übungen" – aktiviert mehr Muskelmasse als fast jede andere Übung. Fördert Hormonausschüttung, Kraft und Muskelaufbau im gesamten Körper.',
+    muskeln: ['quad', 'glute', 'ham', 'lback', 'abs'],
+    tipps: ['Stange auf dem Trapezmuskel, nicht auf dem Nacken', 'Füße schulterbreit, Zehen 15–30° auswärts', 'Knie zeigen immer in Richtung der Zehen', 'Mindestens bis zur Parallele, besser tiefer', 'Blick geradeaus, Rücken neutral – kein Rundrücken', 'Aus den Fersen herausdrücken beim Aufstehen'],
+    fehler: ['Knie nach innen fallen lassen (Valgus-Stellung)', 'Zu wenig Tiefe – Muskel nicht voll aktiviert', 'Rundrücken – Bandscheiben werden belastet', 'Fersen heben (Beweglichkeit trainieren)'],
+  },
+  'kreuzheben': {
+    muskel: 'Rückenstrecker · Gesäß', sekundaer: 'Hamstrings · Trapez · Core',
+    warum: 'Trainiert die gesamte hintere Muskelkette gleichzeitig. Essenziell für Kraft, Körperhaltung und Prävention von Rückenproblemen.',
+    muskeln: ['lback', 'glute', 'ham', 'trap'],
+    tipps: ['Stange über dem Mittelfuß positionieren', 'Schulterblätter einziehen bevor du hebst', 'Rücken gerade, Brust raus, Blick nach vorne-unten', 'Stange nah am Körper führen – fast schaben', 'Hüfte und Knie gleichzeitig strecken', 'Oben Hüfte durchdrücken, Gesäß anspannen'],
+    fehler: ['Rundrücken – besonders im unteren Rücken gefährlich', 'Stange vom Körper wegschwingen lassen', 'Mit dem Rücken hochreißen statt Beine nutzen'],
+  },
+  'klimmzug': {
+    muskel: 'Latissimus (Rücken)', sekundaer: 'Bizeps · Trapez · hintere Schulter',
+    warum: 'Ultimatives Rückentraining für einen breiten V-förmigen Latissimus. Einer der besten Indikatoren für Kraft-zu-Körpergewicht-Ratio.',
+    muskeln: ['lat', 'bicep', 'trap'],
+    tipps: ['Schulterblätter zuerst einziehen, dann hochziehen', 'Ellenbogen führen nach unten-hinten', 'Brust zur Stange, Oberkörper leicht nach hinten', 'Oben kurz halten – Rücken vollständig anspannen', 'Langsam absenken (3–4 Sek.) – exzentrische Phase nutzen'],
+    fehler: ['Nur mit Armen ziehen statt Rücken zu aktivieren', 'Zu schnell und schwingen', 'Nicht vollständig strecken in unterer Position'],
+  },
+  'pull up': {
+    muskel: 'Latissimus (Rücken)', sekundaer: 'Bizeps · Trapez · hintere Schulter',
+    warum: 'Ultimatives Rückentraining für einen breiten V-förmigen Latissimus. Einer der besten Indikatoren für Kraft-zu-Körpergewicht-Ratio.',
+    muskeln: ['lat', 'bicep', 'trap'],
+    tipps: ['Schulterblätter zuerst einziehen, dann hochziehen', 'Ellenbogen führen nach unten-hinten', 'Brust zur Stange, Oberkörper leicht nach hinten', 'Oben kurz halten – Rücken vollständig anspannen', 'Langsam absenken (3–4 Sek.) – exzentrische Phase nutzen'],
+    fehler: ['Nur mit Armen ziehen statt Rücken zu aktivieren', 'Zu schnell und schwingen', 'Nicht vollständig strecken in unterer Position'],
+  },
+  'wide pull up': {
+    muskel: 'Latissimus (breite Schicht)', sekundaer: 'Trapez · hintere Schulter',
+    warum: 'Weiter Griff betont die äußeren Lats und erzeugt maximale Rückenbreite. Intensiver als normaler Klimmzug, weniger Bizeps-Beteiligung.',
+    muskeln: ['lat', 'trap', 'shoulder'],
+    tipps: ['Griffbreite: ca. 1,5× Schulterbreite', 'Schulterblätter aktiv einziehen vor dem Hochziehen', 'Oberkörper leicht nach hinten lehnen', 'Pause oben – Rücken maximal anspannen', 'Kontrolliert absenken'],
+    fehler: ['Zu breiter Griff (Schultergelenk belastet)', 'Schultern nicht aktivieren', 'Zu viel Schwung'],
+  },
+  'schulterdrücken': {
+    muskel: 'Schultern (Deltamuskel)', sekundaer: 'Trizeps · Trapez · Core',
+    warum: 'Die Grundübung für massive Schultern. Belastet den vorderen und seitlichen Deltamuskel maximal und entwickelt Überkopfkraft.',
+    muskeln: ['shoulder', 'tricep', 'trap'],
+    tipps: ['Stange VOR dem Kopf drücken – nie dahinter', 'Core fest anspannen, kein starkes Hohlkreuz', 'Ellenbogen leicht nach vorne-außen', 'Vollständige Streckung am Ende oben', 'Stange kontrolliert zur Brust absenken'],
+    fehler: ['Hinter dem Kopf drücken – Nacken belastet', 'Starkes Hohlkreuz – Lendenwirbel gefährdet', 'Ellenbogen zu weit nach außen klappen'],
+  },
+  'rudern': {
+    muskel: 'Oberer Rücken (Rhomboid, Trapez)', sekundaer: 'Latissimus · Bizeps · hintere Schulter',
+    warum: 'Essenziell für gesunde Körperhaltung und gleicht Drückübungen aus. Kräftigt die obere Rückenmuskulatur und verbessert die Schultergesundheit langfristig.',
+    muskeln: ['lat', 'trap', 'bicep', 'shoulder'],
+    tipps: ['Oberkörper ca. 45° nach vorne neigen, Rücken gerade', 'Ellenbogen eng am Körper führen', 'Stange zum Bauch ziehen, nicht zur Brust', 'Am Ende Schulterblätter kräftig zusammenkneifen', 'Langsam strecken – exzentrische Phase nutzen'],
+    fehler: ['Rücken rund – Bandscheiben belastet', 'Mit dem Rücken Schwung holen', 'Stange zu weit oben zur Brust ziehen'],
+  },
+  'bizeps curl': {
+    muskel: 'Bizeps (Brachii)', sekundaer: 'Brachialis · Unterarmbeuger',
+    warum: 'Isoliert den Bizeps direkt und ist die effektivste Übung für sichtbaren Armaufbau. Ermöglicht Peak-Kontraktion und maximales Muskelgefühl.',
+    muskeln: ['bicep'],
+    tipps: ['Ellenbogen bleibt fest am Körper – kein Schwingen', 'Volle Bewegungsamplitude: ganz strecken, ganz beugen', 'Oben 1–2 Sek. halten und anspannen', 'Langsam absenken (2–3 Sek.) – exzentrischer Vorteil'],
+    fehler: ['Schwingen mit dem Oberkörper', 'Ellenbogen weg vom Körper – Schulter übernimmt', 'Zu schnell absenken'],
+  },
+  'trizepsdrücken': {
+    muskel: 'Trizeps (Brachii)', sekundaer: 'Unterarmstrecker',
+    warum: 'Trizeps macht 2/3 des Armvolumens aus! Isoliert alle 3 Köpfe und ist entscheidend für große Arme und starke Drückbewegungen.',
+    muskeln: ['tricep'],
+    tipps: ['Ellenbogen zeigen nach vorne-oben, fixiert', 'Nur der Unterarm bewegt sich', 'Volle Streckung am Ende durchdrücken', 'Langsam und kontrolliert zurückführen'],
+    fehler: ['Ellenbogen schwingen oder ausweichen', 'Nicht vollständig strecken', 'Zu schweres Gewicht mit Schwung'],
+  },
+  'beinstrecken': {
+    muskel: 'Quadrizeps (4-köpfiger Oberschenkelmuskel)', sekundaer: 'Kniestabilisatoren',
+    warum: 'Isoliert den Quadrizeps direkt und hilft bei der Formgebung des Oberschenkels. Ideal für Kniestabilität und als Ergänzung zu Kniebeugen.',
+    muskeln: ['quad'],
+    tipps: ['Rücken fest an der Lehne, Hüfte nicht heben', 'Volle Streckung – Knie komplett durchdrücken', 'Oben 1–2 Sek. halten und anspannen', 'Langsam absenken (3 Sek.)'],
+    fehler: ['Hüfte hebt – Core kompensiert', 'Zu schnell und schwungvoll', 'Knie nicht voll strecken'],
+  },
+  'beinbeugen': {
+    muskel: 'Hamstrings (Rückseite Oberschenkel)', sekundaer: 'Gluteus · Waden',
+    warum: 'Trainiert die Hamstrings isoliert, die bei Kniebeugen und Kreuzheben oft vernachlässigt werden. Wichtig für Verletzungsprävention und Beinbalance.',
+    muskeln: ['ham', 'glute', 'calf'],
+    tipps: ['Hüfte bleibt fest auf der Maschine', 'Volle Beugung – Ferse zur Gesäßfalte', 'Oben kurz halten und anspannen', 'Langsam strecken – exzentrische Phase nutzen'],
+    fehler: ['Hüfte hebt sich beim Ziehen', 'Zu schnell und ruckartig', 'Nicht voll strecken in der Ausgangsposition'],
+  },
+  'laufen': {
+    muskel: 'Herz-Kreislauf-System', sekundaer: 'Quadrizeps · Hamstrings · Waden',
+    warum: 'Eine der effektivsten Cardio-Formen: verbessert Ausdauer, verbrennt Kalorien, stärkt das Herz und fördert mentale Gesundheit durch Endorphinausschüttung.',
+    muskeln: ['quad', 'ham', 'calf'],
+    tipps: ['Aufrechte Körperhaltung, Blick geradeaus', 'Schrittfrequenz: 170–180 Schritte/Min', 'Weich auftreten – Mittelfuß bevorzugt', 'Arme entspannt, 90° gebeugt', 'Puls im Zielbereich halten (60–80% max HR)'],
+    fehler: ['Zu lange Schritte – Knie belastet', 'Oberkörper zu stark nach vorne beugen', 'Zu schnell starten ohne Aufwärmen'],
+  },
+  'laufband': {
+    muskel: 'Herz-Kreislauf-System', sekundaer: 'Quadrizeps · Hamstrings · Waden',
+    warum: 'Kontrolliertes Cardio-Training bei jedem Wetter. Einstellbare Neigung ermöglicht intensiveres Training und besseren Calorie-Burn.',
+    muskeln: ['quad', 'ham', 'calf'],
+    tipps: ['Neigung 1–2% simuliert Outdoor-Bedingungen', 'Nicht am Handlauf festhalten', 'Puls: 60–80% der max. Herzfrequenz', 'Warmup 3–5 Min langsam beginnen', 'Cooldown: mind. 3 Min langsam gehen'],
+    fehler: ['Am Handlauf festhalten – Intensität sinkt', 'Zu schnell für das aktuelle Fitnesslevel', 'Ohne Aufwärmen direkt Vollgas'],
+  },
+  'fahrrad': {
+    muskel: 'Quadrizeps · Waden', sekundaer: 'Hamstrings · Gesäß · Herz-Kreislauf',
+    warum: 'Schont die Gelenke und trainiert gleichzeitig Ausdauer und Unterkörperkraft. Ideal für Fettverbrennung und gelenkschonendes Cardio.',
+    muskeln: ['quad', 'ham', 'calf', 'glute'],
+    tipps: ['Sattel auf Hüfthöhe einstellen', 'Knie leicht gebeugt in unterer Pedalposition', 'Gleichmäßige Trittfrequenz: 80–100 RPM', 'Oberkörper entspannt, kein Verkrampfen'],
+    fehler: ['Sattel zu niedrig – Knie überlastet', 'Zu langsame Trittfrequenz mit hohem Widerstand'],
+  },
+  'plank': {
+    muskel: 'Core (Transversus Abdominis)', sekundaer: 'Unterer Rücken · Gesäß · Schultern',
+    warum: 'Beste Übung für tiefen Core-Aufbau. Ein starker Core schützt die Wirbelsäule, verbessert Körperhaltung und stabilisiert alle anderen Übungen.',
+    muskeln: ['abs', 'lback', 'glute', 'shoulder'],
+    tipps: ['Körper bildet eine gerade Linie von Kopf bis Ferse', 'Gesäß nicht hochstrecken oder durchhängen', 'Bauch aktiv einziehen und anspannen', 'Schultern über den Ellenbogen', 'Gleichmäßig atmen – nicht die Luft anhalten'],
+    fehler: ['Gesäß hochstrecken – Core wird entlastet', 'Hüfte durchhängen – Lendenwirbel belastet', 'Schultern hochziehen zum Ohr'],
+  },
+  'dips': {
+    muskel: 'Trizeps', sekundaer: 'Brust · Vordere Schulter',
+    warum: 'Kraftklassiker für Trizeps und Oberkörper. Je nach Körperneigung Fokus auf Trizeps (aufrecht) oder Brust (geneigt) – sehr vielseitig.',
+    muskeln: ['tricep', 'chest', 'shoulder'],
+    tipps: ['Aufrecht = mehr Trizeps', 'Nach vorne geneigt = mehr Brust', 'Tief gehen: bis Ellenbogen 90° gebeugt', 'Schultern nicht hochziehen', 'Kontrolliert absenken'],
+    fehler: ['Schultern hochziehen – Rotatorenmanschette belastet', 'Zu wenig Tiefe – Muskel nicht vollständig aktiviert'],
+  },
+  'seitheben': {
+    muskel: 'Seitlicher Deltamuskel (Medial)', sekundaer: 'Vorderer Deltamuskel · Trapez',
+    warum: 'Formt die Schulterbreite und gibt dem Oberkörper die athletische V-Form. Der seitliche Delta wird bei Drücken kaum trainiert – Seitheben ist deshalb unverzichtbar.',
+    muskeln: ['shoulder'],
+    tipps: ['Arme seitlich bis Schulterhöhe heben', 'Ellenbogen leicht gebeugt', 'Daumen leicht nach unten (innere Rotation)', 'Keine Schulterhochzüge', 'Sehr langsam und kontrolliert – kein Schwung!'],
+    fehler: ['Zu viel Gewicht mit Schwung heben', 'Schultern hochziehen', 'Arme über Schulterniveau heben'],
+  },
+  'liegestützen': {
+    muskel: 'Brust (Pectoralis)', sekundaer: 'Trizeps · Vordere Schulter · Core',
+    warum: 'Universellste Oberkörperübung – überall ohne Equipment. Trainiert Brust, Trizeps und Schultern gleichzeitig und stärkt dazu den Core.',
+    muskeln: ['chest', 'tricep', 'shoulder', 'abs'],
+    tipps: ['Körper wie ein Brett: gerade Linie von Kopf bis Ferse', 'Ellenbogen ca. 45° vom Körper', 'Brust berührt fast den Boden', 'Vollständige Streckung am Ende'],
+    fehler: ['Hüfte hängt durch oder ist hochgestreckt', 'Nur halbe Bewegungsamplitude', 'Ellenbogen komplett seitwärts aufspreizen'],
+  },
+}
+
+function getTip(name: string): UebungTip | null {
   const key = name.toLowerCase().trim()
   return UEBUNG_TIPS[key] ?? null
 }
+
+// ─── Muscle Body Diagram ─────────────────────────────────────────────────────
+
+function MuskelMap({ active }: { active: string[] }) {
+  const on = (id: string) => active.includes(id)
+
+  function mStyle(id: string): React.SVGProps<SVGElement> {
+    return on(id)
+      ? { fill: '#6366f1', opacity: 1, className: 'muscle-active' }
+      : { fill: '#2a2d38', opacity: 0.6 }
+  }
+
+  const bodyFill = '#1e2130'
+  const skinFill = '#2a2d38'
+
+  return (
+    <div className="flex gap-4 justify-center py-2">
+      <style>{`
+        .muscle-active { animation: mPulse 1.8s ease-in-out infinite; }
+        @keyframes mPulse { 0%,100%{opacity:1;filter:drop-shadow(0 0 4px #6366f1aa)} 50%{opacity:0.75;filter:drop-shadow(0 0 8px #6366f1)} }
+      `}</style>
+
+      {/* Front View */}
+      <div className="text-center">
+        <div className="text-[9px] font-medium text-text-muted tracking-widest mb-1.5">VORNE</div>
+        <svg viewBox="0 0 90 208" width="76" height="175">
+          {/* Body outline */}
+          <circle cx="45" cy="13" r="10" fill={skinFill} />
+          <rect x="42" y="22" width="6" height="8" rx="2" fill={skinFill} />
+          <rect x="23" y="30" width="44" height="74" rx="11" fill={bodyFill} />
+          <rect x="9" y="32" width="14" height="36" rx="7" fill={skinFill} />
+          <rect x="67" y="32" width="14" height="36" rx="7" fill={skinFill} />
+          <rect x="10" y="68" width="12" height="26" rx="6" fill={skinFill} />
+          <rect x="68" y="68" width="12" height="26" rx="6" fill={skinFill} />
+          <rect x="23" y="104" width="20" height="52" rx="9" fill={skinFill} />
+          <rect x="47" y="104" width="20" height="52" rx="9" fill={skinFill} />
+          <rect x="25" y="156" width="16" height="44" rx="7" fill={skinFill} />
+          <rect x="49" y="156" width="16" height="44" rx="7" fill={skinFill} />
+
+          {/* Front muscles */}
+          <rect x="25" y="32" width="40" height="30" rx="8" {...mStyle('chest') as any} />
+          <ellipse cx="16" cy="42" rx="9" ry="8" {...mStyle('shoulder') as any} />
+          <ellipse cx="74" cy="42" rx="9" ry="8" {...mStyle('shoulder') as any} />
+          <rect x="10" y="36" width="12" height="26" rx="6" {...mStyle('bicep') as any} />
+          <rect x="68" y="36" width="12" height="26" rx="6" {...mStyle('bicep') as any} />
+          <rect x="28" y="62" width="34" height="40" rx="9" {...mStyle('abs') as any} />
+          <rect x="24" y="106" width="18" height="46" rx="8" {...mStyle('quad') as any} />
+          <rect x="48" y="106" width="18" height="46" rx="8" {...mStyle('quad') as any} />
+          <rect x="26" y="158" width="13" height="36" rx="6" {...mStyle('calf') as any} />
+          <rect x="51" y="158" width="13" height="36" rx="6" {...mStyle('calf') as any} />
+        </svg>
+      </div>
+
+      {/* Back View */}
+      <div className="text-center">
+        <div className="text-[9px] font-medium text-text-muted tracking-widest mb-1.5">HINTEN</div>
+        <svg viewBox="0 0 90 208" width="76" height="175">
+          {/* Body outline */}
+          <circle cx="45" cy="13" r="10" fill={skinFill} />
+          <rect x="42" y="22" width="6" height="8" rx="2" fill={skinFill} />
+          <rect x="23" y="30" width="44" height="74" rx="11" fill={bodyFill} />
+          <rect x="9" y="32" width="14" height="36" rx="7" fill={skinFill} />
+          <rect x="67" y="32" width="14" height="36" rx="7" fill={skinFill} />
+          <rect x="10" y="68" width="12" height="26" rx="6" fill={skinFill} />
+          <rect x="68" y="68" width="12" height="26" rx="6" fill={skinFill} />
+          <rect x="23" y="104" width="20" height="52" rx="9" fill={skinFill} />
+          <rect x="47" y="104" width="20" height="52" rx="9" fill={skinFill} />
+          <rect x="25" y="156" width="16" height="44" rx="7" fill={skinFill} />
+          <rect x="49" y="156" width="16" height="44" rx="7" fill={skinFill} />
+
+          {/* Back muscles */}
+          <rect x="26" y="32" width="38" height="22" rx="7" {...mStyle('trap') as any} />
+          <path d="M10,46 L28,40 L26,82 L8,92 Z" {...mStyle('lat') as any} />
+          <path d="M80,46 L62,40 L64,82 L82,92 Z" {...mStyle('lat') as any} />
+          <rect x="10" y="36" width="12" height="26" rx="6" {...mStyle('tricep') as any} />
+          <rect x="68" y="36" width="12" height="26" rx="6" {...mStyle('tricep') as any} />
+          <rect x="30" y="64" width="30" height="20" rx="6" {...mStyle('lback') as any} />
+          <rect x="24" y="104" width="18" height="26" rx="9" {...mStyle('glute') as any} />
+          <rect x="48" y="104" width="18" height="26" rx="9" {...mStyle('glute') as any} />
+          <rect x="24" y="132" width="18" height="40" rx="8" {...mStyle('ham') as any} />
+          <rect x="48" y="132" width="18" height="40" rx="8" {...mStyle('ham') as any} />
+          <rect x="26" y="174" width="13" height="26" rx="6" {...mStyle('calf') as any} />
+          <rect x="51" y="174" width="13" height="26" rx="6" {...mStyle('calf') as any} />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+// ─── Exercise Tip Modal ───────────────────────────────────────────────────────
+
+function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }) {
+  const tip = getTip(name)
+  const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' richtige Ausführung Technik')}`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-bg-card rounded-2xl border border-border w-full max-w-sm overflow-y-auto"
+        style={{ maxHeight: '88vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 pb-3">
+          <div>
+            <div className="font-bold text-text-primary capitalize text-base">{name}</div>
+            {tip && (
+              <>
+                <div className="text-xs text-primary font-medium mt-0.5">{tip.muskel}</div>
+                <div className="text-xs text-text-muted mt-0.5">{tip.sekundaer}</div>
+              </>
+            )}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0"><X size={16} /></button>
+        </div>
+
+        {tip ? (
+          <div className="px-5 pb-5 space-y-5">
+            {/* Muscle Diagram */}
+            <div className="bg-bg-elevated rounded-xl p-3">
+              <MuskelMap active={tip.muskeln} />
+              <div className="flex flex-wrap gap-1.5 justify-center mt-2">
+                {tip.muskeln.map(m => {
+                  const labels: Record<string, string> = {
+                    chest: 'Brust', shoulder: 'Schultern', bicep: 'Bizeps', tricep: 'Trizeps',
+                    trap: 'Trapez', lat: 'Latissimus', lback: 'Unterer Rücken', abs: 'Core',
+                    quad: 'Quadrizeps', ham: 'Hamstrings', glute: 'Gesäß', calf: 'Waden',
+                  }
+                  return (
+                    <span key={m} className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                      {labels[m] ?? m}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Warum */}
+            <div>
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Warum diese Übung?</div>
+              <p className="text-sm text-text-secondary leading-relaxed">{tip.warum}</p>
+            </div>
+
+            {/* Ausführung */}
+            <div>
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
+              <ul className="space-y-2">
+                {tip.tipps.map((t, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Häufige Fehler */}
+            <div>
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Häufige Fehler</div>
+              <ul className="space-y-1.5">
+                {tip.fehler.map((f, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-text-secondary">
+                    <span className="text-danger shrink-0 mt-0.5">✕</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* YouTube Link */}
+            <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 text-sm text-text-secondary hover:text-primary transition-colors">
+              <span className="text-base">▶</span> Videodemonstration ansehen
+            </a>
+          </div>
+        ) : (
+          <div className="px-5 pb-5 space-y-3">
+            <p className="text-sm text-text-muted">Für <span className="text-text-primary font-medium">"{name}"</span> sind noch keine Tipps hinterlegt.</p>
+            <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-primary/50 text-sm text-text-secondary hover:text-primary transition-colors">
+              <span className="text-base">▶</span> Videodemonstration ansehen
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Uebung Form ─────────────────────────────────────────────────────────────
 
 type UebungFormEntry = { uebungsname: string; saetze: string; wdh: string; gewicht_kg: string; notizen: string }
 function UebungForm({ entries, onChange }: {
@@ -73,36 +386,9 @@ function UebungForm({ entries, onChange }: {
     onChange(next)
   }
 
-  const activeTip = tipFor ? getTip(tipFor) : null
-
   return (
     <div className="space-y-3">
-      {/* Exercise tip modal */}
-      {tipFor && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setTipFor(null)}>
-          <div className="bg-bg-card rounded-2xl border border-border w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-semibold text-text-primary capitalize">{tipFor}</div>
-                {activeTip && <div className="text-xs text-primary mt-0.5">{activeTip.muskel}</div>}
-              </div>
-              <button onClick={() => setTipFor(null)} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted"><X size={16} /></button>
-            </div>
-            {activeTip ? (
-              <ul className="space-y-2">
-                {activeTip.tipps.map((t, i) => (
-                  <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
-                    <span className="text-primary font-bold shrink-0">{i + 1}.</span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-text-muted">Für diese Übung sind noch keine Tipps hinterlegt. Gib den Übungsnamen vollständig ein für Hinweise.</p>
-            )}
-          </div>
-        </div>
-      )}
+      {tipFor && <UebungTipModal name={tipFor} onClose={() => setTipFor(null)} />}
 
       {entries.map((e, i) => (
         <div key={i} className="p-3 bg-bg-elevated rounded-lg space-y-2">
