@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil, HelpCircle } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil, HelpCircle, Check, Play } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -481,14 +481,19 @@ async function fetchWorkoutXExercise(name: string): Promise<WorkoutXExercise | n
     // API may return keys in camelCase or ALL_CAPS — normalise both
     const r = data[0] as Record<string, unknown>
     const ex: WorkoutXExercise = {
-      id: r.id ?? r.ID ?? '',
-      name: r.name ?? r.NAME ?? '',
-      gifUrl: r.gifUrl ?? r.gifURL ?? r.GIFURL ?? '',
-      bodyPart: r.bodyPart ?? r.BODYPART,
-      target: r.target ?? r.TARGET,
-      equipment: r.equipment ?? r.EQUIPMENT,
-      instructions: r.instructions ?? r.INSTRUCTIONS,
-      secondaryMuscles: r.secondaryMuscles ?? r.SECONDARYMUSCLES,
+      id: String(r.id ?? r.ID ?? ''),
+      name: String(r.name ?? r.NAME ?? ''),
+      gifUrl: String(r.gifUrl ?? r.gifURL ?? r.GIFURL ?? ''),
+      bodyPart: r.bodyPart != null ? String(r.bodyPart) : (r.BODYPART != null ? String(r.BODYPART) : undefined),
+      target: r.target != null ? String(r.target) : (r.TARGET != null ? String(r.TARGET) : undefined),
+      equipment: r.equipment != null ? String(r.equipment) : (r.EQUIPMENT != null ? String(r.EQUIPMENT) : undefined),
+      instructions: Array.isArray(r.instructions) ? r.instructions.map(String) : (Array.isArray(r.INSTRUCTIONS) ? (r.INSTRUCTIONS as unknown[]).map(String) : undefined),
+      secondaryMuscles: (() => {
+        const raw = r.secondaryMuscles ?? r.SECONDARYMUSCLES
+        if (raw == null) return undefined
+        const s = String(raw)
+        return s.includes(',') ? s.split(',').map(x => x.trim()) : s.split(' ').map(x => x.trim()).filter(Boolean)
+      })(),
     }
     exerciseCache.set(searchTerm, ex)
     return ex
@@ -685,6 +690,162 @@ function UebungForm({ entries, onChange }: {
   )
 }
 
+// ─── Active Workout (Strong-style per-set tracking) ──────────────────────────
+
+interface ActiveSet { wdh: string; kg: string; done: boolean }
+interface ActiveExercise {
+  name: string
+  sets: ActiveSet[]
+  prevSets: { wdh: number | null; kg: number | null }[]
+}
+interface ActiveWorkoutState { vorlage: any; startTime: number; exercises: ActiveExercise[] }
+
+function ActiveWorkoutView({ workout, onFinish, onAbort }: {
+  workout: ActiveWorkoutState
+  onFinish: (exercises: ActiveExercise[], elapsedMin: number) => void
+  onAbort: () => void
+}) {
+  const [exercises, setExercises] = useState<ActiveExercise[]>(workout.exercises)
+  const [elapsed, setElapsed] = useState(0)
+  const [tipFor, setTipFor] = useState<string | null>(null)
+
+  useEffect(() => {
+    const interval = setInterval(() => setElapsed(Math.floor((Date.now() - workout.startTime) / 1000)), 1000)
+    return () => clearInterval(interval)
+  }, [workout.startTime])
+
+  function updateSet(exIdx: number, setIdx: number, field: 'wdh' | 'kg', value: string) {
+    setExercises(prev => {
+      const next = prev.map(e => ({ ...e, sets: [...e.sets] }))
+      next[exIdx].sets[setIdx] = { ...next[exIdx].sets[setIdx], [field]: value }
+      return next
+    })
+  }
+
+  function toggleDone(exIdx: number, setIdx: number) {
+    setExercises(prev => {
+      const next = prev.map(e => ({ ...e, sets: [...e.sets] }))
+      next[exIdx].sets[setIdx] = { ...next[exIdx].sets[setIdx], done: !next[exIdx].sets[setIdx].done }
+      return next
+    })
+  }
+
+  function addSet(exIdx: number) {
+    setExercises(prev => {
+      const next = prev.map(e => ({ ...e, sets: [...e.sets] }))
+      const last = next[exIdx].sets.at(-1)
+      next[exIdx].sets.push({ wdh: last?.wdh ?? '', kg: last?.kg ?? '', done: false })
+      return next
+    })
+  }
+
+  const doneCount = exercises.reduce((a, ex) => a + ex.sets.filter(s => s.done).length, 0)
+  const totalCount = exercises.reduce((a, ex) => a + ex.sets.length, 0)
+  const mm = Math.floor(elapsed / 60).toString().padStart(2, '0')
+  const ss = (elapsed % 60).toString().padStart(2, '0')
+
+  return (
+    <div className="fixed inset-0 z-40 bg-bg-base overflow-y-auto">
+      {tipFor && <UebungTipModal name={tipFor} onClose={() => setTipFor(null)} />}
+
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-bg-card/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
+        <div>
+          <div className="font-bold text-text-primary">{workout.vorlage.name}</div>
+          <div className="text-xs text-text-muted flex items-center gap-1.5 mt-0.5">
+            <Timer size={11} /> {mm}:{ss} · {doneCount}/{totalCount} Sätze
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onAbort} className="btn-secondary text-sm px-3 py-1.5">Abbrechen</button>
+          <button
+            onClick={() => onFinish(exercises, Math.floor(elapsed / 60))}
+            className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5"
+          >
+            <Check size={14} /> Beenden
+          </button>
+        </div>
+      </div>
+
+      {/* Exercise list */}
+      <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+        {exercises.map((ex, exIdx) => {
+          const allDone = ex.sets.length > 0 && ex.sets.every(s => s.done)
+          return (
+            <div key={exIdx} className={`card transition-opacity ${allDone ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-text-primary">{ex.name}</span>
+                <button
+                  onClick={() => setTipFor(ex.name)}
+                  className="p-1.5 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors"
+                >
+                  <HelpCircle size={14} />
+                </button>
+              </div>
+
+              {/* Column headers */}
+              <div className="grid grid-cols-[24px_1fr_72px_72px_36px] gap-1.5 mb-1.5 px-0.5 text-[10px] text-text-muted font-semibold uppercase tracking-wide">
+                <span className="text-center">#</span>
+                <span>Letzte</span>
+                <span className="text-center">Wdh</span>
+                <span className="text-center">kg</span>
+                <span></span>
+              </div>
+
+              {/* Set rows */}
+              {ex.sets.map((set, setIdx) => {
+                const prev = ex.prevSets[setIdx]
+                const prevLabel = prev?.wdh ? `${prev.wdh}×${prev.kg ?? '?'}kg` : '—'
+                return (
+                  <div
+                    key={setIdx}
+                    className={`grid grid-cols-[24px_1fr_72px_72px_36px] gap-1.5 items-center mb-2 transition-opacity ${set.done ? 'opacity-40' : ''}`}
+                  >
+                    <span className="text-xs font-bold text-text-muted text-center">{setIdx + 1}</span>
+                    <span className="text-xs text-text-muted truncate">{prevLabel}</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={set.wdh}
+                      onChange={e => updateSet(exIdx, setIdx, 'wdh', e.target.value)}
+                      placeholder="10"
+                      className="input text-center text-sm py-1.5"
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.5"
+                      value={set.kg}
+                      onChange={e => updateSet(exIdx, setIdx, 'kg', e.target.value)}
+                      placeholder="—"
+                      className="input text-center text-sm py-1.5"
+                    />
+                    <button
+                      onClick={() => toggleDone(exIdx, setIdx)}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
+                        set.done ? 'bg-success text-white' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'
+                      }`}
+                    >
+                      <Check size={15} />
+                    </button>
+                  </div>
+                )
+              })}
+
+              <button
+                onClick={() => addSet(exIdx)}
+                className="mt-1 text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+              >
+                <Plus size={12} /> Satz hinzufügen
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function Training() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -698,6 +859,7 @@ export function Training() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [vorlagen, setVorlagen] = useState<any[]>([])
   const [selectedVorlage, setSelectedVorlage] = useState('')
+  const [activeWorkout, setActiveWorkout] = useState<ActiveWorkoutState | null>(null)
   const [form, setForm] = useState({
     datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '',
   })
@@ -747,6 +909,79 @@ export function Training() {
       notizen: '',
     })))
     setSelectedVorlage(vorlageId)
+  }
+
+  async function startWorkout(vorlage: any) {
+    if (!user) return
+    const names: string[] = (vorlage.uebungen ?? []).map((u: any) => u.uebungsname).filter(Boolean)
+    const prevMap: Record<string, { wdh: number | null; kg: number | null }[]> = {}
+
+    if (names.length) {
+      const { data: lastEx } = await supabase
+        .from('uebungen')
+        .select('uebungsname, saetze_log, saetze, wdh, gewicht_kg')
+        .eq('user_id', user.id)
+        .in('uebungsname', names)
+        .order('created_at', { ascending: false })
+
+      for (const u of (lastEx ?? [])) {
+        if (prevMap[u.uebungsname]) continue
+        if (Array.isArray(u.saetze_log) && u.saetze_log.length > 0) {
+          prevMap[u.uebungsname] = u.saetze_log
+        } else if (u.saetze) {
+          prevMap[u.uebungsname] = Array.from({ length: u.saetze }, () => ({ wdh: u.wdh ?? null, kg: u.gewicht_kg ?? null }))
+        }
+      }
+    }
+
+    const exercises: ActiveExercise[] = (vorlage.uebungen ?? []).map((u: any) => {
+      const n = parseInt(u.saetze) || 3
+      const prev = prevMap[u.uebungsname] ?? []
+      return {
+        name: u.uebungsname,
+        sets: Array.from({ length: n }, (_, i) => ({
+          wdh: String(prev[i]?.wdh ?? u.wdh ?? ''),
+          kg: String(prev[i]?.kg ?? u.gewicht_kg ?? ''),
+          done: false,
+        })),
+        prevSets: prev,
+      }
+    })
+
+    setActiveWorkout({ vorlage, startTime: Date.now(), exercises })
+  }
+
+  async function finishWorkout(exercises: ActiveExercise[], elapsedMin: number) {
+    if (!user || !activeWorkout) return
+    const count = entries.length
+    const einheit_id = `E-${String(count + 1).padStart(3, '0')}`
+    const { data: training } = await supabase.from('training').insert({
+      user_id: user.id, einheit_id,
+      datum: todayISO(),
+      trainingstyp: activeWorkout.vorlage.trainingstyp ?? 'Kraft',
+      dauer_min: elapsedMin > 0 ? elapsedMin : null,
+    }).select().single()
+
+    if (training) {
+      const uebungenRows = exercises
+        .filter(ex => ex.sets.some(s => s.done || s.wdh || s.kg))
+        .map(ex => {
+          const tracked = ex.sets.filter(s => s.done || s.wdh || s.kg)
+          return {
+            user_id: user.id,
+            training_id: training.id,
+            uebungsname: ex.name,
+            saetze: tracked.length,
+            wdh: tracked[0] ? (parseInt(tracked[0].wdh) || null) : null,
+            gewicht_kg: tracked[0] ? (parseFloat(tracked[0].kg) || null) : null,
+            saetze_log: tracked.map(s => ({ wdh: parseInt(s.wdh) || null, kg: parseFloat(s.kg) || null })),
+          }
+        })
+      if (uebungenRows.length) await supabase.from('uebungen').insert(uebungenRows)
+    }
+
+    setActiveWorkout(null)
+    await load()
   }
 
   useEffect(() => { load(); loadVorlagen() }, [user])
@@ -881,6 +1116,16 @@ export function Training() {
     ? Math.round(entries.reduce((a, t) => a + (t.avg_puls ?? 0), 0) / entries.filter(t => t.avg_puls).length)
     : null
 
+  if (activeWorkout) {
+    return (
+      <ActiveWorkoutView
+        workout={activeWorkout}
+        onFinish={finishWorkout}
+        onAbort={() => setActiveWorkout(null)}
+      />
+    )
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -892,11 +1137,36 @@ export function Training() {
           <button onClick={() => navigate('/training/vorlagen')} className="btn-secondary flex items-center gap-2">
             <BookOpen size={16} /> Vorlagen
           </button>
-          <button onClick={() => { setEditingId(null); setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '' }); setUebungen([]); setPhotoPreview(null); setOpen(true) }} className="btn-primary flex items-center gap-2">
-            <Plus size={18} /> Einheit eintragen
+          <button onClick={() => { setEditingId(null); setForm({ datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '' }); setUebungen([]); setPhotoPreview(null); setOpen(true) }} className="btn-secondary flex items-center gap-2">
+            <Plus size={18} /> Manuell eintragen
           </button>
         </div>
       </div>
+
+      {/* Quick-start: workout templates */}
+      {vorlagen.length > 0 && (
+        <div>
+          <h2 className="section-title mb-3 text-base">Workout starten</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {vorlagen.map((v: any) => (
+              <div key={v.id} className="card flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-text-primary truncate">{v.name}</div>
+                  <div className="text-xs text-text-muted mt-0.5">
+                    {v.trainingstyp ?? 'Kraft'} · {(v.uebungen ?? []).length} Übungen
+                  </div>
+                </div>
+                <button
+                  onClick={() => startWorkout(v)}
+                  className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5 shrink-0"
+                >
+                  <Play size={14} /> Starten
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -975,14 +1245,28 @@ export function Training() {
               <div className="mt-4 pt-4 border-t border-border">
                 <div className="text-xs font-medium text-text-muted mb-3">Übungen</div>
                 <div className="space-y-2">
-                  {t.uebungen.map(u => (
-                    <div key={u.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-bg-elevated">
-                      <span className="font-medium text-text-primary">{u.uebungsname}</span>
-                      <span className="text-text-secondary text-xs">
-                        {u.saetze}×{u.wdh} {u.gewicht_kg ? `@ ${u.gewicht_kg}kg` : ''}
-                      </span>
-                    </div>
-                  ))}
+                  {t.uebungen.map(u => {
+                    const satzLog = (u as any).saetze_log as { wdh: number | null; kg: number | null }[] | null
+                    return (
+                      <div key={u.id} className="p-2 rounded-lg bg-bg-elevated">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-text-primary text-sm">{u.uebungsname}</span>
+                          {(!satzLog || satzLog.length === 0) && (
+                            <span className="text-text-secondary text-xs">{u.saetze}×{u.wdh}{u.gewicht_kg ? ` @ ${u.gewicht_kg}kg` : ''}</span>
+                          )}
+                        </div>
+                        {satzLog && satzLog.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {satzLog.map((s, i) => (
+                              <span key={i} className="text-[11px] bg-bg-base px-2 py-0.5 rounded text-text-secondary">
+                                S{i + 1}: {s.wdh ?? '?'}×{s.kg ?? '?'}kg
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

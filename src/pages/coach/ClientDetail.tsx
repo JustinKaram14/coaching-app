@@ -466,7 +466,7 @@ export function ClientDetail() {
   const [weights, setWeights] = useState<GewichtEntry[]>([])
   const [trainings, setTrainings] = useState<TrainingEntry[]>([])
   const [schlaf, setSchlaf] = useState<SchlafEntry[]>([])
-  const [ernaehrung, setErnaehrung] = useState<ErnaehrungEntry[]>([])
+  const [foodLog, setFoodLog] = useState<{ id: string; datum: string; name: string; kalorien: number | null; protein_g: number | null; kohlenhydrate_g: number | null; fett_g: number | null }[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'overview' | 'anamnese' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
   const [notizen, setNotizen] = useState('')
@@ -482,13 +482,13 @@ export function ClientDetail() {
   useEffect(() => {
     if (!clientId) return
     async function load() {
-      const [profileRes, settingsRes, weightRes, trainingRes, schlafRes, ernaehrungRes] = await Promise.all([
+      const [profileRes, settingsRes, weightRes, trainingRes, schlafRes, foodLogRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', clientId!).single(),
         supabase.from('client_settings').select('*').eq('user_id', clientId!).single(),
         supabase.from('gewicht').select('*').eq('user_id', clientId!).order('datum', { ascending: true }),
         supabase.from('training').select('*').eq('user_id', clientId!).order('datum', { ascending: false }),
         supabase.from('schlaf').select('*').eq('user_id', clientId!).order('datum', { ascending: true }),
-        supabase.from('ernaehrung').select('*').eq('user_id', clientId!).order('datum', { ascending: false }),
+        supabase.from('food_log').select('id,datum,name,kalorien,protein_g,kohlenhydrate_g,fett_g').eq('user_id', clientId!).order('datum', { ascending: false }),
       ])
       setClient(profileRes.data)
       setSettings(settingsRes.data)
@@ -496,7 +496,7 @@ export function ClientDetail() {
       setWeights(weightRes.data ?? [])
       setTrainings(trainingRes.data ?? [])
       setSchlaf(schlafRes.data ?? [])
-      setErnaehrung(ernaehrungRes.data ?? [])
+      setFoodLog(foodLogRes.data ?? [])
       setLoading(false)
     }
     load()
@@ -792,25 +792,43 @@ export function ClientDetail() {
         </div>
       )}
 
-      {tab === 'nutrition' && (
-        <div className="card overflow-x-auto">
-          <h3 className="font-semibold text-text-primary mb-4">Ernährungslog</h3>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-border"><th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th><th className="text-right py-2 px-3 text-text-muted font-medium">Kalorien</th><th className="text-right py-2 px-3 text-text-muted font-medium">Protein</th><th className="text-right py-2 px-3 text-text-muted font-medium">Karbs</th><th className="text-right py-2 px-3 text-text-muted font-medium">Fett</th></tr></thead>
-            <tbody>
-              {ernaehrung.map(e => (
-                <tr key={e.id} className="border-b border-border/50">
-                  <td className="py-2.5 px-3 text-text-secondary">{formatDate(e.datum)}</td>
-                  <td className="py-2.5 px-3 text-right font-semibold text-text-primary">{e.kalorien ? `${e.kalorien} kcal` : '--'}</td>
-                  <td className="py-2.5 px-3 text-right text-text-secondary">{e.protein_g ? `${e.protein_g}g` : '--'}</td>
-                  <td className="py-2.5 px-3 text-right text-text-secondary">{e.kohlenhydrate_g ? `${e.kohlenhydrate_g}g` : '--'}</td>
-                  <td className="py-2.5 px-3 text-right text-text-secondary">{e.fett_g ? `${e.fett_g}g` : '--'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {tab === 'nutrition' && (() => {
+        // Group food_log by date and sum macros
+        const byDate = foodLog.reduce<Record<string, { kcal: number; p: number; k: number; f: number; items: string[] }>>((acc, e) => {
+          if (!acc[e.datum]) acc[e.datum] = { kcal: 0, p: 0, k: 0, f: 0, items: [] }
+          acc[e.datum].kcal += e.kalorien ?? 0
+          acc[e.datum].p += e.protein_g ?? 0
+          acc[e.datum].k += e.kohlenhydrate_g ?? 0
+          acc[e.datum].f += e.fett_g ?? 0
+          acc[e.datum].items.push(e.name)
+          return acc
+        }, {})
+        const days = Object.entries(byDate).sort((a, b) => b[0].localeCompare(a[0]))
+        return (
+          <div className="card overflow-x-auto">
+            <h3 className="font-semibold text-text-primary mb-4">Ernährungslog ({days.length} Tage)</h3>
+            {days.length === 0 ? (
+              <p className="text-text-muted text-sm">Noch keine Einträge.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-border"><th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th><th className="text-right py-2 px-3 text-text-muted font-medium">Kalorien</th><th className="text-right py-2 px-3 text-text-muted font-medium">Protein</th><th className="text-right py-2 px-3 text-text-muted font-medium">Karbs</th><th className="text-right py-2 px-3 text-text-muted font-medium">Fett</th><th className="text-left py-2 px-3 text-text-muted font-medium">Mahlzeiten</th></tr></thead>
+                <tbody>
+                  {days.map(([datum, d]) => (
+                    <tr key={datum} className="border-b border-border/50">
+                      <td className="py-2.5 px-3 text-text-secondary">{formatDate(datum)}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-text-primary">{Math.round(d.kcal)} kcal</td>
+                      <td className="py-2.5 px-3 text-right text-text-secondary">{Math.round(d.p)}g</td>
+                      <td className="py-2.5 px-3 text-right text-text-secondary">{Math.round(d.k)}g</td>
+                      <td className="py-2.5 px-3 text-right text-text-secondary">{Math.round(d.f)}g</td>
+                      <td className="py-2.5 px-3 text-text-muted text-xs max-w-[200px] truncate">{d.items.join(', ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )
+      })()}
 
       {tab === 'masterplan' && clientId && (
         <MasterplanTab clientId={clientId} settings={settings} onApplied={reloadSettings} />
