@@ -467,10 +467,15 @@ export function ClientDetail() {
   const [trainings, setTrainings] = useState<TrainingEntry[]>([])
   const [schlaf, setSchlaf] = useState<SchlafEntry[]>([])
   const [foodLog, setFoodLog] = useState<{ id: string; datum: string; name: string; kalorien: number | null; protein_g: number | null; kohlenhydrate_g: number | null; fett_g: number | null }[]>([])
+  const [uebungenMap, setUebungenMap] = useState<Record<string, { id: string; uebungsname: string; saetze: number | null; wdh: number | null; gewicht_kg: number | null; saetze_log: { wdh: number | null; kg: number | null }[] | null }[]>>({})
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'overview' | 'anamnese' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt'>('overview')
   const [notizen, setNotizen] = useState('')
   const [notizenSaving, setNotizenSaving] = useState(false)
+  const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(null)
+  const [nutritionFilter, setNutritionFilter] = useState('')
+  const [expandedNutritionDay, setExpandedNutritionDay] = useState<string | null>(null)
+  const [trainingFilter, setTrainingFilter] = useState('')
 
   async function reloadSettings() {
     if (!clientId) return
@@ -494,9 +499,25 @@ export function ClientDetail() {
       setSettings(settingsRes.data)
       setNotizen(settingsRes.data?.ernaehrungs_notizen ?? '')
       setWeights(weightRes.data ?? [])
-      setTrainings(trainingRes.data ?? [])
+      const trainingData = trainingRes.data ?? []
+      setTrainings(trainingData)
       setSchlaf(schlafRes.data ?? [])
       setFoodLog(foodLogRes.data ?? [])
+
+      // Load exercises for all training sessions
+      if (trainingData.length > 0) {
+        const { data: uebungen } = await supabase
+          .from('uebungen')
+          .select('id, training_id, uebungsname, saetze, wdh, gewicht_kg, saetze_log')
+          .in('training_id', trainingData.map(t => t.id))
+        const map: typeof uebungenMap = {}
+        for (const u of (uebungen ?? [])) {
+          const tid = (u as any).training_id as string
+          if (!map[tid]) map[tid] = []
+          map[tid].push(u as any)
+        }
+        setUebungenMap(map)
+      }
       setLoading(false)
     }
     load()
@@ -749,25 +770,122 @@ export function ClientDetail() {
         </div>
       )}
 
-      {tab === 'training' && (
-        <div className="card overflow-x-auto">
-          <h3 className="font-semibold text-text-primary mb-4">Trainingseinheiten ({trainings.length})</h3>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-border"><th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th><th className="text-left py-2 px-3 text-text-muted font-medium">Typ</th><th className="text-right py-2 px-3 text-text-muted font-medium">Dauer</th><th className="text-right py-2 px-3 text-text-muted font-medium">Kalorien</th><th className="text-left py-2 px-3 text-text-muted font-medium">Notizen</th></tr></thead>
-            <tbody>
-              {trainings.map(t => (
-                <tr key={t.id} className="border-b border-border/50">
-                  <td className="py-2.5 px-3 text-text-secondary">{formatDate(t.datum)}</td>
-                  <td className="py-2.5 px-3 text-text-primary">{t.trainingstyp ?? '--'}</td>
-                  <td className="py-2.5 px-3 text-right text-text-secondary">{t.dauer_min ? `${t.dauer_min} min` : '--'}</td>
-                  <td className="py-2.5 px-3 text-right text-text-secondary">{t.kalorien_verbrannt ? `${t.kalorien_verbrannt} kcal` : '--'}</td>
-                  <td className="py-2.5 px-3 text-text-muted">{t.notizen ?? '--'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {tab === 'training' && (() => {
+        const filtered = trainings.filter(t =>
+          !trainingFilter ||
+          (t.trainingstyp ?? '').toLowerCase().includes(trainingFilter.toLowerCase()) ||
+          (t.datum ?? '').includes(trainingFilter)
+        )
+        // Build exercise progression map: uebungsname → [{datum, maxKg, sets}]
+        const progression: Record<string, { datum: string; maxKg: number | null; totalSaetze: number }[]> = {}
+        for (const t of trainings) {
+          for (const u of (uebungenMap[t.id] ?? [])) {
+            if (!progression[u.uebungsname]) progression[u.uebungsname] = []
+            const maxKg = u.saetze_log?.length
+              ? Math.max(...u.saetze_log.map(s => s.kg ?? 0))
+              : u.gewicht_kg ?? null
+            progression[u.uebungsname].push({ datum: t.datum, maxKg, totalSaetze: u.saetze ?? 1 })
+          }
+        }
+        const selectedT = selectedTrainingId ? trainings.find(t => t.id === selectedTrainingId) : null
+        return (
+          <div className="space-y-3">
+            {/* Filter */}
+            <div className="card">
+              <input
+                className="input text-sm w-full"
+                placeholder="Nach Typ oder Datum filtern…"
+                value={trainingFilter}
+                onChange={e => setTrainingFilter(e.target.value)}
+              />
+            </div>
+
+            {/* Detail modal */}
+            {selectedT && (
+              <div className="card border border-primary/30 bg-primary/5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="font-bold text-text-primary">{selectedT.trainingstyp ?? 'Training'} — {formatDate(selectedT.datum)}</div>
+                    <div className="text-xs text-text-muted mt-0.5">
+                      {selectedT.dauer_min ? `${selectedT.dauer_min} min` : ''}{selectedT.kalorien_verbrannt ? ` · ${selectedT.kalorien_verbrannt} kcal` : ''}
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedTrainingId(null)} className="p-1.5 text-text-muted hover:text-text-primary"><X size={16} /></button>
+                </div>
+                {(uebungenMap[selectedT.id] ?? []).length === 0 ? (
+                  <p className="text-sm text-text-muted">Keine Übungen erfasst.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {(uebungenMap[selectedT.id] ?? []).map(u => {
+                      const hist = (progression[u.uebungsname] ?? []).sort((a, b) => a.datum.localeCompare(b.datum))
+                      const idx = hist.findIndex(h => h.datum === selectedT.datum)
+                      const prev = idx > 0 ? hist[idx - 1] : null
+                      const currKg = u.saetze_log?.length ? Math.max(...u.saetze_log.map(s => s.kg ?? 0)) : u.gewicht_kg ?? null
+                      const delta = currKg && prev?.maxKg ? currKg - prev.maxKg : null
+                      return (
+                        <div key={u.id} className="p-3 rounded-xl bg-bg-elevated">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-text-primary text-sm">{u.uebungsname}</span>
+                            {delta !== null && delta !== 0 && (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${delta > 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
+                                {delta > 0 ? '+' : ''}{delta}kg
+                              </span>
+                            )}
+                          </div>
+                          {u.saetze_log && u.saetze_log.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {u.saetze_log.map((s, i) => (
+                                <span key={i} className="text-xs bg-bg-base px-2 py-1 rounded text-text-secondary">
+                                  S{i + 1}: {s.wdh ?? '?'} Wdh × {s.kg ?? '?'} kg
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-text-muted mt-1">{u.saetze ?? '?'} Sätze × {u.wdh ?? '?'} Wdh{u.gewicht_kg ? ` @ ${u.gewicht_kg} kg` : ''}</div>
+                          )}
+                          {prev && (
+                            <div className="text-[11px] text-text-muted mt-1.5">
+                              Vorher ({formatDate(prev.datum)}): {prev.maxKg ?? '?'} kg max
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* List */}
+            <div className="card overflow-x-auto">
+              <h3 className="font-semibold text-text-primary mb-3">Trainingseinheiten ({filtered.length})</h3>
+              <div className="space-y-2">
+                {filtered.map(t => {
+                  const exList = uebungenMap[t.id] ?? []
+                  const isSelected = t.id === selectedTrainingId
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => setSelectedTrainingId(isSelected ? null : t.id)}
+                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${isSelected ? 'border-primary/40 bg-primary/5' : 'border-transparent hover:bg-bg-elevated'}`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-text-primary text-sm">{t.trainingstyp ?? 'Training'}</span>
+                          {exList.length > 0 && <span className="text-[11px] text-text-muted">{exList.length} Übungen</span>}
+                        </div>
+                        <div className="text-xs text-text-muted mt-0.5">{formatDate(t.datum)}{t.dauer_min ? ` · ${t.dauer_min} min` : ''}{t.kalorien_verbrannt ? ` · ${t.kalorien_verbrannt} kcal` : ''}</div>
+                      </div>
+                      <ChevronDown size={14} className={`text-text-muted transition-transform ${isSelected ? 'rotate-180' : ''}`} />
+                    </div>
+                  )
+                })}
+                {filtered.length === 0 && <p className="text-sm text-text-muted py-4 text-center">Keine Einträge gefunden.</p>}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {tab === 'sleep' && (
         <div className="card overflow-x-auto">
@@ -793,39 +911,74 @@ export function ClientDetail() {
       )}
 
       {tab === 'nutrition' && (() => {
-        // Group food_log by date and sum macros
-        const byDate = foodLog.reduce<Record<string, { kcal: number; p: number; k: number; f: number; items: string[] }>>((acc, e) => {
-          if (!acc[e.datum]) acc[e.datum] = { kcal: 0, p: 0, k: 0, f: 0, items: [] }
+        const filteredItems = nutritionFilter
+          ? foodLog.filter(e => e.name.toLowerCase().includes(nutritionFilter.toLowerCase()) || e.datum.includes(nutritionFilter))
+          : foodLog
+        const byDate = filteredItems.reduce<Record<string, { kcal: number; p: number; k: number; f: number; entries: typeof foodLog }>>((acc, e) => {
+          if (!acc[e.datum]) acc[e.datum] = { kcal: 0, p: 0, k: 0, f: 0, entries: [] }
           acc[e.datum].kcal += e.kalorien ?? 0
           acc[e.datum].p += e.protein_g ?? 0
           acc[e.datum].k += e.kohlenhydrate_g ?? 0
           acc[e.datum].f += e.fett_g ?? 0
-          acc[e.datum].items.push(e.name)
+          acc[e.datum].entries.push(e)
           return acc
         }, {})
         const days = Object.entries(byDate).sort((a, b) => b[0].localeCompare(a[0]))
         return (
-          <div className="card overflow-x-auto">
-            <h3 className="font-semibold text-text-primary mb-4">Ernährungslog ({days.length} Tage)</h3>
-            {days.length === 0 ? (
-              <p className="text-text-muted text-sm">Noch keine Einträge.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-border"><th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th><th className="text-right py-2 px-3 text-text-muted font-medium">Kalorien</th><th className="text-right py-2 px-3 text-text-muted font-medium">Protein</th><th className="text-right py-2 px-3 text-text-muted font-medium">Karbs</th><th className="text-right py-2 px-3 text-text-muted font-medium">Fett</th><th className="text-left py-2 px-3 text-text-muted font-medium">Mahlzeiten</th></tr></thead>
-                <tbody>
-                  {days.map(([datum, d]) => (
-                    <tr key={datum} className="border-b border-border/50">
-                      <td className="py-2.5 px-3 text-text-secondary">{formatDate(datum)}</td>
-                      <td className="py-2.5 px-3 text-right font-semibold text-text-primary">{Math.round(d.kcal)} kcal</td>
-                      <td className="py-2.5 px-3 text-right text-text-secondary">{Math.round(d.p)}g</td>
-                      <td className="py-2.5 px-3 text-right text-text-secondary">{Math.round(d.k)}g</td>
-                      <td className="py-2.5 px-3 text-right text-text-secondary">{Math.round(d.f)}g</td>
-                      <td className="py-2.5 px-3 text-text-muted text-xs max-w-[200px] truncate">{d.items.join(', ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div className="space-y-3">
+            <div className="card">
+              <input
+                className="input text-sm w-full"
+                placeholder="Nach Mahlzeit oder Datum filtern…"
+                value={nutritionFilter}
+                onChange={e => setNutritionFilter(e.target.value)}
+              />
+            </div>
+            <div className="card">
+              <h3 className="font-semibold text-text-primary mb-3">Ernährungslog ({days.length} Tage)</h3>
+              {days.length === 0 ? (
+                <p className="text-text-muted text-sm">Noch keine Einträge.</p>
+              ) : (
+                <div className="space-y-2">
+                  {days.map(([datum, d]) => {
+                    const isOpen = expandedNutritionDay === datum
+                    return (
+                      <div key={datum} className="border border-border rounded-xl overflow-hidden">
+                        <div
+                          onClick={() => setExpandedNutritionDay(isOpen ? null : datum)}
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-bg-elevated transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-text-secondary w-24 shrink-0">{formatDate(datum)}</span>
+                            <span className="font-semibold text-text-primary text-sm">{Math.round(d.kcal)} kcal</span>
+                            <span className="text-xs text-text-muted hidden sm:block">{Math.round(d.p)}g P · {Math.round(d.k)}g K · {Math.round(d.f)}g F</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-text-muted">{d.entries.length} Einträge</span>
+                            <ChevronDown size={14} className={`text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+                        {isOpen && (
+                          <div className="border-t border-border px-3 py-2 bg-bg-elevated space-y-1">
+                            {d.entries.map(e => (
+                              <div key={e.id} className="flex items-center justify-between py-1.5 text-sm border-b border-border/40 last:border-0">
+                                <span className="text-text-primary">{e.name}</span>
+                                <div className="flex items-center gap-3 text-xs text-text-muted">
+                                  <span className="font-medium text-text-secondary">{e.kalorien ?? 0} kcal</span>
+                                  <span>{e.protein_g ?? 0}g P</span>
+                                  <span>{e.kohlenhydrate_g ?? 0}g K</span>
+                                  <span>{e.fett_g ?? 0}g F</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )
       })()}

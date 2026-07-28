@@ -85,7 +85,7 @@ export function CoachDashboard() {
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-text-primary">
-            {clients.filter(c => c.lastTrainingDate && (Date.now() - new Date(c.lastTrainingDate).getTime()) < 86400000 * 7).length}
+            {clients.filter(c => c.lastTrainingDate && (Date.now() - new Date(c.lastTrainingDate + 'T12:00:00').getTime()) < 86400000 * 7).length}
           </div>
           <div className="text-xs text-text-muted mt-1">Diese Woche aktiv</div>
         </div>
@@ -97,7 +97,7 @@ export function CoachDashboard() {
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-success">
-            {clients.filter(c => c.lastTrainingDate && (Date.now() - new Date(c.lastTrainingDate).getTime()) < 86400000).length}
+            {(() => { const today = new Date().toISOString().split('T')[0]; return clients.filter(c => c.lastTrainingDate === today).length })()}
           </div>
           <div className="text-xs text-text-muted mt-1">Heute aktiv</div>
         </div>

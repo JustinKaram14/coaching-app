@@ -700,6 +700,8 @@ interface ActiveExercise {
 }
 interface ActiveWorkoutState { vorlage: any; startTime: number; exercises: ActiveExercise[] }
 
+const REST_SECONDS = 120
+
 function ActiveWorkoutView({ workout, onFinish, onAbort }: {
   workout: ActiveWorkoutState
   onFinish: (exercises: ActiveExercise[], elapsedMin: number) => void
@@ -708,11 +710,21 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
   const [exercises, setExercises] = useState<ActiveExercise[]>(workout.exercises)
   const [elapsed, setElapsed] = useState(0)
   const [tipFor, setTipFor] = useState<string | null>(null)
+  // rest timer: { exIdx, setIdx, remaining }
+  const [rest, setRest] = useState<{ exIdx: number; setIdx: number; remaining: number } | null>(null)
 
   useEffect(() => {
     const interval = setInterval(() => setElapsed(Math.floor((Date.now() - workout.startTime) / 1000)), 1000)
     return () => clearInterval(interval)
   }, [workout.startTime])
+
+  // Rest timer countdown
+  useEffect(() => {
+    if (!rest) return
+    if (rest.remaining <= 0) { setRest(null); return }
+    const t = setTimeout(() => setRest(r => r ? { ...r, remaining: r.remaining - 1 } : null), 1000)
+    return () => clearTimeout(t)
+  }, [rest])
 
   function updateSet(exIdx: number, setIdx: number, field: 'wdh' | 'kg', value: string) {
     setExercises(prev => {
@@ -725,7 +737,10 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
   function toggleDone(exIdx: number, setIdx: number) {
     setExercises(prev => {
       const next = prev.map(e => ({ ...e, sets: [...e.sets] }))
-      next[exIdx].sets[setIdx] = { ...next[exIdx].sets[setIdx], done: !next[exIdx].sets[setIdx].done }
+      const wasDone = next[exIdx].sets[setIdx].done
+      next[exIdx].sets[setIdx] = { ...next[exIdx].sets[setIdx], done: !wasDone }
+      if (!wasDone) setRest({ exIdx, setIdx, remaining: REST_SECONDS })
+      else setRest(null)
       return next
     })
   }
@@ -754,6 +769,11 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
           <div className="font-bold text-text-primary">{workout.vorlage.name}</div>
           <div className="text-xs text-text-muted flex items-center gap-1.5 mt-0.5">
             <Timer size={11} /> {mm}:{ss} · {doneCount}/{totalCount} Sätze
+            {rest && (
+              <span className="ml-2 text-primary font-semibold">
+                Pause {Math.floor(rest.remaining / 60)}:{String(rest.remaining % 60).padStart(2, '0')}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -773,8 +793,8 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
           const allDone = ex.sets.length > 0 && ex.sets.every(s => s.done)
           return (
             <div key={exIdx} className={`card transition-opacity ${allDone ? 'opacity-50' : ''}`}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-semibold text-text-primary">{ex.name}</span>
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-bold text-text-primary text-base">{ex.name}</span>
                 <button
                   onClick={() => setTipFor(ex.name)}
                   className="p-1.5 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors"
@@ -784,59 +804,73 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
               </div>
 
               {/* Column headers */}
-              <div className="grid grid-cols-[24px_1fr_72px_72px_36px] gap-1.5 mb-1.5 px-0.5 text-[10px] text-text-muted font-semibold uppercase tracking-wide">
-                <span className="text-center">#</span>
-                <span>Letzte</span>
-                <span className="text-center">Wdh</span>
+              <div className="grid grid-cols-[36px_1fr_76px_76px_40px] gap-2 mb-2 px-1 text-[11px] text-text-muted font-semibold uppercase tracking-wide">
+                <span className="text-center">Set</span>
+                <span>Vorherige</span>
                 <span className="text-center">kg</span>
+                <span className="text-center">Wdh.</span>
                 <span></span>
               </div>
 
-              {/* Set rows */}
+              {/* Set rows with rest timer between them */}
               {ex.sets.map((set, setIdx) => {
                 const prev = ex.prevSets[setIdx]
-                const prevLabel = prev?.wdh ? `${prev.wdh}×${prev.kg ?? '?'}kg` : '—'
+                const prevLabel = prev?.kg ? `${prev.kg} kg × ${prev.wdh ?? '?'}` : '—'
+                const isRestAfter = rest?.exIdx === exIdx && rest?.setIdx === setIdx
                 return (
-                  <div
-                    key={setIdx}
-                    className={`grid grid-cols-[24px_1fr_72px_72px_36px] gap-1.5 items-center mb-2 transition-opacity ${set.done ? 'opacity-40' : ''}`}
-                  >
-                    <span className="text-xs font-bold text-text-muted text-center">{setIdx + 1}</span>
-                    <span className="text-xs text-text-muted truncate">{prevLabel}</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={set.wdh}
-                      onChange={e => updateSet(exIdx, setIdx, 'wdh', e.target.value)}
-                      placeholder="10"
-                      className="input text-center text-sm py-1.5"
-                    />
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.5"
-                      value={set.kg}
-                      onChange={e => updateSet(exIdx, setIdx, 'kg', e.target.value)}
-                      placeholder="—"
-                      className="input text-center text-sm py-1.5"
-                    />
-                    <button
-                      onClick={() => toggleDone(exIdx, setIdx)}
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
-                        set.done ? 'bg-success text-white' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'
-                      }`}
+                  <div key={setIdx}>
+                    <div
+                      className={`grid grid-cols-[36px_1fr_76px_76px_40px] gap-2 items-center py-1 transition-opacity ${set.done ? 'opacity-40' : ''}`}
                     >
-                      <Check size={15} />
-                    </button>
+                      <span className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-muted">{setIdx + 1}</span>
+                      <span className="text-sm text-text-muted">{prevLabel}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.5"
+                        value={set.kg}
+                        onChange={e => updateSet(exIdx, setIdx, 'kg', e.target.value)}
+                        placeholder="—"
+                        className="input text-center text-sm py-2 font-semibold"
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={set.wdh}
+                        onChange={e => updateSet(exIdx, setIdx, 'wdh', e.target.value)}
+                        placeholder="10"
+                        className="input text-center text-sm py-2 font-semibold"
+                      />
+                      <button
+                        onClick={() => toggleDone(exIdx, setIdx)}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                          set.done ? 'bg-success text-white' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'
+                        }`}
+                      >
+                        <Check size={16} />
+                      </button>
+                    </div>
+                    {/* Rest timer separator */}
+                    {setIdx < ex.sets.length - 1 && (
+                      <div className="flex items-center gap-2 my-1 px-1">
+                        <div className="flex-1 h-px bg-border" />
+                        <span className={`text-xs font-semibold ${isRestAfter ? 'text-primary' : 'text-text-muted'}`}>
+                          {isRestAfter
+                            ? `${Math.floor(rest!.remaining / 60)}:${String(rest!.remaining % 60).padStart(2, '0')}`
+                            : '2:00'}
+                        </span>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                    )}
                   </div>
                 )
               })}
 
               <button
                 onClick={() => addSet(exIdx)}
-                className="mt-1 text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                className="mt-3 w-full py-2.5 rounded-xl bg-bg-elevated text-sm text-text-muted hover:text-text-primary hover:bg-border transition-colors flex items-center justify-center gap-1.5"
               >
-                <Plus size={12} /> Satz hinzufügen
+                <Plus size={14} /> Satz hinzufügen (2:00)
               </button>
             </div>
           )
@@ -845,6 +879,7 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
     </div>
   )
 }
+
 
 export function Training() {
   const { user } = useAuth()
@@ -1340,9 +1375,16 @@ export function Training() {
             </div>
             <div>
               <label className="label">Trainingstyp</label>
-              <select className="input" value={form.trainingstyp} onChange={e => setForm(f => ({ ...f, trainingstyp: e.target.value }))}>
-                {TRAINING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <input
+                className="input"
+                list="training-types-list"
+                value={form.trainingstyp}
+                onChange={e => setForm(f => ({ ...f, trainingstyp: e.target.value }))}
+                placeholder="z.B. Kraft, Cardio, eigener Typ…"
+              />
+              <datalist id="training-types-list">
+                {TRAINING_TYPES.map(t => <option key={t} value={t} />)}
+              </datalist>
             </div>
             <div>
               <label className="label">Dauer</label>
