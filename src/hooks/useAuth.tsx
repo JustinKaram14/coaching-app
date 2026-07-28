@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function updateLastActive(userId: string) {
-    supabase.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId)
+    supabase.from('profiles').update({ last_active: new Date().toISOString() }).eq('id', userId).then(() => {})
   }
 
   async function refreshProfile() {

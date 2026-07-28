@@ -10,7 +10,7 @@ import type { Profile } from '../../types/database'
 interface ClientWithStats extends Profile {
   lastWeight?: number | null
   totalTrainings?: number
-  avgSleep?: number | null
+  lastTrainingDate?: string | null
 }
 
 export function CoachDashboard() {
@@ -38,7 +38,7 @@ export function CoachDashboard() {
 
       const [weightsRes, trainingsRes] = await Promise.all([
         supabase.from('gewicht').select('user_id, gewicht, datum').in('user_id', clientIds).order('datum', { ascending: false }),
-        supabase.from('training').select('user_id').in('user_id', clientIds),
+        supabase.from('training').select('user_id, datum').in('user_id', clientIds).order('datum', { ascending: false }),
       ])
 
       const weights = weightsRes.data ?? []
@@ -51,6 +51,7 @@ export function CoachDashboard() {
           ...c,
           lastWeight: clientWeights[0]?.gewicht ?? null,
           totalTrainings: clientTrainings.length,
+          lastTrainingDate: clientTrainings[0]?.datum ?? null,
         }
       })
 
@@ -60,16 +61,13 @@ export function CoachDashboard() {
     load()
   }, [user])
 
-  function timeSince(dateStr: string | null) {
-    if (!dateStr) return 'Nie aktiv'
+  function timeSinceTraining(dateStr: string | null) {
+    if (!dateStr) return 'Nie trainiert'
     const diff = Date.now() - new Date(dateStr).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 60) return `Vor ${mins} Min.`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `Vor ${hours} Std.`
-    const days = Math.floor(hours / 24)
-    if (days === 1) return 'Gestern'
-    return `Vor ${days} Tagen`
+    const days = Math.floor(diff / 86400000)
+    if (days === 0) return 'Heute trainiert'
+    if (days === 1) return 'Gestern trainiert'
+    return `Vor ${days} Tagen trainiert`
   }
 
   return (
@@ -87,7 +85,7 @@ export function CoachDashboard() {
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-text-primary">
-            {clients.filter(c => c.last_active && (Date.now() - new Date(c.last_active).getTime()) < 86400000 * 7).length}
+            {clients.filter(c => c.lastTrainingDate && (Date.now() - new Date(c.lastTrainingDate).getTime()) < 86400000 * 7).length}
           </div>
           <div className="text-xs text-text-muted mt-1">Diese Woche aktiv</div>
         </div>
@@ -99,7 +97,7 @@ export function CoachDashboard() {
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-success">
-            {clients.filter(c => c.last_active && (Date.now() - new Date(c.last_active).getTime()) < 86400000).length}
+            {clients.filter(c => c.lastTrainingDate && (Date.now() - new Date(c.lastTrainingDate).getTime()) < 86400000).length}
           </div>
           <div className="text-xs text-text-muted mt-1">Heute aktiv</div>
         </div>
@@ -122,7 +120,7 @@ export function CoachDashboard() {
         ) : (
           <div className="space-y-2">
             {clients.map(client => {
-              const isActive = client.last_active && (Date.now() - new Date(client.last_active).getTime()) < 86400000 * 3
+              const isActive = client.lastTrainingDate && (Date.now() - new Date(client.lastTrainingDate).getTime()) < 86400000 * 7
               return (
                 <div
                   key={client.id}
@@ -156,7 +154,7 @@ export function CoachDashboard() {
                     <div className="text-center min-w-[100px]">
                       <div className="flex items-center gap-1 text-xs text-text-secondary">
                         <Clock size={11} />
-                        {timeSince(client.last_active)}
+                        {timeSinceTraining(client.lastTrainingDate ?? null)}
                       </div>
                     </div>
                   </div>
