@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, Link, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, Dumbbell, Moon, Apple, Pill, Calendar,
   Settings, Users, LogOut, Menu, X, ChevronRight, Zap, ChefHat,
@@ -83,6 +83,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           >
             <LogOut size={16} />
           </button>
+        </div>
+        {/* Legal footer */}
+        <div className="flex gap-3 px-2 pb-1 mt-1">
+          <Link to="/legal" className="text-[10px] text-text-muted hover:text-text-secondary transition-colors">Impressum</Link>
+          <Link to="/legal" className="text-[10px] text-text-muted hover:text-text-secondary transition-colors">Datenschutz</Link>
         </div>
       </div>
     </div>

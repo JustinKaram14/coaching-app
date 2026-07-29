@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Shield } from 'lucide-react'
 import { Zap, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { Spinner } from '../components/ui/Spinner'
@@ -101,6 +102,14 @@ export function Login() {
         <p className="text-center text-xs text-text-muted mt-6">
           Coach? Kontaktiere den Admin für deinen Zugang.
         </p>
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <Link to="/legal" className="text-xs text-text-muted hover:text-text-secondary flex items-center gap-1 transition-colors">
+            <Shield size={11} /> Datenschutz
+          </Link>
+          <Link to="/legal" className="text-xs text-text-muted hover:text-text-secondary transition-colors">
+            Impressum
+          </Link>
+        </div>
       </div>
     </div>
   )

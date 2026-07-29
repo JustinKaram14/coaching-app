@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, AlertTriangle, Shield } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bmi, bmiCategory, generateCode } from '../lib/utils'
@@ -16,6 +17,8 @@ export function Settings() {
   const [saved, setSaved] = useState(false)
   const [name, setName] = useState(profile?.name ?? '')
   const [notifStatus, setNotifStatus] = useState<'idle'|'loading'|'ok'|'denied'|'unsupported'>('idle')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
 
   const isCoach = profile?.role === 'coach'
   const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
@@ -49,6 +52,16 @@ export function Settings() {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleDeleteAccount() {
+    if (!user || deleteConfirm !== 'LÖSCHEN') return
+    setDeletingAccount(true)
+    // Delete profile row — cascades to ALL health/fitness data (ON DELETE CASCADE)
+    // The auth.users entry remains but is effectively an empty shell
+    await supabase.from('profiles').delete().eq('id', user.id)
+    await supabase.auth.signOut()
+    // Redirect is handled automatically by AuthProvider (user becomes null)
   }
 
   async function createInviteCode() {
@@ -326,6 +339,80 @@ export function Settings() {
         {saving ? <Spinner size={18} /> : <Save size={18} />}
         {saved ? 'Gespeichert!' : saving ? 'Speichern...' : 'Einstellungen speichern'}
       </button>
+
+      {/* DSGVO / Legal section */}
+      <div className="card space-y-4 border-border/60">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <Shield size={18} className="text-primary" /> Datenschutz & Rechtliches
+        </h2>
+
+        {!isCoach && settings.consent_given_at && (
+          <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-xs text-text-secondary space-y-1">
+            <div className="flex items-center gap-2 text-success font-semibold"><CheckCircle size={14} /> Einwilligungen erteilt</div>
+            <div>DSGVO-Einwilligung: {settings.consent_dsgvo ? '✓' : '✗'}</div>
+            <div>KI-Analyse: {settings.consent_ai ? '✓ aktiviert' : '✗ nicht erteilt'}</div>
+            <div>Erteilt am: {new Date(settings.consent_given_at).toLocaleDateString('de', { dateStyle: 'long' })}</div>
+          </div>
+        )}
+
+        {!isCoach && (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-text-primary">KI-Analyse (optional)</div>
+              <div className="text-xs text-text-muted">Fotos an Google Gemini senden für automatische Erkennung</div>
+            </div>
+            <label className="relative cursor-pointer">
+              <input type="checkbox" className="sr-only" checked={!!settings.consent_ai}
+                onChange={async e => {
+                  const val = e.target.checked
+                  setSettings(s => ({ ...s, consent_ai: val }))
+                  if (user) await supabase.from('client_settings').update({ consent_ai: val }).eq('user_id', user.id)
+                }} />
+              <div className={`w-11 h-6 rounded-full transition-colors ${settings.consent_ai ? 'bg-primary' : 'bg-border'}`} />
+              <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.consent_ai ? 'translate-x-5' : ''}`} />
+            </label>
+          </div>
+        )}
+
+        <div className="flex gap-3 text-sm">
+          <Link to="/legal" className="text-primary hover:underline flex items-center gap-1">
+            <FileText size={14} /> Impressum
+          </Link>
+          <Link to="/legal" onClick={() => setTimeout(() => document.getElementById('datenschutz-tab')?.click(), 50)} className="text-primary hover:underline flex items-center gap-1">
+            <Shield size={14} /> Datenschutzerklärung
+          </Link>
+        </div>
+      </div>
+
+      {/* Account deletion (DSGVO Art. 17 — Recht auf Löschung) */}
+      <div className="card space-y-4 border-danger/20">
+        <h2 className="font-semibold text-danger flex items-center gap-2">
+          <AlertTriangle size={18} /> Konto löschen
+        </h2>
+        <p className="text-sm text-text-secondary">
+          Durch das Löschen deines Kontos werden <strong className="text-text-primary">alle deine Daten unwiderruflich gelöscht</strong>:
+          Gewicht, Training, Ernährung, Schlaf, Körperfotos und alle weiteren persönlichen Daten.
+          Dies kann nicht rückgängig gemacht werden (DSGVO Art. 17).
+        </p>
+        <div className="space-y-2">
+          <label className="text-xs text-text-muted">Tippe <strong className="text-danger font-mono">LÖSCHEN</strong> zur Bestätigung:</label>
+          <input
+            type="text"
+            className="input border-danger/30 focus:border-danger"
+            placeholder="LÖSCHEN"
+            value={deleteConfirm}
+            onChange={e => setDeleteConfirm(e.target.value)}
+          />
+        </div>
+        <button
+          onClick={handleDeleteAccount}
+          disabled={deleteConfirm !== 'LÖSCHEN' || deletingAccount}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger/10 text-danger border border-danger/30 hover:bg-danger hover:text-white transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {deletingAccount ? <Spinner size={16} /> : <Trash2 size={16} />}
+          {deletingAccount ? 'Wird gelöscht...' : 'Konto und alle Daten löschen'}
+        </button>
+      </div>
     </div>
   )
 }

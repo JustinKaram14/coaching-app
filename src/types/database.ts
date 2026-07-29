@@ -51,6 +51,9 @@ export interface Database {
           notif_appointment_minutes: number | null
           ernaehrungs_notizen: string | null
           coach_foto_freigabe: boolean | null
+          consent_dsgvo: boolean | null
+          consent_ai: boolean | null
+          consent_given_at: string | null
         }
         Insert: Omit<Database['public']['Tables']['client_settings']['Row'], 'id' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['client_settings']['Insert']>

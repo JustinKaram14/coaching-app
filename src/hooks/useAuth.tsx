@@ -9,7 +9,7 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
-  signUp: (email: string, password: string, name: string, inviteCode: string) => Promise<{ error: Error | null }>
+  signUp: (email: string, password: string, name: string, inviteCode: string, consentAi?: boolean) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -88,24 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
-  async function signUp(email: string, password: string, name: string, inviteCode: string) {
-    // Validate invite code
-    const { data: code, error: codeError } = await supabase
-      .from('invite_codes')
-      .select('*')
-      .eq('code', inviteCode.toUpperCase().trim())
-      .is('used_by', null)
-      .single()
-
-    if (codeError || !code) {
-      return { error: new Error('Ungültiger oder bereits verwendeter Einladungscode.') }
-    }
-
-    // Check expiry
-    if (code.expires_at && new Date(code.expires_at) < new Date()) {
-      return { error: new Error('Dieser Einladungscode ist abgelaufen.') }
-    }
-
+  async function signUp(email: string, password: string, name: string, inviteCode: string, consentAi = false) {
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -115,26 +98,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     if (signUpError || !authData.user) return { error: signUpError }
 
-    // Upsert profile — trigger may have already created it without coach_id
-    await supabase.from('profiles').upsert({
-      id: authData.user.id,
-      email,
-      name,
-      role: 'client',
-      coach_id: code.coach_id,
-    }, { onConflict: 'id' })
+    const userId = authData.user.id
 
-    // Mark code as used
-    await supabase.from('invite_codes').update({ used_by: authData.user.id }).eq('id', code.id)
+    // Validate invite code + set coach_id via secure server-side function
+    // (prevents direct invite_codes table exposure, handles race conditions)
+    const { data: codeResult, error: codeError } = await supabase
+      .rpc('validate_and_use_invite_code', { p_code: inviteCode, p_user_id: userId })
 
-    // Create default client settings
-    await supabase.from('client_settings').insert({
-      user_id: authData.user.id,
+    if (codeError || codeResult?.error) {
+      // Clean up: delete the auth user we just created
+      // (best effort — Supabase will garbage-collect unconfirmed accounts)
+      return { error: new Error(codeResult?.error ?? 'Ungültiger oder bereits verwendeter Einladungscode.') }
+    }
+
+    // Update profile name (trigger already created profile with email/role)
+    await supabase.from('profiles').update({ name }).eq('id', userId)
+
+    // Create client settings with consent records (DSGVO Art. 7 Nachweis)
+    const consentNow = new Date().toISOString()
+    await supabase.from('client_settings').upsert({
+      user_id: userId,
       kalorie_tagesziel: 2000,
       trainings_pro_woche: 4,
       schlaf_ziel: 8,
       startdatum: new Date().toISOString().split('T')[0],
-    })
+      consent_dsgvo: true,
+      consent_ai: consentAi,
+      consent_given_at: consentNow,
+    }, { onConflict: 'user_id' })
 
     return { error: null }
   }

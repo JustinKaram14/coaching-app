@@ -16,6 +16,7 @@ import { CoachDashboard } from './pages/coach/CoachDashboard'
 import { ClientDetail } from './pages/coach/ClientDetail'
 import { TrainingVorlagen } from './pages/TrainingVorlagen'
 import { Rezepte } from './pages/Rezepte'
+import { Legal } from './pages/Legal'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -43,9 +44,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public */}
+      {/* Public — no auth required */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/legal" element={<Legal />} />
 
       {/* Protected - Client & Coach */}
       <Route path="/dashboard" element={<ProtectedRoute>

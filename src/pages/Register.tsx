@@ -12,6 +12,9 @@ export function Register() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [consentDsgvo, setConsentDsgvo] = useState(false)
+  const [consentCoach, setConsentCoach] = useState(false)
+  const [consentAi, setConsentAi] = useState(false)
 
   function update(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [field]: e.target.value }))
@@ -28,8 +31,12 @@ export function Register() {
       setError('Das Passwort muss mindestens 8 Zeichen lang sein.')
       return
     }
+    if (!consentDsgvo || !consentCoach) {
+      setError('Bitte stimme den erforderlichen Datenschutzhinweisen zu, um fortzufahren.')
+      return
+    }
     setLoading(true)
-    const { error } = await signUp(form.email, form.password, form.name, form.inviteCode)
+    const { error } = await signUp(form.email, form.password, form.name, form.inviteCode, consentAi)
     setLoading(false)
     if (error) {
       setError(error.message)
@@ -124,13 +131,62 @@ export function Register() {
               />
             </div>
 
+            {/* ── Datenschutz-Einwilligungen (DSGVO Art. 7 + Art. 9) ── */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Einwilligungen (Pflichtfelder *)</p>
+
+              {/* Pflicht: DSGVO + Datenweitergabe an Coach */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={consentDsgvo}
+                  onChange={e => setConsentDsgvo(e.target.checked)}
+                  className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
+                />
+                <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
+                  * Ich habe die{' '}
+                  <Link to="/legal" target="_blank" className="text-primary hover:underline">Datenschutzerklärung</Link>
+                  {' '}gelesen und stimme der Verarbeitung meiner personenbezogenen Daten (Name, E-Mail) zur Bereitstellung des Coaching-Dienstes zu (Art. 6 Abs. 1 lit. b DSGVO).
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={consentCoach}
+                  onChange={e => setConsentCoach(e.target.checked)}
+                  className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
+                />
+                <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
+                  * Ich willige ausdrücklich ein, dass meine <strong className="text-text-primary">Gesundheits- und Fitnessdaten</strong> (Gewicht, Training, Ernährung, Schlaf, Anamnese) verarbeitet und meinem Coach zur Betreuung zugänglich gemacht werden (Art. 9 Abs. 2 lit. a DSGVO). Diese Einwilligung kann ich jederzeit widerrufen.
+                </span>
+              </label>
+
+              {/* Optional: KI-Analyse */}
+              <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <input
+                  type="checkbox"
+                  checked={consentAi}
+                  onChange={e => setConsentAi(e.target.checked)}
+                  className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
+                />
+                <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
+                  <span className="font-medium text-text-primary">Optional:</span> Ich willige ein, dass Fotos und Screenshots zur KI-Analyse (Ernährung, Training) an Google Gemini (USA) übermittelt werden. Diese Funktion kann ich jederzeit in den Einstellungen de-/aktivieren (Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO).
+                </span>
+              </label>
+            </div>
+
             {error && (
               <div className="p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm">
                 {error}
               </div>
             )}
 
-            <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2" disabled={loading}>
+            <button
+              type="submit"
+              className="btn-primary w-full flex items-center justify-center gap-2"
+              disabled={loading || !consentDsgvo || !consentCoach}
+            >
               {loading && <Spinner size={18} />}
               {loading ? 'Registrieren...' : 'Account erstellen'}
             </button>
