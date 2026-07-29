@@ -31,8 +31,8 @@ export function Register() {
       setError('Das Passwort muss mindestens 8 Zeichen lang sein.')
       return
     }
-    if (!consentDsgvo || !consentCoach) {
-      setError('Bitte stimme den erforderlichen Datenschutzhinweisen zu, um fortzufahren.')
+    if (!consentDsgvo || !consentCoach || !consentAi) {
+      setError('Bitte stimme allen erforderlichen Einwilligungen zu, um fortzufahren.')
       return
     }
     setLoading(true)
@@ -162,7 +162,7 @@ export function Register() {
                 </span>
               </label>
 
-              {/* Optional: KI-Analyse */}
+              {/* Pflicht: KI-Analyse */}
               <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl bg-primary/5 border border-primary/20">
                 <input
                   type="checkbox"
@@ -171,7 +171,7 @@ export function Register() {
                   className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
                 />
                 <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
-                  <span className="font-medium text-text-primary">Optional:</span> Ich willige ein, dass Fotos und Screenshots zur KI-Analyse (Ernährung, Training) an Google Gemini (USA) übermittelt werden. Diese Funktion kann ich jederzeit in den Einstellungen de-/aktivieren (Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO).
+                  <span className="font-medium text-text-primary">* </span>Ich willige ein, dass Fotos und Screenshots zur KI-Analyse (Ernährung, Training) an Google Gemini (USA) übermittelt werden. Diese Einwilligung ist für die Nutzung der App erforderlich und kann jederzeit in den Einstellungen widerrufen werden (Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO).
                 </span>
               </label>
             </div>
@@ -185,7 +185,7 @@ export function Register() {
             <button
               type="submit"
               className="btn-primary w-full flex items-center justify-center gap-2"
-              disabled={loading || !consentDsgvo || !consentCoach}
+              disabled={loading || !consentDsgvo || !consentCoach || !consentAi}
             >
               {loading && <Spinner size={18} />}
               {loading ? 'Registrieren...' : 'Account erstellen'}

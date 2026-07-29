@@ -2,14 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Shield, FileText } from 'lucide-react'
 
-// ─── IMPORTANT: Replace all [PLACEHOLDER] values with real info ───────────────
-// Required by German law (TMG § 5, DSGVO Art. 13)
-
-const BETREIBER_NAME = 'Justin Karam'           // Vollständiger Name (Pflicht)
-const BETREIBER_ADRESSE = '[Straße, Hausnr.]'   // Anschrift (Pflicht)
+const BETREIBER_NAME = '[Name]'
+const BETREIBER_ADRESSE = '[Straße, Hausnr.]'
 const BETREIBER_ORT = '[PLZ Ort]'
-const BETREIBER_EMAIL = 'justinkaram1410@gmail.com'
-const BETREIBER_TEL = '[Telefonnummer]'          // Pflicht nach TMG § 5
+const BETREIBER_EMAIL = '[E-Mail]'
+const BETREIBER_TEL = '[Telefonnummer]'
 const APP_NAME = 'HLX Coaching App'
 const STAND_DATUM = '29. Juli 2026'
 
