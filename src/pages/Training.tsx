@@ -559,7 +559,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
             </div>
           ) : apiEx?.gifUrl ? (
             <div className="w-full rounded-xl overflow-hidden bg-bg-elevated" style={{ aspectRatio: '4/3' }}>
-              <img src={apiEx.gifUrl} alt="" className="w-full h-full object-cover" />
+              <img src={`${apiEx.gifUrl}?api-key=${WX_KEY}`} alt="" className="w-full h-full object-cover" />
             </div>
           ) : null}
 
