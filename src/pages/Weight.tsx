@@ -248,54 +248,6 @@ export function Weight() {
       {/* Fotos Tab */}
       {tab === 'fotos' && (
         <div className="space-y-6">
-          {/* 30/60/90 Comparison */}
-          {startPhoto && (
-            <div className="card">
-              <h3 className="section-title mb-4">Fortschrittsvergleich</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Start */}
-                <div className="space-y-2">
-                  <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border border-border">
-                    <img src={startPhoto.foto_url!} alt="Start" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs font-semibold text-primary">Start</div>
-                    <div className="text-xs text-text-muted">{formatDate(startPhoto.datum)}</div>
-                    <div className="text-xs text-text-secondary">{startPhoto.gewicht} kg</div>
-                  </div>
-                </div>
-                {/* 30 / 60 / 90 days ago */}
-                {COMPARE_DAYS.map(days => {
-                  const entry = getPhotoNearDaysAgo(days)
-                  return (
-                    <div key={days} className="space-y-2">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border border-border flex items-center justify-center">
-                        {entry?.foto_url ? (
-                          <img src={entry.foto_url} alt={`Vor ${days} Tagen`} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="text-center p-4">
-                            <Camera size={20} className="text-text-muted mx-auto mb-1" />
-                            <span className="text-xs text-text-muted">Kein Foto</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs font-semibold text-text-secondary">Vor {days} Tagen</div>
-                        {entry ? (
-                          <>
-                            <div className="text-xs text-text-muted">{formatDate(entry.datum)}</div>
-                            <div className="text-xs text-text-secondary">{entry.gewicht} kg</div>
-                          </>
-                        ) : <div className="text-xs text-text-muted">Kein Eintrag</div>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* All photos grid */}
           {photosOnly.length === 0 ? (
             <div className="card text-center py-12">
               <Camera size={32} className="text-text-muted mx-auto mb-3" />
@@ -303,20 +255,126 @@ export function Weight() {
               <div className="text-text-muted text-xs mt-1">Füge beim nächsten Eintrag ein Foto hinzu.</div>
             </div>
           ) : (
-            <div className="card">
-              <h3 className="section-title mb-4">Alle Fotos</h3>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {[...photosOnly].reverse().map(e => (
-                  <button key={e.id} onClick={() => setLightboxUrl(e.foto_url!)}
-                    className="relative aspect-square rounded-xl overflow-hidden border border-border hover:border-primary transition-colors group">
-                    <img src={e.foto_url!} alt={e.datum} className="w-full h-full object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] py-1 px-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {formatDate(e.datum, 'dd.MM.yy')} · {e.gewicht} kg
+            <>
+              {/* Referenz vs Aktuell */}
+              {startPhoto && photosOnly.length >= 2 && (() => {
+                const currentPhoto = photosOnly.at(-1)!
+                const kgChange = currentPhoto.gewicht - startPhoto.gewicht
+                return (
+                  <div className="card">
+                    <h3 className="section-title mb-4">Referenz vs. Aktuell</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border-2 border-primary/30 cursor-pointer" onClick={() => setLightboxUrl(startPhoto.foto_url!)}>
+                          <img src={startPhoto.foto_url!} alt="Referenz" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs font-bold text-primary">Referenz (Start)</div>
+                          <div className="text-xs text-text-muted">{formatDate(startPhoto.datum)}</div>
+                          <div className="text-xs text-text-secondary">{startPhoto.gewicht} kg</div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border-2 border-success/30 cursor-pointer" onClick={() => setLightboxUrl(currentPhoto.foto_url!)}>
+                          <img src={currentPhoto.foto_url!} alt="Aktuell" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs font-bold text-success">Aktuell</div>
+                          <div className="text-xs text-text-muted">{formatDate(currentPhoto.datum)}</div>
+                          <div className="text-xs text-text-secondary">
+                            {currentPhoto.gewicht} kg
+                            <span className={`ml-1.5 font-semibold ${kgChange < 0 ? 'text-success' : kgChange > 0 ? 'text-danger' : 'text-text-muted'}`}>
+                              ({kgChange > 0 ? '+' : ''}{kgChange.toFixed(1)} kg)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </button>
-                ))}
+                  </div>
+                )
+              })()}
+
+              {/* 15-day milestones: reference alongside each 15-day photo */}
+              {startPhoto && (() => {
+                const startMs = new Date(startPhoto.datum).getTime()
+                const milestones: { label: string; entry: GewichtEntry | null }[] = []
+                let day = 15
+                while (startMs + day * 86400000 <= Date.now() + 86400000) {
+                  const target = new Date(startMs + day * 86400000)
+                  const nearest = photosOnly.reduce<GewichtEntry | null>((best, e) => {
+                    const diff = Math.abs(new Date(e.datum).getTime() - target.getTime())
+                    const bestDiff = best ? Math.abs(new Date(best.datum).getTime() - target.getTime()) : Infinity
+                    return diff < bestDiff ? e : best
+                  }, null)
+                  // Only include if nearest photo is within 7 days of milestone
+                  const nearestDiff = nearest ? Math.abs(new Date(nearest.datum).getTime() - target.getTime()) : Infinity
+                  milestones.push({ label: `Tag ${day}`, entry: nearestDiff <= 7 * 86400000 ? nearest : null })
+                  day += 15
+                }
+                if (milestones.length === 0) return null
+                return (
+                  <div className="card">
+                    <h3 className="section-title mb-4">15-Tage Vergleich (mit Referenz)</h3>
+                    <div className="space-y-4">
+                      {milestones.map(({ label, entry }) => (
+                        <div key={label}>
+                          <div className="text-xs font-semibold text-text-muted mb-2">{label}</div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Reference always on left */}
+                            <div className="space-y-1">
+                              <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border border-primary/30 cursor-pointer" onClick={() => setLightboxUrl(startPhoto.foto_url!)}>
+                                <img src={startPhoto.foto_url!} alt="Referenz" className="w-full h-full object-cover" />
+                              </div>
+                              <div className="text-center">
+                                <div className="text-[10px] font-semibold text-primary">Referenz</div>
+                                <div className="text-[10px] text-text-muted">{startPhoto.gewicht} kg</div>
+                              </div>
+                            </div>
+                            {/* Milestone photo on right */}
+                            <div className="space-y-1">
+                              <div className={`aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border ${entry ? 'border-border cursor-pointer' : 'border-dashed border-border'} flex items-center justify-center`}
+                                onClick={() => entry?.foto_url && setLightboxUrl(entry.foto_url)}>
+                                {entry?.foto_url ? (
+                                  <img src={entry.foto_url} alt={label} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="text-center p-2">
+                                    <Camera size={18} className="text-text-muted mx-auto mb-1" />
+                                    <span className="text-[10px] text-text-muted">Kein Foto</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-center">
+                                <div className="text-[10px] font-semibold text-text-secondary">{label}</div>
+                                {entry && <div className="text-[10px] text-text-muted">{entry.gewicht} kg · {formatDate(entry.datum, 'dd.MM.yy')}</div>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* All photos grid */}
+              <div className="card">
+                <h3 className="section-title mb-4">Alle Fotos ({photosOnly.length})</h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {[...photosOnly].reverse().map(e => (
+                    <button key={e.id} onClick={() => setLightboxUrl(e.foto_url!)}
+                      className={`relative aspect-square rounded-xl overflow-hidden border hover:border-primary transition-colors group ${e.id === startPhoto?.id ? 'border-primary/50 ring-1 ring-primary/30' : 'border-border'}`}>
+                      <img src={e.foto_url!} alt={e.datum} className="w-full h-full object-cover" />
+                      {e.id === startPhoto?.id && (
+                        <div className="absolute top-1 left-1 bg-primary text-white text-[9px] px-1 py-0.5 rounded font-bold">REF</div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] py-1 px-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {formatDate(e.datum, 'dd.MM.yy')} · {e.gewicht} kg
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}

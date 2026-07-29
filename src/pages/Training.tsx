@@ -702,6 +702,8 @@ interface ActiveWorkoutState { vorlage: any; startTime: number; exercises: Activ
 
 const REST_SECONDS = 120
 
+const WORKOUT_KEY = 'hlx_activeWorkout'
+
 function ActiveWorkoutView({ workout, onFinish, onAbort }: {
   workout: ActiveWorkoutState
   onFinish: (exercises: ActiveExercise[], elapsedMin: number) => void
@@ -710,8 +712,13 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
   const [exercises, setExercises] = useState<ActiveExercise[]>(workout.exercises)
   const [elapsed, setElapsed] = useState(0)
   const [tipFor, setTipFor] = useState<string | null>(null)
-  // rest timer: { exIdx, setIdx, remaining }
   const [rest, setRest] = useState<{ exIdx: number; setIdx: number; remaining: number } | null>(null)
+  const [newExName, setNewExName] = useState('')
+
+  // Persist workout state (including live exercise edits) whenever exercises change
+  useEffect(() => {
+    localStorage.setItem(WORKOUT_KEY, JSON.stringify({ ...workout, exercises }))
+  }, [exercises])
 
   useEffect(() => {
     const interval = setInterval(() => setElapsed(Math.floor((Date.now() - workout.startTime) / 1000)), 1000)
@@ -754,6 +761,17 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
     })
   }
 
+  function removeExercise(exIdx: number) {
+    setExercises(prev => prev.filter((_, i) => i !== exIdx))
+  }
+
+  function addExercise() {
+    const name = newExName.trim()
+    if (!name) return
+    setExercises(prev => [...prev, { name, sets: [{ wdh: '', kg: '', done: false }, { wdh: '', kg: '', done: false }, { wdh: '', kg: '', done: false }], prevSets: [] }])
+    setNewExName('')
+  }
+
   const doneCount = exercises.reduce((a, ex) => a + ex.sets.filter(s => s.done).length, 0)
   const totalCount = exercises.reduce((a, ex) => a + ex.sets.length, 0)
   const mm = Math.floor(elapsed / 60).toString().padStart(2, '0')
@@ -788,19 +806,27 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
       </div>
 
       {/* Exercise list */}
-      <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+      <div className="p-4 space-y-4 max-w-lg mx-auto pb-8">
         {exercises.map((ex, exIdx) => {
           const allDone = ex.sets.length > 0 && ex.sets.every(s => s.done)
           return (
             <div key={exIdx} className={`card transition-opacity ${allDone ? 'opacity-50' : ''}`}>
               <div className="flex items-center justify-between mb-4">
                 <span className="font-bold text-text-primary text-base">{ex.name}</span>
-                <button
-                  onClick={() => setTipFor(ex.name)}
-                  className="p-1.5 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors"
-                >
-                  <HelpCircle size={14} />
-                </button>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setTipFor(ex.name)}
+                    className="p-1.5 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors"
+                  >
+                    <HelpCircle size={14} />
+                  </button>
+                  <button
+                    onClick={() => removeExercise(exIdx)}
+                    className="p-1.5 rounded-lg border border-border hover:bg-danger/10 hover:text-danger text-text-muted transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
 
               {/* Column headers */}
@@ -875,6 +901,27 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
             </div>
           )
         })}
+
+        {/* Add new exercise */}
+        <div className="card">
+          <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Übung hinzufügen</div>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1 text-sm"
+              placeholder="Übungsname…"
+              value={newExName}
+              onChange={e => setNewExName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addExercise()}
+            />
+            <button
+              onClick={addExercise}
+              disabled={!newExName.trim()}
+              className="btn-primary px-4 text-sm flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <Plus size={14} /> Hinzufügen
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -895,6 +942,7 @@ export function Training() {
   const [vorlagen, setVorlagen] = useState<any[]>([])
   const [selectedVorlage, setSelectedVorlage] = useState('')
   const [activeWorkout, setActiveWorkout] = useState<ActiveWorkoutState | null>(null)
+  const [savedWorkout, setSavedWorkout] = useState<ActiveWorkoutState | null>(null)
   const [form, setForm] = useState({
     datum: todayISO(), trainingstyp: 'Kraft', dauer_h: '0', dauer_m: '0', avg_puls: '', kalorien_verbrannt: '', notizen: '',
   })
@@ -983,6 +1031,7 @@ export function Training() {
       }
     })
 
+    setSavedWorkout(null)
     setActiveWorkout({ vorlage, startTime: Date.now(), exercises })
   }
 
@@ -1015,11 +1064,20 @@ export function Training() {
       if (uebungenRows.length) await supabase.from('uebungen').insert(uebungenRows)
     }
 
+    localStorage.removeItem(WORKOUT_KEY)
+    setSavedWorkout(null)
     setActiveWorkout(null)
     await load()
   }
 
-  useEffect(() => { load(); loadVorlagen() }, [user])
+  useEffect(() => {
+    load()
+    loadVorlagen()
+    const raw = localStorage.getItem(WORKOUT_KEY)
+    if (raw) {
+      try { setSavedWorkout(JSON.parse(raw)) } catch {}
+    }
+  }, [user])
 
   async function analyzePhoto(file: File) {
     setAnalyzing(true)
@@ -1177,6 +1235,30 @@ export function Training() {
           </button>
         </div>
       </div>
+
+      {/* Resume banner for interrupted workout */}
+      {savedWorkout && (
+        <div className="card border-primary/40 bg-primary/5 flex items-center justify-between gap-4 p-4">
+          <div className="min-w-0">
+            <div className="font-semibold text-text-primary">Workout pausiert: {savedWorkout.vorlage?.name}</div>
+            <div className="text-xs text-text-muted mt-0.5">{savedWorkout.exercises.length} Übungen · Fortsetzen oder verwerfen</div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => { setSavedWorkout(null); localStorage.removeItem(WORKOUT_KEY) }}
+              className="btn-secondary text-sm px-3 py-1.5"
+            >
+              Verwerfen
+            </button>
+            <button
+              onClick={() => { setActiveWorkout(savedWorkout); setSavedWorkout(null) }}
+              className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5"
+            >
+              <Play size={14} /> Fortsetzen
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Quick-start: workout templates */}
       {vorlagen.length > 0 && (
@@ -1350,24 +1432,7 @@ export function Training() {
               </>
             )}
           </div>
-          {/* Vorlage Selector */}
-          {vorlagen.length > 0 && (
-            <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
-              <label className="label text-xs text-primary">Vorlage laden</label>
-              <div className="flex gap-2">
-                <select
-                  className="input flex-1 text-sm"
-                  value={selectedVorlage}
-                  onChange={e => applyVorlage(e.target.value)}
-                >
-                  <option value="">— Vorlage auswählen —</option>
-                  {vorlagen.map((v: any) => (
-                    <option key={v.id} value={v.id}>{v.name} ({v.uebungen.length} Übungen)</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Datum</label>

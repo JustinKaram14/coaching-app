@@ -171,6 +171,29 @@ export function Settings() {
         </div>
       )}
 
+      {/* Coach photo access (clients only) */}
+      {!isCoach && (
+        <div className="card space-y-3">
+          <h2 className="font-semibold text-text-primary">Körperfotos</h2>
+          <label className="flex items-center justify-between cursor-pointer gap-4">
+            <div>
+              <div className="text-sm font-medium text-text-primary">Coach darf Körperfotos sehen</div>
+              <div className="text-xs text-text-muted mt-0.5">Dein Coach kann deine Körperfotos im Gewichtsverlauf einsehen</div>
+            </div>
+            <div className="relative shrink-0">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={!!settings.coach_foto_freigabe}
+                onChange={e => setSettings(s => ({ ...s, coach_foto_freigabe: e.target.checked }))}
+              />
+              <div className={`w-11 h-6 rounded-full transition-colors ${settings.coach_foto_freigabe ? 'bg-primary' : 'bg-border'}`} />
+              <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.coach_foto_freigabe ? 'translate-x-5' : ''}`} />
+            </div>
+          </label>
+        </div>
+      )}
+
       {/* Masterplan Download (clients only) */}
       {!isCoach && masterplan && (
         <div className="card space-y-3">

@@ -753,20 +753,43 @@ export function ClientDetail() {
       })()}
 
       {tab === 'weight' && (
-        <div className="card overflow-x-auto">
-          <h3 className="font-semibold text-text-primary mb-4">Gewichtsverlauf ({weights.length} Einträge)</h3>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-border"><th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th><th className="text-right py-2 px-3 text-text-muted font-medium">Gewicht</th><th className="text-left py-2 px-3 text-text-muted font-medium">Notizen</th></tr></thead>
-            <tbody>
-              {[...weights].reverse().map(w => (
-                <tr key={w.id} className="border-b border-border/50">
-                  <td className="py-2.5 px-3 text-text-secondary">{formatDate(w.datum)}</td>
-                  <td className="py-2.5 px-3 text-right font-semibold text-text-primary">{w.gewicht} kg</td>
-                  <td className="py-2.5 px-3 text-text-muted">{w.notizen ?? '--'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {!settings?.coach_foto_freigabe && (
+            <div className="card border-border bg-bg-elevated/60 flex items-center gap-3 py-3 px-4 text-sm text-text-muted">
+              <span>🔒</span>
+              <span>Körperfotos nicht freigegeben — Klient kann die Freigabe in den Einstellungen erteilen.</span>
+            </div>
+          )}
+          <div className="card overflow-x-auto">
+            <h3 className="font-semibold text-text-primary mb-4">Gewichtsverlauf ({weights.length} Einträge)</h3>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-border">
+                <th className="text-left py-2 px-3 text-text-muted font-medium">Datum</th>
+                <th className="text-right py-2 px-3 text-text-muted font-medium">Gewicht</th>
+                <th className="text-left py-2 px-3 text-text-muted font-medium">Notizen</th>
+                {settings?.coach_foto_freigabe && <th className="text-center py-2 px-3 text-text-muted font-medium">Foto</th>}
+              </tr></thead>
+              <tbody>
+                {[...weights].reverse().map(w => (
+                  <tr key={w.id} className="border-b border-border/50">
+                    <td className="py-2.5 px-3 text-text-secondary">{formatDate(w.datum)}</td>
+                    <td className="py-2.5 px-3 text-right font-semibold text-text-primary">{w.gewicht} kg</td>
+                    <td className="py-2.5 px-3 text-text-muted">{w.notizen ?? '--'}</td>
+                    {settings?.coach_foto_freigabe && (
+                      <td className="py-2.5 px-3 text-center">
+                        {(w as any).foto_url ? (
+                          <a href={(w as any).foto_url} target="_blank" rel="noopener noreferrer"
+                            className="w-8 h-8 rounded-lg overflow-hidden border border-border hover:border-primary transition-colors inline-block">
+                            <img src={(w as any).foto_url} alt="" className="w-full h-full object-cover" />
+                          </a>
+                        ) : <span className="text-text-muted text-xs">–</span>}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
