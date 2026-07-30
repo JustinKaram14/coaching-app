@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil, HelpCircle, Check, Play } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity, BookOpen, Camera, Sparkles, X, Pencil, HelpCircle, Check, Play, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -385,122 +385,31 @@ function getTip(name: string): UebungTip | null {
   return null
 }
 
-// ─── Exercise GIF (free-exercise-db, CC BY-SA 3.0 Everkinetic) ───────────────
+// ─── Local Exercise Dataset ───────────────────────────────────────────────────
 
-// ─── WorkoutX Exercise API ────────────────────────────────────────────────────
-
-interface WorkoutXExercise {
-  id: string
-  name: string
-  gifUrl: string
-  bodyPart?: string
-  target?: string
-  equipment?: string
-  instructions?: string[]
-  secondaryMuscles?: string[]
+interface LocalExercise {
+  id: string; name: string; category: string; body_part: string
+  equipment: string; instructions_en: string; muscle_group: string
+  secondary_muscles: string[] | string; target: string; image: string; gif_url: string
 }
 
-// German canonical key → English search term for WorkoutX /exercises/name/:name
-const WORKOUTX_SEARCH: Record<string, string> = {
-  'bankdrücken': 'barbell bench press',
-  'kniebeuge': 'barbell squat',
-  'kreuzheben': 'barbell deadlift',
-  'klimmzug': 'pullups',
-  'pull up': 'pullups',
-  'wide pull up': 'wide grip pullup',
-  'schulterdrücken': 'barbell shoulder press',
-  'rudern': 'bent over barbell row',
-  'bizeps curl': 'barbell curl',
-  'trizepsdrücken': 'tricep dips between benches',
-  'beinstrecken': 'leg extensions',
-  'beinbeugen': 'seated leg curl',
-  'plank': 'plank',
-  'dips': 'dips',
-  'seitheben': 'side lateral raise',
-  'liegestützen': 'push ups',
-  'laufen': 'treadmill',
-  'laufband': 'treadmill',
-  'fahrrad': 'stationary bike',
-  'latzug': 'lat pulldown',
-  'rückenstrecker': 'hyperextension',
-  'beinpresse': 'leg press',
-  'wadenheben': 'standing calf raise',
-  'hip thrust': 'barbell hip thrust',
-  'ausfallschritt': 'barbell lunge',
-  'schrägbankdrücken': 'barbell incline bench press',
-  'butterfly': 'peck deck fly',
-  'crunch': 'crunch',
-  'sit-up': 'sit up',
-  'face pull': 'face pull',
-  'trizeps pushdown': 'tricep pushdown',
-  'hammer curl': 'hammer curl',
-  'rumänisches kreuzheben': 'romanian deadlift',
-  'bulgarian split squat': 'bulgarian split squat',
-  'kabelrudern': 'seated cable row',
-  'rudermaschine': 'rowing stationary',
-  'crosstrainer': 'stationary bike',
-  'beinheben': 'hanging leg raise',
-  'russian twist': 'russian twist',
-  'goblet squat': 'goblet squat',
-  'arnold press': 'arnold dumbbell press',
-  'ausfallschritte': 'barbell lunge',
-}
+const EX_BASE = import.meta.env.BASE_URL + 'exercises/'
+let _localExCache: LocalExercise[] | null = null
 
-const exerciseCache = new Map<string, WorkoutXExercise | null>()
-const WX_KEY = import.meta.env.VITE_WORKOUTX_API_KEY as string
-
-function resolveCanonicalKey(name: string): string | null {
-  const key = name.toLowerCase().trim()
-  if (UEBUNG_TIPS[key]) return key
-  const alias = ALIASES[key]
-  if (alias) return alias
-  const fuzzy = Object.keys(UEBUNG_TIPS).find(k => key.includes(k) || k.includes(key))
-  if (fuzzy) return fuzzy
-  const fuzzyAlias = Object.entries(ALIASES).find(([a]) => key.includes(a) || a.includes(key))
-  return fuzzyAlias ? fuzzyAlias[1] : null
-}
-
-async function fetchWorkoutXExercise(name: string): Promise<WorkoutXExercise | null> {
-  const canonical = resolveCanonicalKey(name)
-  const searchTerm = canonical
-    ? (WORKOUTX_SEARCH[canonical] ?? canonical)
-    : name.toLowerCase().trim()
-
-  if (exerciseCache.has(searchTerm)) return exerciseCache.get(searchTerm)!
-
+async function loadLocalExercises(): Promise<LocalExercise[]> {
+  if (_localExCache) return _localExCache
   try {
-    const res = await fetch(
-      `https://api.workoutxapp.com/v1/exercises/name/${encodeURIComponent(searchTerm)}?lang=de`,
-      { headers: { 'X-WorkoutX-Key': WX_KEY } }
-    )
-    if (!res.ok) { exerciseCache.set(searchTerm, null); return null }
-    const json = await res.json()
-    // API returns { total, count, data: [...] } wrapper
-    const data: unknown[] = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : [])
-    if (data.length === 0) { exerciseCache.set(searchTerm, null); return null }
-    // API may return keys in camelCase or ALL_CAPS — normalise both
-    const r = data[0] as Record<string, unknown>
-    const ex: WorkoutXExercise = {
-      id: String(r.id ?? r.ID ?? ''),
-      name: String(r.name ?? r.NAME ?? ''),
-      gifUrl: String(r.gifUrl ?? r.gifURL ?? r.GIFURL ?? ''),
-      bodyPart: r.bodyPart != null ? String(r.bodyPart) : (r.BODYPART != null ? String(r.BODYPART) : undefined),
-      target: r.target != null ? String(r.target) : (r.TARGET != null ? String(r.TARGET) : undefined),
-      equipment: r.equipment != null ? String(r.equipment) : (r.EQUIPMENT != null ? String(r.EQUIPMENT) : undefined),
-      instructions: Array.isArray(r.instructions) ? r.instructions.map(String) : (Array.isArray(r.INSTRUCTIONS) ? (r.INSTRUCTIONS as unknown[]).map(String) : undefined),
-      secondaryMuscles: (() => {
-        const raw = r.secondaryMuscles ?? r.SECONDARYMUSCLES
-        if (raw == null) return undefined
-        const s = String(raw)
-        return s.includes(',') ? s.split(',').map(x => x.trim()) : s.split(' ').map(x => x.trim()).filter(Boolean)
-      })(),
-    }
-    exerciseCache.set(searchTerm, ex)
-    return ex
-  } catch {
-    exerciseCache.set(searchTerm, null)
-    return null
-  }
+    const r = await fetch(EX_BASE + 'exercises.json')
+    _localExCache = await r.json()
+    return _localExCache!
+  } catch { _localExCache = []; return [] }
+}
+
+function findLocalExercise(name: string, list: LocalExercise[]): LocalExercise | null {
+  const q = name.toLowerCase().trim()
+  return list.find(e => e.name.toLowerCase() === q)
+    ?? list.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()))
+    ?? null
 }
 
 // ─── Exercise Tip Modal ───────────────────────────────────────────────────────
@@ -513,16 +422,16 @@ const MUSKEL_LABELS: Record<string, string> = {
 
 function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }) {
   const tip = getTip(name)
-  const [apiEx, setApiEx] = useState<WorkoutXExercise | null>(null)
-  const [apiLoading, setApiLoading] = useState(true)
+  const [localEx, setLocalEx] = useState<LocalExercise | null>(null)
+  const [localLoading, setLocalLoading] = useState(true)
   const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' richtige Ausführung Technik')}`
 
   useEffect(() => {
-    setApiLoading(true)
-    setApiEx(null)
-    fetchWorkoutXExercise(name).then(ex => {
-      setApiEx(ex)
-      setApiLoading(false)
+    setLocalLoading(true)
+    setLocalEx(null)
+    loadLocalExercises().then(list => {
+      setLocalEx(findLocalExercise(name, list))
+      setLocalLoading(false)
     })
   }, [name])
 
@@ -542,9 +451,9 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 <div className="text-xs text-primary font-medium mt-0.5">{tip.muskel}</div>
                 <div className="text-xs text-text-muted">{tip.sekundaer}</div>
               </>
-            ) : apiEx?.target ? (
+            ) : localEx?.target ? (
               <div className="text-xs text-primary font-medium mt-0.5 capitalize">
-                {apiEx.target}{apiEx.bodyPart ? ` · ${apiEx.bodyPart}` : ''}
+                {localEx.target}{localEx.body_part ? ` · ${localEx.body_part}` : ''}
               </div>
             ) : null}
           </div>
@@ -552,14 +461,14 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
         </div>
 
         <div className="px-5 pb-6 space-y-5">
-          {/* GIF from WorkoutX API */}
-          {apiLoading ? (
+          {/* GIF from local dataset */}
+          {localLoading ? (
             <div className="w-full rounded-xl bg-bg-elevated flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : apiEx?.gifUrl ? (
+          ) : localEx?.gif_url ? (
             <div className="w-full rounded-xl overflow-hidden bg-bg-elevated" style={{ aspectRatio: '4/3' }}>
-              <img src={`${apiEx.gifUrl}?api-key=${WX_KEY}`} alt="" className="w-full h-full object-cover" />
+              <img src={EX_BASE + localEx.gif_url} alt="" className="w-full h-full object-contain" />
             </div>
           ) : null}
 
@@ -605,19 +514,19 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 </ul>
               </div>
             </>
-          ) : apiEx?.instructions && apiEx.instructions.length > 0 ? (
+          ) : localEx?.instructions_en ? (
             <div>
               <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
               <ul className="space-y-2">
-                {apiEx.instructions.map((step, i) => (
+                {localEx.instructions_en.split(/(?:\.\s+|\n)/).map(s => s.trim()).filter(Boolean).map((step, i) => (
                   <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
                     <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                    {step}
+                    {step.endsWith('.') ? step : step + '.'}
                   </li>
                 ))}
               </ul>
             </div>
-          ) : !apiLoading ? (
+          ) : !localLoading ? (
             <p className="text-sm text-text-muted">Für <span className="text-text-primary font-medium">"{name}"</span> sind noch keine Tipps hinterlegt.</p>
           ) : null}
 
@@ -632,6 +541,64 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
   )
 }
 
+// ─── Exercise Picker Modal ────────────────────────────────────────────────────
+
+function ExercisePickerModal({ onSelect, onClose }: { onSelect: (name: string) => void; onClose: () => void }) {
+  const [list, setList] = useState<LocalExercise[]>([])
+  const [query, setQuery] = useState('')
+
+  useEffect(() => { loadLocalExercises().then(setList) }, [])
+
+  const filtered = list.length === 0 ? [] : (() => {
+    const q = query.toLowerCase()
+    return (q
+      ? list.filter(e => e.name.toLowerCase().includes(q) || e.body_part?.toLowerCase().includes(q))
+      : list
+    ).sort((a, b) => a.name.localeCompare(b.name, 'de')).slice(0, 80)
+  })()
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-bg-card w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
+          <Search size={15} className="text-text-muted shrink-0" />
+          <input
+            autoFocus
+            type="search"
+            placeholder="Übung suchen…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-muted"
+          />
+          <button onClick={onClose} className="text-text-muted hover:text-text-secondary"><X size={16} /></button>
+        </div>
+        <div className="overflow-y-auto">
+          {list.length === 0 ? (
+            <div className="py-10 text-center text-sm text-text-muted">Keine Übungen geladen.<br/>exercises.json in public/exercises/ kopieren.</div>
+          ) : filtered.length === 0 ? (
+            <div className="py-8 text-center text-sm text-text-muted">Keine Treffer.</div>
+          ) : filtered.map(ex => (
+            <button
+              key={ex.id}
+              onClick={() => { onSelect(ex.name); onClose() }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-bg-elevated transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-lg bg-bg-elevated overflow-hidden shrink-0">
+                <img src={EX_BASE + ex.image} alt="" className="w-full h-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-text-primary truncate">{ex.name}</div>
+                <div className="text-xs text-text-muted">{ex.body_part}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Uebung Form ─────────────────────────────────────────────────────────────
 
 type UebungFormEntry = { uebungsname: string; saetze: string; wdh: string; gewicht_kg: string; notizen: string }
@@ -640,6 +607,7 @@ function UebungForm({ entries, onChange }: {
   onChange: (entries: UebungFormEntry[]) => void
 }) {
   const [tipFor, setTipFor] = useState<string | null>(null)
+  const [pickerFor, setPickerFor] = useState<number | null>(null)
 
   function add() {
     onChange([...entries, { uebungsname: '', saetze: '', wdh: '', gewicht_kg: '', notizen: '' }])
@@ -656,11 +624,21 @@ function UebungForm({ entries, onChange }: {
   return (
     <div className="space-y-3">
       {tipFor && <UebungTipModal name={tipFor} onClose={() => setTipFor(null)} />}
+      {pickerFor !== null && (
+        <ExercisePickerModal
+          onSelect={name => update(pickerFor, 'uebungsname', name)}
+          onClose={() => setPickerFor(null)}
+        />
+      )}
 
       {entries.map((e, i) => (
         <div key={i} className="p-3 bg-bg-elevated rounded-lg space-y-2">
           <div className="flex gap-2">
             <input className="input flex-1 text-sm py-2" placeholder="Übungsname" value={e.uebungsname} onChange={ev => update(i, 'uebungsname', ev.target.value)} />
+            <button onClick={() => setPickerFor(i)} title="Aus Übungspool wählen"
+              className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
+              <Search size={14} />
+            </button>
             <button onClick={() => setTipFor(e.uebungsname || null)} title="Tipps anzeigen"
               className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
               <HelpCircle size={14} />
