@@ -389,7 +389,7 @@ function getTip(name: string): UebungTip | null {
 
 interface LocalExercise {
   id: string; name: string; category: string; body_part: string
-  equipment: string; instructions: Record<string, string>; instruction_steps: Record<string, string[]>
+  equipment: string; instructions: string; instruction_steps: string[]
   muscle_group: string; secondary_muscles: string[]; target: string; image: string; gif_url: string
 }
 
@@ -399,7 +399,7 @@ let _localExCache: LocalExercise[] | null = null
 async function loadLocalExercises(): Promise<LocalExercise[]> {
   if (_localExCache) return _localExCache
   try {
-    const r = await fetch(EX_BASE + 'data/exercises.json')
+    const r = await fetch(EX_BASE + 'data/exercises_clean.json')
     _localExCache = await r.json()
     return _localExCache!
   } catch { _localExCache = []; return [] }
@@ -567,11 +567,11 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 </ul>
               </div>
             </>
-          ) : (localEx?.instruction_steps?.de ?? localEx?.instruction_steps?.en)?.length ? (
+          ) : localEx?.instruction_steps?.length ? (
             <div>
               <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
               <ul className="space-y-2">
-                {(localEx!.instruction_steps.de ?? localEx!.instruction_steps.en).map((step, i) => (
+                {localEx!.instruction_steps.map((step, i) => (
                   <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
                     <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                     {step}
@@ -652,6 +652,67 @@ function ExercisePickerModal({ onSelect, onClose }: { onSelect: (name: string) =
   )
 }
 
+// ─── Exercise Name Input with Autocomplete ────────────────────────────────────
+
+function ExerciseNameInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [suggestions, setSuggestions] = useState<LocalExercise[]>([])
+  const [open, setOpen] = useState(false)
+  const [allEx, setAllEx] = useState<LocalExercise[]>([])
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { loadLocalExercises().then(setAllEx) }, [])
+
+  useEffect(() => {
+    const q = value.toLowerCase().trim()
+    if (q.length < 2 || allEx.length === 0) { setSuggestions([]); return }
+    const res = allEx
+      .filter(e => e.name.toLowerCase().includes(q) || e.body_part?.toLowerCase().includes(q) || e.target?.toLowerCase().includes(q))
+      .slice(0, 7)
+    setSuggestions(res)
+    setOpen(res.length > 0)
+  }, [value, allEx])
+
+  function select(name: string) {
+    onChange(name)
+    setSuggestions([])
+    setOpen(false)
+  }
+
+  return (
+    <div ref={wrapRef} className="relative flex-1">
+      <input
+        className="input w-full text-sm py-2"
+        placeholder="Übungsname"
+        value={value}
+        onChange={ev => { onChange(ev.target.value); setOpen(true) }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        autoComplete="off"
+      />
+      {open && suggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+          {suggestions.map(ex => (
+            <button
+              key={ex.id}
+              onMouseDown={() => select(ex.name)}
+              className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-bg-elevated transition-colors text-left"
+            >
+              <div className="w-8 h-8 rounded-lg bg-bg-elevated overflow-hidden shrink-0">
+                <img src={EX_BASE + ex.image} alt="" className="w-full h-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-text-primary truncate">{ex.name}</div>
+                <div className="text-[10px] text-text-muted">{ex.body_part}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Uebung Form ─────────────────────────────────────────────────────────────
 
 type UebungFormEntry = { uebungsname: string; saetze: string; wdh: string; gewicht_kg: string; notizen: string }
@@ -660,7 +721,6 @@ function UebungForm({ entries, onChange }: {
   onChange: (entries: UebungFormEntry[]) => void
 }) {
   const [tipFor, setTipFor] = useState<string | null>(null)
-  const [pickerFor, setPickerFor] = useState<number | null>(null)
 
   function add() {
     onChange([...entries, { uebungsname: '', saetze: '', wdh: '', gewicht_kg: '', notizen: '' }])
@@ -677,21 +737,11 @@ function UebungForm({ entries, onChange }: {
   return (
     <div className="space-y-3">
       {tipFor && <UebungTipModal name={tipFor} onClose={() => setTipFor(null)} />}
-      {pickerFor !== null && (
-        <ExercisePickerModal
-          onSelect={name => update(pickerFor, 'uebungsname', name)}
-          onClose={() => setPickerFor(null)}
-        />
-      )}
 
       {entries.map((e, i) => (
         <div key={i} className="p-3 bg-bg-elevated rounded-lg space-y-2">
           <div className="flex gap-2">
-            <input className="input flex-1 text-sm py-2" placeholder="Übungsname" value={e.uebungsname} onChange={ev => update(i, 'uebungsname', ev.target.value)} />
-            <button onClick={() => setPickerFor(i)} title="Aus Übungspool wählen"
-              className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
-              <Search size={14} />
-            </button>
+            <ExerciseNameInput value={e.uebungsname} onChange={v => update(i, 'uebungsname', v)} />
             <button onClick={() => setTipFor(e.uebungsname || null)} title="Tipps anzeigen"
               className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
               <HelpCircle size={14} />
