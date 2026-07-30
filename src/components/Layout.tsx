@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, Dumbbell, Moon, Apple, Pill, Calendar,
-  Settings, Users, LogOut, Menu, X, ChevronRight, Zap, ChefHat,
+  Settings, Users, LogOut, Menu, X, ChevronRight, Zap, ChefHat, Library,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '../lib/utils'
@@ -11,6 +11,7 @@ const clientNav = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/weight', icon: Scale, label: 'Gewicht' },
   { to: '/training', icon: Dumbbell, label: 'Training' },
+  { to: '/uebungen', icon: Library, label: 'Übungspool' },
   { to: '/sleep', icon: Moon, label: 'Schlaf' },
   { to: '/nutrition', icon: Apple, label: 'Ernährung' },
   { to: '/rezepte', icon: ChefHat, label: 'Rezepte' },

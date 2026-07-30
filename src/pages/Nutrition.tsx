@@ -102,6 +102,62 @@ function CalorieRing({ eaten, goal }: { eaten: number; goal: number }) {
   )
 }
 
+// ─── CalorieBilanzRing ────────────────────────────────────────────────────────
+
+function CalorieBilanzRing({ consumed, burned, goal }: { consumed: number; burned: number; goal: number }) {
+  const R_OUT = 50, R_IN = 36, cx = 60, cy = 60
+  const circOut = 2 * Math.PI * R_OUT
+  const circIn  = 2 * Math.PI * R_IN
+  const net = Math.max(0, consumed - burned)
+  const consumedPct = goal > 0 ? Math.min(consumed / goal, 1) : 0
+  const burnedPct   = goal > 0 ? Math.min(burned  / goal, 1) : 0
+  const netRatio    = goal > 0 ? net / goal : 0
+  const atGoal  = Math.abs(netRatio - 1) < 0.1
+  const overGoal = net > goal * 1.1
+  const statusColor = atGoal ? '#22c55e' : '#eab308'
+
+  return (
+    <div className="flex flex-col items-center gap-2 shrink-0">
+      <svg width="144" height="144" viewBox="0 0 120 120">
+        {/* Outer bg */}
+        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="10" />
+        {/* Outer blue: consumed */}
+        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke="#3b82f6" strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={circOut} strokeDashoffset={circOut * (1 - consumedPct)}
+          transform={`rotate(-90,${cx},${cy})`}
+          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+        />
+        {/* Inner bg */}
+        <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" />
+        {/* Inner red: burned */}
+        {burned > 0 && (
+          <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke="#ef4444" strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={circIn} strokeDashoffset={circIn * (1 - burnedPct)}
+            transform={`rotate(-90,${cx},${cy})`}
+            style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+          />
+        )}
+        {/* Center */}
+        <text x={cx} y={cy - 9} textAnchor="middle" fill="white" fontSize="19" fontWeight="700">{net}</text>
+        <text x={cx} y={cy + 4}  textAnchor="middle" fill="#6b7280" fontSize="8">kcal netto</text>
+        <text x={cx} y={cy + 16} textAnchor="middle" fill={statusColor} fontSize="7.5" fontWeight="600">
+          {atGoal ? '✓ Ziel erreicht' : overGoal ? `+${net - goal} über Ziel` : `${goal - net} bis Ziel`}
+        </text>
+      </svg>
+      <div className="flex gap-5 text-xs">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+          <span className="text-text-secondary">{consumed} kcal gegessen</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+          <span className="text-text-secondary">{burned} kcal verbrannt</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ─── MacroBar ─────────────────────────────────────────────────────────────────
 
 function MacroBar({ label, value, goal, color }: { label: string; value: number; goal: number; color: string }) {
@@ -1225,8 +1281,10 @@ function MealSection({ meal, items, onAdd, onDelete }: {
 export function Nutrition() {
   const { user } = useAuth()
   const [date, setDate] = useState(todayISO())
+  const [tab, setTab] = useState<'ernaehrung' | 'bilanz'>('ernaehrung')
   const [items, setItems] = useState<FoodLogItem[]>([])
   const [water, setWater] = useState<WasserLogEntry[]>([])
+  const [burnedKcal, setBurnedKcal] = useState(0)
   const [goals, setGoals] = useState<NutritionGoals>({
     kalorie_tagesziel: 2000,
     protein_ziel: 150,
@@ -1240,15 +1298,19 @@ export function Nutrition() {
 
   async function load() {
     if (!user) return
-    const [foodRes, waterRes, goalsRes] = await Promise.all([
+    const [foodRes, waterRes, goalsRes, trainingRes] = await Promise.all([
       supabase.from('food_log').select('*').eq('user_id', user.id).eq('datum', date).order('created_at'),
       supabase.from('wasser_log').select('*').eq('user_id', user.id).eq('datum', date).order('created_at'),
       supabase.from('client_settings')
         .select('kalorie_tagesziel,protein_ziel,karbs_ziel,fett_ziel')
         .eq('user_id', user.id).single(),
+      supabase.from('training').select('kalorien_verbrannt').eq('user_id', user.id).eq('datum', date),
     ])
     setItems((foodRes.data ?? []) as FoodLogItem[])
     setWater((waterRes.data ?? []) as WasserLogEntry[])
+    const burned = ((trainingRes.data ?? []) as { kalorien_verbrannt: number | null }[])
+      .reduce((sum, r) => sum + (r.kalorien_verbrannt ?? 0), 0)
+    setBurnedKcal(burned)
     if (goalsRes.data) {
       const d = goalsRes.data as Partial<NutritionGoals>
       setGoals(g => ({
@@ -1327,19 +1389,34 @@ export function Nutrition() {
           </div>
         </div>
         <button
-          onClick={() => date < today && setDate(shiftDate(date, 1))}
+          onClick={() => { if (date < today) setDate(shiftDate(date, 1)) }}
           disabled={date >= today}
           className={`p-2 rounded-xl transition-colors ${
-            date >= today ? 'text-border cursor-default' : 'hover:bg-bg-elevated text-text-secondary'
+            date >= today ? 'text-border cursor-not-allowed' : 'hover:bg-bg-elevated text-text-secondary'
           }`}
         >
           <ChevronRight size={18} />
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-bg-elevated rounded-xl">
+        {(['ernaehrung', 'bilanz'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === t ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            {t === 'ernaehrung' ? 'Ernährung' : 'Bilanz'}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-16"><Spinner size={36} /></div>
-      ) : (
+      ) : tab === 'ernaehrung' ? (
         <>
           {/* Calorie ring + macros */}
           <div className="card">
@@ -1371,6 +1448,40 @@ export function Nutrition() {
             onRemoveLast={handleRemoveLastWater}
           />
         </>
+      ) : (
+        /* ── Bilanz Tab ── */
+        <div className="space-y-4">
+          <div className="card flex flex-col items-center py-6 gap-4">
+            <h3 className="text-sm font-semibold text-text-primary self-start">Kalorien-Bilanz</h3>
+            <CalorieBilanzRing
+              consumed={totals.kalorien}
+              burned={burnedKcal}
+              goal={goals.kalorie_tagesziel}
+            />
+            <div className="w-full border-t border-border pt-4 grid grid-cols-3 gap-2 text-center text-xs">
+              <div>
+                <div className="text-base font-bold text-text-primary">{totals.kalorien}</div>
+                <div className="text-text-muted">gegessen</div>
+              </div>
+              <div>
+                <div className="text-base font-bold text-red-400">{burnedKcal}</div>
+                <div className="text-text-muted">verbrannt</div>
+              </div>
+              <div>
+                <div className="text-base font-bold text-text-primary">{goals.kalorie_tagesziel}</div>
+                <div className="text-text-muted">Ziel</div>
+              </div>
+            </div>
+          </div>
+
+          {burnedKcal === 0 && (
+            <div className="card text-center py-5 text-sm text-text-muted">
+              Noch kein Training für diesen Tag eingetragen.
+              <br />
+              <span className="text-xs">Trage Training mit Kalorien-Angabe ein — es erscheint hier automatisch.</span>
+            </div>
+          )}
+        </div>
       )}
 
       {addingToMeal && (

@@ -54,6 +54,10 @@ export interface Database {
           consent_dsgvo: boolean | null
           consent_ai: boolean | null
           consent_given_at: string | null
+          aktivitaetsniveau: string | null
+          sport_ziel: string | null
+          ernaehrungs_typ: string | null
+          intervall_fasten: string | null
         }
         Insert: Omit<Database['public']['Tables']['client_settings']['Row'], 'id' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['client_settings']['Insert']>

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, AlertTriangle, Shield } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, AlertTriangle, Shield, Calculator, Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { bmi, bmiCategory, generateCode } from '../lib/utils'
+import { bmi, bmiCategory, generateCode, berechneTDEE, type TDEEResult } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
 import { subscribeToPush } from '../hooks/usePushNotifications'
 import type { ClientSettings, InviteCode, CoachPlan } from '../types/database'
@@ -19,6 +19,7 @@ export function Settings() {
   const [notifStatus, setNotifStatus] = useState<'idle'|'loading'|'ok'|'denied'|'unsupported'>('idle')
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [tdeePreview, setTdeePreview] = useState<TDEEResult | null>(null)
 
   const isCoach = profile?.role === 'coach'
   const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
@@ -100,6 +101,27 @@ export function Settings() {
     navigator.clipboard.writeText(code)
   }
 
+  function handleBerechnen() {
+    const g = settings.startgewicht
+    const h = settings.koerpergroesse
+    const a = settings.alter_jahre
+    if (!g || !h || !a) return
+    const result = berechneTDEE(
+      g, h, a,
+      settings.aktivitaetsniveau ?? 'maessig_aktiv',
+      settings.sport_ziel ?? 'halten',
+      settings.ernaehrungs_typ ?? 'standard',
+    )
+    setTdeePreview(result)
+    setSettings(s => ({
+      ...s,
+      kalorie_tagesziel: result.kalorien,
+      protein_ziel: result.protein,
+      karbs_ziel: result.karbs,
+      fett_ziel: result.fett,
+    }))
+  }
+
   const bmiVal = settings.startgewicht && settings.koerpergroesse
     ? bmi(settings.startgewicht, settings.koerpergroesse)
     : null
@@ -179,6 +201,156 @@ export function Settings() {
               <div className="text-sm text-text-muted mb-1">BMI (berechnet)</div>
               <div className="text-2xl font-bold text-text-primary">{bmiVal}</div>
               <div className="text-sm text-text-secondary">{bmiCategory(bmiVal)}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Nutrition calculator (clients only) */}
+      {!isCoach && (
+        <div className="card space-y-5">
+          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+            <Calculator size={18} className="text-primary" /> Ernährungsberechnung
+          </h2>
+          <p className="text-xs text-text-muted -mt-2">Wähle deine Ziele — die Kalorien & Makros werden automatisch berechnet.</p>
+
+          {/* Aktivitätsniveau */}
+          <div className="space-y-2">
+            <label className="label">Aktivitätsniveau</label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {([
+                ['sitzend',      'Kaum Bewegung', 'Bürojob, keine Sport'],
+                ['leicht_aktiv', 'Leicht aktiv',  '1–2× Sport/Woche'],
+                ['maessig_aktiv','Moderat aktiv', '3–5× Sport/Woche'],
+                ['sehr_aktiv',   'Sehr aktiv',    '6–7× Sport/Woche'],
+                ['extrem_aktiv', 'Extrem aktiv',  'Profisportler / körperl. Arbeit'],
+              ] as const).map(([val, label, sub]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setSettings(s => ({ ...s, aktivitaetsniveau: val }))}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                    (settings.aktivitaetsniveau ?? 'maessig_aktiv') === val
+                      ? 'border-primary bg-primary/10 text-text-primary'
+                      : 'border-border text-text-secondary hover:border-primary/40'
+                  }`}
+                >
+                  <div className={`w-3 h-3 rounded-full border-2 shrink-0 ${
+                    (settings.aktivitaetsniveau ?? 'maessig_aktiv') === val ? 'border-primary bg-primary' : 'border-border'
+                  }`} />
+                  <div>
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-xs text-text-muted">{sub}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ziel */}
+          <div className="space-y-2">
+            <label className="label">Mein Ziel</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ['abnehmen', 'Abnehmen', '−400 kcal'],
+                ['halten',   'Halten',   '±0 kcal'],
+                ['zunehmen', 'Zunehmen', '+350 kcal'],
+              ] as const).map(([val, label, hint]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setSettings(s => ({ ...s, sport_ziel: val }))}
+                  className={`py-3 rounded-xl border text-center transition-colors ${
+                    (settings.sport_ziel ?? 'halten') === val
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-text-secondary hover:border-primary/40'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{label}</div>
+                  <div className="text-xs text-text-muted mt-0.5">{hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ernährungsweise */}
+          <div className="space-y-2">
+            <label className="label">Ernährungsweise</label>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ['standard',     'Ausgewogen'],
+                ['low_carb',     'Low Carb'],
+                ['high_protein', 'High Protein'],
+                ['vegan',        'Vegan'],
+                ['vegetarisch',  'Vegetarisch'],
+                ['pescetarisch', 'Pescetarisch'],
+              ] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setSettings(s => ({ ...s, ernaehrungs_typ: val }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    (settings.ernaehrungs_typ ?? 'standard') === val
+                      ? 'bg-primary border-primary text-white'
+                      : 'border-border text-text-secondary hover:border-primary/40'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Intervallfasten */}
+          <div className="space-y-2">
+            <label className="label">Intervallfasten</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ['kein',  'Kein Fasten',   'Normale Mahlzeitenverteilung'],
+                ['12:12', '12:12',          '12h fasten · 12h essen'],
+                ['14:10', '14:10',          '14h fasten · 10h essen'],
+                ['16:8',  '16:8',           '16h fasten · 8h essen'],
+              ] as const).map(([val, label, sub]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setSettings(s => ({ ...s, intervall_fasten: val }))}
+                  className={`px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                    (settings.intervall_fasten ?? 'kein') === val
+                      ? 'border-primary bg-primary/10 text-text-primary'
+                      : 'border-border text-text-secondary hover:border-primary/40'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{label}</div>
+                  <div className="text-xs text-text-muted">{sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Calculate button */}
+          {settings.startgewicht && settings.koerpergroesse && settings.alter_jahre ? (
+            <button
+              type="button"
+              onClick={handleBerechnen}
+              className="btn-primary flex items-center gap-2 w-full justify-center"
+            >
+              <Zap size={16} /> Ziele berechnen & übernehmen
+            </button>
+          ) : (
+            <p className="text-xs text-text-muted text-center">Bitte zuerst Gewicht, Größe und Alter unter «Ziele & Körperdaten» eintragen.</p>
+          )}
+
+          {tdeePreview && (
+            <div className="p-3 rounded-xl bg-success/10 border border-success/20 space-y-1.5">
+              <div className="text-xs font-semibold text-success flex items-center gap-1"><CheckCircle size={13} /> Berechnet & gesetzt</div>
+              <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                <div><div className="font-bold text-text-primary text-base">{tdeePreview.kalorien}</div><div className="text-text-muted">kcal</div></div>
+                <div><div className="font-bold text-text-primary text-base">{tdeePreview.protein}g</div><div className="text-text-muted">Protein</div></div>
+                <div><div className="font-bold text-text-primary text-base">{tdeePreview.karbs}g</div><div className="text-text-muted">Karbs</div></div>
+                <div><div className="font-bold text-text-primary text-base">{tdeePreview.fett}g</div><div className="text-text-muted">Fett</div></div>
+              </div>
+              <p className="text-xs text-text-muted">Klicke «Einstellungen speichern» um die Werte zu sichern.</p>
             </div>
           )}
         </div>
@@ -356,21 +528,12 @@ export function Settings() {
         )}
 
         {!isCoach && (
-          <div className="flex items-center justify-between">
+          <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-2 text-xs text-text-secondary">
+            <Zap size={14} className="text-primary shrink-0 mt-0.5" />
             <div>
-              <div className="text-sm font-medium text-text-primary">KI-Analyse (optional)</div>
-              <div className="text-xs text-text-muted">Fotos an Google Gemini senden für automatische Erkennung</div>
+              <div className="font-semibold text-primary mb-0.5">KI-Analyse aktiv</div>
+              Fotos werden zur automatischen Ernährungs- und Trainingsanalyse an Google Gemini übermittelt (gemäß deiner Einwilligung bei der Registrierung).
             </div>
-            <label className="relative cursor-pointer">
-              <input type="checkbox" className="sr-only" checked={!!settings.consent_ai}
-                onChange={async e => {
-                  const val = e.target.checked
-                  setSettings(s => ({ ...s, consent_ai: val }))
-                  if (user) await supabase.from('client_settings').update({ consent_ai: val }).eq('user_id', user.id)
-                }} />
-              <div className={`w-11 h-6 rounded-full transition-colors ${settings.consent_ai ? 'bg-primary' : 'bg-border'}`} />
-              <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.consent_ai ? 'translate-x-5' : ''}`} />
-            </label>
           </div>
         )}
 
