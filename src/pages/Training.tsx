@@ -405,11 +405,64 @@ async function loadLocalExercises(): Promise<LocalExercise[]> {
   } catch { _localExCache = []; return [] }
 }
 
+const DE_TO_EN_EX: Record<string, string> = {
+  'seitheben': 'side lateral raise',
+  'bankdrücken': 'barbell bench press',
+  'kniebeuge': 'barbell squat',
+  'kniebeugen': 'barbell squat',
+  'kreuzheben': 'barbell deadlift',
+  'klimmzug': 'wide-grip pullup',
+  'klimmzüge': 'wide-grip pullup',
+  'schulterdrücken': 'barbell shoulder press',
+  'rudern': 'bent over barbell row',
+  'kabelrudern': 'seated cable row',
+  'bizeps curl': 'barbell curl',
+  'bizepscurl': 'barbell curl',
+  'trizepsdrücken': 'triceps dip',
+  'beinstrecken': 'leg extension',
+  'beinbeugen': 'seated leg curl',
+  'plank': 'plank',
+  'dips': 'chest dip',
+  'liegestützen': 'push-up',
+  'liegestütze': 'push-up',
+  'latzug': 'cable lat pulldown',
+  'beinpresse': 'leg press',
+  'wadenheben': 'calf raise',
+  'hip thrust': 'barbell hip thrust',
+  'ausfallschritt': 'barbell lunge',
+  'ausfallschritte': 'barbell lunge',
+  'schrägbankdrücken': 'incline barbell bench press',
+  'crunch': 'crunch',
+  'sit-up': 'sit-up',
+  'situp': 'sit-up',
+  'hammer curl': 'hammer curl',
+  'hammercurl': 'hammer curl',
+  'goblet squat': 'goblet squat',
+  'arnold press': 'arnold press',
+  'beinheben': 'hanging leg raise',
+  'russian twist': 'russian twist',
+  'butterfly': 'peck deck fly',
+  'rückenstrecker': 'back extension',
+  'hyperextension': 'back extension',
+  'face pull': 'face pull',
+  'trizeps pushdown': 'triceps pushdown',
+  'rumänisches kreuzheben': 'romanian deadlift',
+  'bulgarian split squat': 'bulgarian split squat',
+}
+
 function findLocalExercise(name: string, list: LocalExercise[]): LocalExercise | null {
   const q = name.toLowerCase().trim()
-  return list.find(e => e.name.toLowerCase() === q)
-    ?? list.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()))
-    ?? null
+  const exact = list.find(e => e.name.toLowerCase() === q)
+  if (exact) return exact
+  const contains = list.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()))
+  if (contains) return contains
+  const enTerm = DE_TO_EN_EX[q]
+  if (enTerm) {
+    return list.find(e => e.name.toLowerCase() === enTerm)
+      ?? list.find(e => e.name.toLowerCase().includes(enTerm.split(' ')[0]))
+      ?? null
+  }
+  return null
 }
 
 // ─── Exercise Tip Modal ───────────────────────────────────────────────────────
@@ -514,11 +567,11 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 </ul>
               </div>
             </>
-          ) : (localEx?.instruction_steps?.en ?? localEx?.instruction_steps?.de)?.length ? (
+          ) : (localEx?.instruction_steps?.de ?? localEx?.instruction_steps?.en)?.length ? (
             <div>
               <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
               <ul className="space-y-2">
-                {(localEx!.instruction_steps.en ?? localEx!.instruction_steps.de).map((step, i) => (
+                {(localEx!.instruction_steps.de ?? localEx!.instruction_steps.en).map((step, i) => (
                   <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
                     <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                     {step}

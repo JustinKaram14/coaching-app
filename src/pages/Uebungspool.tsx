@@ -49,7 +49,7 @@ function DetailModal({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
       ? String(ex.secondary_muscles).split(',').map(s => s.trim()).filter(Boolean)
       : []
 
-  const steps = ex.instruction_steps?.en ?? ex.instruction_steps?.de ?? []
+  const steps = ex.instruction_steps?.de ?? ex.instruction_steps?.en ?? []
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={onClose}>
