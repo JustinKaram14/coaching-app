@@ -389,8 +389,8 @@ function getTip(name: string): UebungTip | null {
 
 interface LocalExercise {
   id: string; name: string; category: string; body_part: string
-  equipment: string; instructions_en: string; muscle_group: string
-  secondary_muscles: string[] | string; target: string; image: string; gif_url: string
+  equipment: string; instructions: Record<string, string>; instruction_steps: Record<string, string[]>
+  muscle_group: string; secondary_muscles: string[]; target: string; image: string; gif_url: string
 }
 
 const EX_BASE = import.meta.env.BASE_URL + 'exercises/'
@@ -399,7 +399,7 @@ let _localExCache: LocalExercise[] | null = null
 async function loadLocalExercises(): Promise<LocalExercise[]> {
   if (_localExCache) return _localExCache
   try {
-    const r = await fetch(EX_BASE + 'exercises.json')
+    const r = await fetch(EX_BASE + 'data/exercises.json')
     _localExCache = await r.json()
     return _localExCache!
   } catch { _localExCache = []; return [] }
@@ -514,14 +514,14 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 </ul>
               </div>
             </>
-          ) : localEx?.instructions_en ? (
+          ) : (localEx?.instruction_steps?.en ?? localEx?.instruction_steps?.de)?.length ? (
             <div>
               <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">Richtige Ausführung</div>
               <ul className="space-y-2">
-                {localEx.instructions_en.split(/(?:\.\s+|\n)/).map(s => s.trim()).filter(Boolean).map((step, i) => (
+                {(localEx!.instruction_steps.en ?? localEx!.instruction_steps.de).map((step, i) => (
                   <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
                     <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                    {step.endsWith('.') ? step : step + '.'}
+                    {step}
                   </li>
                 ))}
               </ul>

@@ -10,10 +10,10 @@ interface Exercise {
   category: string
   body_part: string
   equipment: string
-  instructions_en: string
-  instructions_de?: string
+  instructions: Record<string, string>
+  instruction_steps: Record<string, string[]>
   muscle_group: string
-  secondary_muscles: string[] | string
+  secondary_muscles: string[]
   target: string
   image: string
   gif_url: string
@@ -49,11 +49,7 @@ function DetailModal({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
       ? String(ex.secondary_muscles).split(',').map(s => s.trim()).filter(Boolean)
       : []
 
-  const instructions = (ex.instructions_de || ex.instructions_en || '')
-  const steps = instructions
-    .split(/(?:\.\s+|\n)/)
-    .map(s => s.trim())
-    .filter(Boolean)
+  const steps = ex.instruction_steps?.en ?? ex.instruction_steps?.de ?? []
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={onClose}>
@@ -165,7 +161,7 @@ export function Uebungspool() {
   const letterRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
-    fetch(import.meta.env.BASE_URL + 'exercises/exercises.json')
+    fetch(import.meta.env.BASE_URL + 'exercises/data/exercises.json')
       .then(r => r.json())
       .then((data: Exercise[]) => { setExercises(data); setLoading(false) })
       .catch(() => setLoading(false))
