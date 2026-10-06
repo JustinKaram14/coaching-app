@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Moon, Camera, Sparkles, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import { formatDate, calcSleepHours, todayISO } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -24,7 +25,7 @@ function QualityStars({ value }: { value: number | null }) {
   return (
     <div className="flex items-center gap-0.5">
       {Array.from({ length: 10 }).map((_, i) => (
-        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < value ? 'bg-primary' : 'bg-border'}`} />
+        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < value ? 'bg-brand' : 'bg-border'}`} />
       ))}
       <span className="ml-1.5 text-xs text-text-secondary">{value}/10</span>
     </div>
@@ -33,6 +34,7 @@ function QualityStars({ value }: { value: number | null }) {
 
 export function Sleep() {
   const { user } = useAuth()
+  const { colors } = useTheme()
   const [entries, setEntries] = useState<SchlafEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -160,12 +162,12 @@ export function Sleep() {
           <h2 className="section-title mb-6">Schlafdauer Verlauf</h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2d38" vertical={false} />
-              <XAxis dataKey="datumLabel" tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
+              <XAxis dataKey="datumLabel" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={sleepGoal} stroke="#10b981" strokeDasharray="6 3" label={{ value: 'Ziel', fill: '#10b981', fontSize: 11 }} />
-              <Bar dataKey="stunden" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <ReferenceLine y={sleepGoal} stroke={colors.success} strokeDasharray="6 3" label={{ value: 'Ziel', fill: colors.success, fontSize: 11 }} />
+              <Bar dataKey="stunden" fill={colors.accent} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -287,7 +289,7 @@ export function Sleep() {
             <label className="label">Schlafqualität (1–10)</label>
             <div className="flex items-center gap-3">
               <input
-                type="range" min="1" max="10" className="flex-1 accent-primary"
+                type="range" min="1" max="10" className="flex-1 accent-brand"
                 value={form.schlafqualitaet}
                 onChange={e => setForm(f => ({ ...f, schlafqualitaet: e.target.value }))}
               />

@@ -5,7 +5,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { todayISO, toLocalISO } from '../lib/utils'
+import { useTheme } from '../hooks/useTheme'
+import { todayISO, toLocalISO, tokenColor } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
 import type { FoodLogItem, WasserLogEntry, Rezept } from '../types/database'
 
@@ -46,10 +47,10 @@ interface FoodItemInput {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MEALS = [
-  { id: 'Frühstück', icon: '🌅', color: '#f59e0b' },
-  { id: 'Mittagessen', icon: '☀️', color: '#6366f1' },
-  { id: 'Abendessen', icon: '🌙', color: '#8b5cf6' },
-  { id: 'Snack', icon: '🍎', color: '#10b981' },
+  { id: 'Frühstück', icon: '🌅', color: 'warning' },
+  { id: 'Mittagessen', icon: '☀️', color: 'info' },
+  { id: 'Abendessen', icon: '🌙', color: 'accent' },
+  { id: 'Snack', icon: '🍎', color: 'success' },
 ] as const
 
 const WATER_GOAL_ML = 2000
@@ -75,6 +76,7 @@ function formatDateLabel(iso: string): string {
 // ─── CalorieRing ──────────────────────────────────────────────────────────────
 
 function CalorieRing({ eaten, goal }: { eaten: number; goal: number }) {
+  const { colors } = useTheme()
   const r = 48
   const circ = 2 * Math.PI * r
   const pct = goal > 0 ? Math.min(eaten / goal, 1) : 0
@@ -83,17 +85,17 @@ function CalorieRing({ eaten, goal }: { eaten: number; goal: number }) {
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
       <svg width="136" height="136" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="9" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke={colors.track} strokeWidth="9" />
         <circle
           cx="60" cy="60" r={r} fill="none"
-          stroke={over ? '#ef4444' : '#6366f1'} strokeWidth="9" strokeLinecap="round"
+          stroke={over ? colors.danger : colors.brand} strokeWidth="9" strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
           transform="rotate(-90 60 60)"
           style={{ transition: 'stroke-dashoffset 0.5s ease' }}
         />
-        <text x="60" y="53" textAnchor="middle" fill="white" fontSize="20" fontWeight="700">{eaten}</text>
-        <text x="60" y="67" textAnchor="middle" fill="#6b7280" fontSize="8">kcal gegessen</text>
-        <text x="60" y="81" textAnchor="middle" fill={over ? '#ef4444' : '#10b981'} fontSize="8" fontWeight="600">
+        <text x="60" y="53" textAnchor="middle" fill={colors.text} fontSize="20" fontWeight="700">{eaten}</text>
+        <text x="60" y="67" textAnchor="middle" fill={colors.tick} fontSize="8">kcal gegessen</text>
+        <text x="60" y="81" textAnchor="middle" fill={over ? colors.danger : colors.success} fontSize="8" fontWeight="600">
           {over ? `+${eaten - goal} über Ziel` : `${goal - eaten} übrig`}
         </text>
       </svg>
@@ -105,6 +107,7 @@ function CalorieRing({ eaten, goal }: { eaten: number; goal: number }) {
 // ─── CalorieBilanzRing ────────────────────────────────────────────────────────
 
 function CalorieBilanzRing({ consumed, burned, goal }: { consumed: number; burned: number; goal: number }) {
+  const { colors } = useTheme()
   const R_OUT = 50, R_IN = 36, cx = 60, cy = 60
   const circOut = 2 * Math.PI * R_OUT
   const circIn  = 2 * Math.PI * R_IN
@@ -114,43 +117,43 @@ function CalorieBilanzRing({ consumed, burned, goal }: { consumed: number; burne
   const netRatio    = goal > 0 ? net / goal : 0
   const atGoal  = Math.abs(netRatio - 1) < 0.1
   const overGoal = net > goal * 1.1
-  const statusColor = atGoal ? '#22c55e' : '#eab308'
+  const statusColor = atGoal ? colors.success : colors.warning
 
   return (
     <div className="flex flex-col items-center gap-2 shrink-0">
       <svg width="144" height="144" viewBox="0 0 120 120">
         {/* Outer bg */}
-        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="10" />
+        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke={colors.track} strokeWidth="10" />
         {/* Outer blue: consumed */}
-        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke="#3b82f6" strokeWidth="10" strokeLinecap="round"
+        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke={colors.info} strokeWidth="10" strokeLinecap="round"
           strokeDasharray={circOut} strokeDashoffset={circOut * (1 - consumedPct)}
           transform={`rotate(-90,${cx},${cy})`}
           style={{ transition: 'stroke-dashoffset 0.5s ease' }}
         />
         {/* Inner bg */}
-        <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" />
+        <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke={colors.track} strokeWidth="8" />
         {/* Inner red: burned */}
         {burned > 0 && (
-          <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke="#ef4444" strokeWidth="8" strokeLinecap="round"
+          <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke={colors.danger} strokeWidth="8" strokeLinecap="round"
             strokeDasharray={circIn} strokeDashoffset={circIn * (1 - burnedPct)}
             transform={`rotate(-90,${cx},${cy})`}
             style={{ transition: 'stroke-dashoffset 0.5s ease' }}
           />
         )}
         {/* Center */}
-        <text x={cx} y={cy - 9} textAnchor="middle" fill="white" fontSize="19" fontWeight="700">{net}</text>
-        <text x={cx} y={cy + 4}  textAnchor="middle" fill="#6b7280" fontSize="8">kcal netto</text>
+        <text x={cx} y={cy - 9} textAnchor="middle" fill={colors.text} fontSize="19" fontWeight="700">{net}</text>
+        <text x={cx} y={cy + 4}  textAnchor="middle" fill={colors.tick} fontSize="8">kcal netto</text>
         <text x={cx} y={cy + 16} textAnchor="middle" fill={statusColor} fontSize="7.5" fontWeight="600">
           {atGoal ? '✓ Ziel erreicht' : overGoal ? `+${net - goal} über Ziel` : `${goal - net} bis Ziel`}
         </text>
       </svg>
       <div className="flex gap-5 text-xs">
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+          <span className="w-2.5 h-2.5 rounded-full bg-info shrink-0" />
           <span className="text-text-secondary">{consumed} kcal gegessen</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+          <span className="w-2.5 h-2.5 rounded-full bg-danger shrink-0" />
           <span className="text-text-secondary">{burned} kcal verbrannt</span>
         </span>
       </div>
@@ -173,7 +176,7 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
       </div>
       <div className="h-1.5 bg-bg rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, backgroundColor: over ? '#ef4444' : color }} />
+          style={{ width: `${pct}%`, backgroundColor: over ? tokenColor('danger') : tokenColor(color) }} />
       </div>
     </div>
   )
@@ -194,7 +197,7 @@ function WaterTracker({ entries, onAdd, onRemoveLast }: {
     <div className="card">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Droplets size={16} className="text-blue-400" />
+          <Droplets size={16} className="text-info" />
           <span className="font-semibold text-text-primary text-sm">Wasser</span>
         </div>
         <span className="text-xs text-text-secondary">{totalMl} / {WATER_GOAL_ML} ml</span>
@@ -205,7 +208,7 @@ function WaterTracker({ entries, onAdd, onRemoveLast }: {
             key={i}
             className={`flex items-center justify-center rounded-lg border transition-all ${
               i < glasses
-                ? 'bg-blue-500/20 border-blue-400 text-blue-400'
+                ? 'bg-info/20 border-info text-info'
                 : 'bg-bg border-border text-border'
             }`}
             style={{ width: 36, height: 44 }}
@@ -224,7 +227,7 @@ function WaterTracker({ entries, onAdd, onRemoveLast }: {
             </button>
           )}
           <button onClick={onAdd}
-            className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-0.5 px-2 py-1 rounded">
+            className="text-xs text-info hover:underline font-medium flex items-center gap-0.5 px-2 py-1 rounded">
             <Plus size={11} /> 250 ml
           </button>
         </div>
@@ -284,7 +287,7 @@ function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
             const name = p.product_name_de || p.product_name || ''
             return (
               <button key={i} onClick={() => onSelect(p)}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-primary/10 text-left transition-colors">
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-brand/10 text-left transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-text-primary truncate">{name}</div>
                   {p.brands && <div className="text-xs text-text-muted truncate">{p.brands}</div>}
@@ -374,10 +377,10 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
               ['bottom-0 left-0','border-b-2 border-l-2 rounded-bl-xl'],
               ['bottom-0 right-0','border-b-2 border-r-2 rounded-br-xl'],
             ].map(([pos, cls]) => (
-              <div key={pos} className={`absolute w-8 h-8 border-primary ${pos} ${cls}`} />
+              <div key={pos} className={`absolute w-8 h-8 border-brand ${pos} ${cls}`} />
             ))}
             {/* Scan line animation */}
-            <div className="absolute left-2 right-2 h-0.5 bg-primary/80 animate-scanline" />
+            <div className="absolute left-2 right-2 h-0.5 bg-brand/80 animate-scanline" />
           </div>
         </div>
         {camError && (
@@ -702,13 +705,13 @@ function AddFoodModal({ meal, onClose, onAdd }: {
       onClick={onClose}
     >
       <div
-        className="relative w-full rounded-t-2xl overflow-y-auto"
-        style={{ background: '#1a1d24', maxHeight: '88vh' }}
+        className="relative w-full rounded-t-4xl overflow-y-auto bg-bg-card"
+        style={{ maxHeight: '88vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 px-4 pt-3 pb-3 border-b border-border" style={{ background: '#1a1d24' }}>
-          <div className="w-10 h-1 bg-border rounded-full mx-auto mb-3" />
+        <div className="sticky top-0 z-10 px-4 pt-3 pb-3 border-b border-border bg-bg-card">
+          <div className="w-10 h-1 bg-border-light rounded-full mx-auto mb-3" />
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-text-primary text-sm">Hinzufügen — {meal}</h3>
             <button onClick={onClose} className="p-1 text-text-muted hover:text-text-primary rounded-lg">
@@ -763,10 +766,10 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                     <>
                       <button
                         onClick={() => setShowLiveScanner(true)}
-                        className="w-full flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                        className="w-full flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-brand/50 hover:bg-brand/5 transition-colors"
                       >
-                        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                          <ScanLine size={26} className="text-primary" />
+                        <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center">
+                          <ScanLine size={26} className="text-brand" />
                         </div>
                         <div className="text-center">
                           <div className="font-medium text-text-primary text-sm">Live-Kamera starten</div>
@@ -809,14 +812,14 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                   {!photoPreview ? (
                     <button
                       onClick={() => photoRef.current?.click()}
-                      className="w-full flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed border-border hover:border-primary/50 transition-colors"
+                      className="w-full flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed border-border hover:border-brand/50 transition-colors"
                     >
-                      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Camera size={24} className="text-primary" />
+                      <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center">
+                        <Camera size={24} className="text-brand" />
                       </div>
                       <div className="text-center">
                         <div className="font-medium text-text-primary flex items-center gap-1.5 justify-center">
-                          <Sparkles size={13} className="text-yellow-400" /> KI-Foto-Analyse
+                          <Sparkles size={13} className="text-warning" /> KI-Foto-Analyse
                         </div>
                         <div className="text-xs text-text-muted mt-1">
                           Foto der Mahlzeit, Verpackung oder Rezept
@@ -845,16 +848,16 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                           {/* Macro result card */}
                           <div className="p-3 bg-bg-elevated rounded-xl space-y-3">
                             <div className="text-xs text-text-muted flex items-center gap-1">
-                              <Sparkles size={11} className="text-yellow-400" />
+                              <Sparkles size={11} className="text-warning" />
                               KI hat erkannt:
                             </div>
                             <div className="text-sm font-semibold text-text-primary">{aiResult.name}</div>
                             <div className="grid grid-cols-2 gap-2">
                               {([
-                                { l: 'Kalorien', v: aiResult.kalorien, u: 'kcal', color: 'text-orange-400' },
-                                { l: 'Protein', v: aiResult.protein_g, u: 'g', color: 'text-blue-400' },
-                                { l: 'Kohlenhydrate', v: aiResult.kohlenhydrate_g, u: 'g', color: 'text-yellow-400' },
-                                { l: 'Fett', v: aiResult.fett_g, u: 'g', color: 'text-green-400' },
+                                { l: 'Kalorien', v: aiResult.kalorien, u: 'kcal', color: 'text-brand' },
+                                { l: 'Protein', v: aiResult.protein_g, u: 'g', color: 'text-info' },
+                                { l: 'Kohlenhydrate', v: aiResult.kohlenhydrate_g, u: 'g', color: 'text-warning' },
+                                { l: 'Fett', v: aiResult.fett_g, u: 'g', color: 'text-success' },
                               ] as const).map(m => (
                                 <div key={m.l} className="flex items-center justify-between bg-bg-card rounded-lg px-3 py-2">
                                   <span className="text-xs text-text-muted">{m.l}</span>
@@ -880,7 +883,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                                 disabled={!aiCorrection.trim() || analyzing}
                                 className="btn-secondary px-3 text-sm flex items-center gap-1.5 shrink-0"
                               >
-                                <Sparkles size={13} className="text-yellow-400" />
+                                <Sparkles size={13} className="text-warning" />
                                 Neu
                               </button>
                             </div>
@@ -915,7 +918,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                     <>
                       <div>
                         <label className="label flex items-center gap-1.5">
-                          <FileText size={13} className="text-primary" />
+                          <FileText size={13} className="text-brand" />
                           Rezept oder Zutaten einfügen
                         </label>
                         <textarea
@@ -939,7 +942,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                         {textAnalyzing ? (
                           <><Spinner size={14} /> KI analysiert...</>
                         ) : (
-                          <><Sparkles size={14} className="text-yellow-300" /> Analysieren</>
+                          <><Sparkles size={14} className="text-warning" /> Analysieren</>
                         )}
                       </button>
                     </>
@@ -981,7 +984,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                       <button
                         onClick={() => saveAsRezept(textResult)}
                         disabled={textSavedAsRezept}
-                        className="w-full text-xs text-center py-2 rounded-xl border border-border hover:border-primary/50 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+                        className="w-full text-xs text-center py-2 rounded-xl border border-border hover:border-brand/50 text-text-secondary hover:text-brand transition-colors disabled:opacity-50"
                       >
                         {textSavedAsRezept ? '✓ Als Rezept gespeichert' : '+ Als Rezept speichern'}
                       </button>
@@ -1069,7 +1072,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                             <button
                               key={r.id}
                               onClick={() => { setSelectedRezept(r); setRezeptPortion('1') }}
-                              className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-primary/10 text-left transition-colors"
+                              className="w-full flex items-center justify-between p-3 rounded-xl bg-bg-elevated hover:bg-brand/10 text-left transition-colors"
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium text-text-primary truncate">{r.name}</div>
@@ -1130,7 +1133,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                       ) : (
                         <button
                           onClick={() => setShowNewRezept(true)}
-                          className="w-full py-2.5 text-xs text-text-muted border border-dashed border-border/50 rounded-xl hover:border-primary/30 hover:text-primary transition-colors"
+                          className="w-full py-2.5 text-xs text-text-muted border border-dashed border-border/50 rounded-xl hover:border-brand/30 hover:text-brand transition-colors"
                         >
                           + Neues Rezept erstellen
                         </button>
@@ -1236,7 +1239,7 @@ function MealSection({ meal, items, onAdd, onDelete }: {
         </div>
         <button
           onClick={onAdd}
-          className="w-7 h-7 rounded-full flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
+          className="w-7 h-7 rounded-full flex items-center justify-center bg-brand/10 text-brand hover:bg-brand/20 transition-colors shrink-0"
         >
           <Plus size={14} />
         </button>
@@ -1246,7 +1249,7 @@ function MealSection({ meal, items, onAdd, onDelete }: {
         <div className="space-y-1">
           {items.map(item => (
             <div key={item.id} className="flex items-center gap-2.5 py-2 px-2.5 rounded-xl bg-bg">
-              <div className="w-1.5 h-7 rounded-full shrink-0" style={{ backgroundColor: meal.color }} />
+              <div className="w-1.5 h-7 rounded-full shrink-0" style={{ backgroundColor: tokenColor(meal.color) }} />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-text-primary truncate">{item.name}</div>
                 <div className="text-xs text-text-secondary">
@@ -1267,7 +1270,7 @@ function MealSection({ meal, items, onAdd, onDelete }: {
       ) : (
         <button
           onClick={onAdd}
-          className="w-full py-2.5 text-xs text-text-muted border border-dashed border-border/50 rounded-xl hover:border-primary/30 hover:text-text-secondary transition-colors"
+          className="w-full py-2.5 text-xs text-text-muted border border-dashed border-border/50 rounded-xl hover:border-brand/30 hover:text-text-secondary transition-colors"
         >
           + Lebensmittel hinzufügen
         </button>
@@ -1423,9 +1426,9 @@ export function Nutrition() {
             <div className="flex items-center gap-4">
               <CalorieRing eaten={totals.kalorien} goal={goals.kalorie_tagesziel} />
               <div className="flex-1 space-y-3">
-                <MacroBar label="Protein" value={totals.protein_g} goal={goals.protein_ziel} color="#6366f1" />
-                <MacroBar label="Kohlenhydrate" value={totals.kohlenhydrate_g} goal={goals.karbs_ziel} color="#f59e0b" />
-                <MacroBar label="Fett" value={totals.fett_g} goal={goals.fett_ziel} color="#10b981" />
+                <MacroBar label="Protein" value={totals.protein_g} goal={goals.protein_ziel} color="info" />
+                <MacroBar label="Kohlenhydrate" value={totals.kohlenhydrate_g} goal={goals.karbs_ziel} color="warning" />
+                <MacroBar label="Fett" value={totals.fett_g} goal={goals.fett_ziel} color="success" />
               </div>
             </div>
           </div>
@@ -1464,7 +1467,7 @@ export function Nutrition() {
                 <div className="text-text-muted">gegessen</div>
               </div>
               <div>
-                <div className="text-base font-bold text-red-400">{burnedKcal}</div>
+                <div className="text-base font-bold text-danger">{burnedKcal}</div>
                 <div className="text-text-muted">verbrannt</div>
               </div>
               <div>

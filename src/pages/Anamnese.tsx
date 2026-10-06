@@ -48,8 +48,8 @@ function Chip({ label, selected, onClick }: { label: string; selected: boolean; 
     <button type="button" onClick={onClick}
       className={`px-3 py-1.5 rounded-xl border text-sm font-medium transition-all ${
         selected
-          ? 'bg-primary text-white border-primary'
-          : 'border-border text-text-secondary hover:border-primary/50 hover:text-text-primary'
+          ? 'bg-primary text-white border-brand'
+          : 'border-border text-text-secondary hover:border-brand/50 hover:text-text-primary'
       }`}>
       {label}
     </button>
@@ -61,8 +61,8 @@ function Radio({ label, selected, onClick }: { label: string; selected: boolean;
     <button type="button" onClick={onClick}
       className={`flex-1 py-2 px-3 rounded-xl border text-sm text-center transition-all ${
         selected
-          ? 'bg-primary/10 border-primary text-primary font-medium'
-          : 'border-border text-text-secondary hover:border-primary/40'
+          ? 'bg-brand/10 border-brand text-brand font-medium'
+          : 'border-border text-text-secondary hover:border-brand/40'
       }`}>
       {label}
     </button>
@@ -293,7 +293,7 @@ export function Anamnese({ userId, onDone }: { userId: string; onDone: () => voi
       {/* Header */}
       <div className="shrink-0 px-5 pt-6 pb-4 flex items-start justify-between">
         <div>
-          <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
+          <div className="text-xs font-semibold text-brand uppercase tracking-wider mb-1">
             Erstanamnese · Schritt {step + 1} / {STEPS.length}
           </div>
           <h2 className="text-xl font-bold text-text-primary">{STEPS[step].title}</h2>
@@ -308,7 +308,7 @@ export function Anamnese({ userId, onDone }: { userId: string; onDone: () => voi
       <div className="shrink-0 px-5 mb-6">
         <div className="flex gap-1.5">
           {STEPS.map((_, i) => (
-            <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'bg-primary' : 'bg-bg-elevated'}`} />
+            <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'bg-brand' : 'bg-bg-elevated'}`} />
           ))}
         </div>
       </div>

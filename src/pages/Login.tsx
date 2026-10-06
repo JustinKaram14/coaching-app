@@ -30,13 +30,13 @@ export function Login() {
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/20 border border-primary/30 shadow-glow mb-4">
-            <Zap size={28} className="text-primary" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand/20 border border-brand/30 shadow-glow mb-4">
+            <Zap size={28} className="text-brand" />
           </div>
           <h1 className="text-2xl font-bold text-text-primary">Willkommen zurück</h1>
           <p className="text-text-secondary mt-1 text-sm">Melde dich in deinem Coaching-Account an</p>
@@ -93,7 +93,7 @@ export function Login() {
 
           <p className="text-center text-sm text-text-secondary mt-4">
             Neu hier?{' '}
-            <Link to="/register" className="text-primary hover:text-primary-light font-medium">
+            <Link to="/register" className="text-brand hover:text-brand font-medium">
               Mit Einladungscode registrieren
             </Link>
           </p>

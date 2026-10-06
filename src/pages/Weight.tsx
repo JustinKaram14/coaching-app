@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Scale, Camera, X, Images } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import { formatDate, todayISO } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -25,6 +26,7 @@ const COMPARE_DAYS = [30, 60, 90] as const
 
 export function Weight() {
   const { user } = useAuth()
+  const { colors } = useTheme()
   const [entries, setEntries] = useState<GewichtEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -163,18 +165,18 @@ export function Weight() {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="5%" stopColor={colors.brand} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={colors.brand} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2d38" vertical={false} />
-              <XAxis dataKey="datum" tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} domain={[domainMin, domainMax]} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
+              <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[domainMin, domainMax]} />
               <Tooltip content={<CustomTooltip />} />
               {targetWeight && (
-                <ReferenceLine y={targetWeight} stroke="#10b981" strokeDasharray="6 3" label={{ value: 'Ziel', fill: '#10b981', fontSize: 11 }} />
+                <ReferenceLine y={targetWeight} stroke={colors.success} strokeDasharray="6 3" label={{ value: 'Ziel', fill: colors.success, fontSize: 11 }} />
               )}
-              <Area type="monotone" dataKey="gewicht" stroke="#6366f1" strokeWidth={2.5} fill="url(#wGrad)" dot={{ fill: '#6366f1', r: 3 }} />
+              <Area type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2.5} fill="url(#wGrad)" dot={{ fill: colors.brand, r: 3 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -225,7 +227,7 @@ export function Weight() {
                         <td className="py-2.5 px-3 text-center">
                           {e.foto_url ? (
                             <button onClick={() => setLightboxUrl(e.foto_url!)}
-                              className="w-8 h-8 rounded-lg overflow-hidden border border-border hover:border-primary transition-colors inline-block">
+                              className="w-8 h-8 rounded-lg overflow-hidden border border-border hover:border-brand transition-colors inline-block">
                               <img src={e.foto_url} alt="" className="w-full h-full object-cover" />
                             </button>
                           ) : <span className="text-text-muted text-xs">–</span>}
@@ -265,11 +267,11 @@ export function Weight() {
                     <h3 className="section-title mb-4">Referenz vs. Aktuell</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border-2 border-primary/30 cursor-pointer" onClick={() => setLightboxUrl(startPhoto.foto_url!)}>
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border-2 border-brand/30 cursor-pointer" onClick={() => setLightboxUrl(startPhoto.foto_url!)}>
                           <img src={startPhoto.foto_url!} alt="Referenz" className="w-full h-full object-cover" />
                         </div>
                         <div className="text-center">
-                          <div className="text-xs font-bold text-primary">Referenz (Start)</div>
+                          <div className="text-xs font-bold text-brand">Referenz (Start)</div>
                           <div className="text-xs text-text-muted">{formatDate(startPhoto.datum)}</div>
                           <div className="text-xs text-text-secondary">{startPhoto.gewicht} kg</div>
                         </div>
@@ -322,11 +324,11 @@ export function Weight() {
                           <div className="grid grid-cols-2 gap-3">
                             {/* Reference always on left */}
                             <div className="space-y-1">
-                              <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border border-primary/30 cursor-pointer" onClick={() => setLightboxUrl(startPhoto.foto_url!)}>
+                              <div className="aspect-[3/4] rounded-xl overflow-hidden bg-bg-elevated border border-brand/30 cursor-pointer" onClick={() => setLightboxUrl(startPhoto.foto_url!)}>
                                 <img src={startPhoto.foto_url!} alt="Referenz" className="w-full h-full object-cover" />
                               </div>
                               <div className="text-center">
-                                <div className="text-[10px] font-semibold text-primary">Referenz</div>
+                                <div className="text-[10px] font-semibold text-brand">Referenz</div>
                                 <div className="text-[10px] text-text-muted">{startPhoto.gewicht} kg</div>
                               </div>
                             </div>
@@ -362,7 +364,7 @@ export function Weight() {
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {[...photosOnly].reverse().map(e => (
                     <button key={e.id} onClick={() => setLightboxUrl(e.foto_url!)}
-                      className={`relative aspect-square rounded-xl overflow-hidden border hover:border-primary transition-colors group ${e.id === startPhoto?.id ? 'border-primary/50 ring-1 ring-primary/30' : 'border-border'}`}>
+                      className={`relative aspect-square rounded-xl overflow-hidden border hover:border-brand transition-colors group ${e.id === startPhoto?.id ? 'border-brand/50 ring-1 ring-brand/30' : 'border-border'}`}>
                       <img src={e.foto_url!} alt={e.datum} className="w-full h-full object-cover" />
                       {e.id === startPhoto?.id && (
                         <div className="absolute top-1 left-1 bg-primary text-white text-[9px] px-1 py-0.5 rounded font-bold">REF</div>
@@ -420,7 +422,7 @@ export function Weight() {
               </div>
             ) : (
               <button onClick={() => fileRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-sm text-text-muted">
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-border hover:border-brand/50 hover:bg-brand/5 transition-colors text-sm text-text-muted">
                 <Camera size={16} /> Foto aufnehmen oder auswählen
               </button>
             )}

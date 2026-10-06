@@ -38,6 +38,11 @@ export function generateCode(length = 8): string {
   return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+// Theme-abhängige Farbe für Inline-Styles (Token aus index.css, z. B. 'warning')
+export function tokenColor(name: string): string {
+  return `rgb(var(--c-${name}))`
+}
+
 export function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ')
 }
@@ -49,6 +54,19 @@ export function toLocalISO(d: Date): string {
 
 export function todayISO() {
   return toLocalISO(new Date())
+}
+
+// Aufeinanderfolgende Tage mit mindestens einem Eintrag, bis heute.
+// Hat der heutige Tag noch keinen Eintrag, bricht der Streak erst morgen ab (Zählung ab gestern).
+export function calcStreak(dates: Set<string>, now: Date = new Date()): number {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (!dates.has(toLocalISO(d))) d.setDate(d.getDate() - 1)
+  let streak = 0
+  while (dates.has(toLocalISO(d))) {
+    streak++
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
 }
 
 export interface TDEEResult {
