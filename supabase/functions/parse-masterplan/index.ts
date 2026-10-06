@@ -71,33 +71,11 @@ WICHTIG zur Vollständigkeit von rezepte:
 - Verwechsle nicht zwei ähnliche Varianten miteinander und lasse keine aus, nur weil sie sich ähneln.
 - Halte zutaten_text und kochanleitung so kurz wie möglich (nur Stichpunkte/kurze Sätze), damit auch bei vielen Rezepten die Antwort vollständig bleibt.`
 
-async function pickFlashModel(apiKey: string): Promise<{ name: string; outputTokenLimit: number }> {
-  const fallback = { name: 'gemini-2.5-flash', outputTokenLimit: 8192 }
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
-    )
-    if (!res.ok) return fallback
-    const { models = [] } = await res.json()
-    const candidates = (models as { name: string; supportedGenerationMethods?: string[]; outputTokenLimit?: number }[])
-      .filter(m =>
-        m.name.toLowerCase().includes('flash') &&
-        !m.name.includes('tts') &&
-        !m.name.includes('thinking') &&
-        (m.supportedGenerationMethods ?? []).includes('generateContent')
-      )
-      .sort((a, b) => {
-        const aStable = a.name.includes('preview') ? 0 : 1
-        const bStable = b.name.includes('preview') ? 0 : 1
-        if (aStable !== bStable) return bStable - aStable
-        return b.name.localeCompare(a.name)
-      })
-    if (candidates.length > 0) {
-      const best = candidates[0]
-      return { name: best.name.replace('models/', ''), outputTokenLimit: best.outputTokenLimit ?? fallback.outputTokenLimit }
-    }
-  } catch { /* fall through */ }
-  return fallback
+// Festes Modell: die automatische Modellwahl hat ein Modell gewählt, das generateContent ablehnt (502)
+const GEMINI_MODEL = { name: 'gemini-2.5-flash', outputTokenLimit: 32768 }
+
+function pickFlashModel(_apiKey: string): { name: string; outputTokenLimit: number } {
+  return GEMINI_MODEL
 }
 
 serve(async (req) => {
