@@ -83,10 +83,10 @@ function DetailModal({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
           {/* Muscles */}
           <div className="flex flex-wrap gap-2">
             {ex.target && (
-              <span className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium">{ex.target}</span>
+              <span className="px-2.5 py-1 rounded-full bg-brand/15 text-brand text-xs font-medium">{ex.target}</span>
             )}
             {ex.muscle_group && ex.muscle_group !== ex.target && (
-              <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary/80 text-xs">{ex.muscle_group}</span>
+              <span className="px-2.5 py-1 rounded-full bg-brand/10 text-brand/80 text-xs">{ex.muscle_group}</span>
             )}
             {secondary.map(m => (
               <span key={m} className="px-2.5 py-1 rounded-full bg-bg-elevated text-text-muted text-xs border border-border">{m}</span>
@@ -102,7 +102,7 @@ function DetailModal({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
               <ol className="space-y-2">
                 {steps.map((step, i) => (
                   <li key={i} className="flex gap-3 text-sm text-text-secondary leading-relaxed">
-                    <span className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-semibold">{i + 1}</span>
+                    <span className="w-5 h-5 rounded-full bg-brand/15 text-brand text-xs flex items-center justify-center shrink-0 mt-0.5 font-semibold">{i + 1}</span>
                     <span>{step.endsWith('.') ? step : step + '.'}</span>
                   </li>
                 ))}
@@ -267,7 +267,7 @@ export function Uebungspool() {
           <button
             onClick={() => setSelectedBodyPart(null)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors shrink-0 ${
-              !selectedBodyPart ? 'bg-primary border-primary text-white' : 'border-border text-text-secondary hover:border-primary/40'
+              !selectedBodyPart ? 'bg-primary border-brand text-white' : 'border-border text-text-secondary hover:border-brand/40'
             }`}
           >
             Alle
@@ -277,7 +277,7 @@ export function Uebungspool() {
               key={bp}
               onClick={() => setSelectedBodyPart(selectedBodyPart === bp ? null : bp)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors shrink-0 ${
-                selectedBodyPart === bp ? 'bg-primary border-primary text-white' : 'border-border text-text-secondary hover:border-primary/40'
+                selectedBodyPart === bp ? 'bg-primary border-brand text-white' : 'border-border text-text-secondary hover:border-brand/40'
               }`}
             >
               {bpDe(bp)}
@@ -317,7 +317,7 @@ export function Uebungspool() {
             <button
               key={l}
               onClick={() => scrollToLetter(l)}
-              className="w-5 text-center text-[10px] font-bold text-primary hover:text-primary-light transition-colors leading-tight"
+              className="w-5 text-center text-[10px] font-bold text-brand hover:text-brand transition-colors leading-tight"
             >
               {l}
             </button>

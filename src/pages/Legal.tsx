@@ -72,7 +72,7 @@ export function Legal() {
             </Section>
 
             <Section id="kontakt" title="Kontakt">
-              <P>E-Mail: <a href={`mailto:${BETREIBER_EMAIL}`} className="text-primary hover:underline">{BETREIBER_EMAIL}</a></P>
+              <P>E-Mail: <a href={`mailto:${BETREIBER_EMAIL}`} className="text-brand hover:underline">{BETREIBER_EMAIL}</a></P>
               <P>Telefon: {BETREIBER_TEL}</P>
             </Section>
 
@@ -150,13 +150,13 @@ export function Legal() {
                   <P><strong className="text-text-primary">Supabase Inc.</strong> (Datenbankdienst, Authentifizierung, Dateispeicher)</P>
                   <P>Adresse: 970 Toa Payoh North #07-04, Singapore 318992</P>
                   <P>Hosting: EU-Rechenzentrum (Frankfurt/Dublin) — keine Übermittlung in Drittländer für Kerndaten</P>
-                  <P>Datenschutz: <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">supabase.com/privacy</a></P>
+                  <P>Datenschutz: <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">supabase.com/privacy</a></P>
                 </div>
                 <div className="p-3 bg-bg-elevated rounded-xl border border-border">
                   <P><strong className="text-text-primary">Google LLC</strong> (Gemini AI API — nur bei optionaler KI-Nutzung)</P>
                   <P>Adresse: 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA</P>
                   <P>Drittlandübermittlung in die USA; Rechtsgrundlage: Standardvertragsklauseln (SCCs) gem. Art. 46 Abs. 2 lit. c DSGVO</P>
-                  <P>Datenschutz: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">policies.google.com/privacy</a></P>
+                  <P>Datenschutz: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">policies.google.com/privacy</a></P>
                 </div>
                 <div className="p-3 bg-bg-elevated rounded-xl border border-border">
                   <P><strong className="text-text-primary">WorkoutX API</strong> (Übungsdatenbank — öffentliche Übungsinformationen)</P>
@@ -165,7 +165,7 @@ export function Legal() {
                 <div className="p-3 bg-bg-elevated rounded-xl border border-border">
                   <P><strong className="text-text-primary">Open Food Facts</strong> (Lebensmitteldatenbank)</P>
                   <P>Gemeinnützige Datenbank; nur Barcode/Produktname wird übermittelt (kein Personenbezug)</P>
-                  <P>Datenschutz: <a href="https://world.openfoodfacts.org/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">openfoodfacts.org/privacy</a></P>
+                  <P>Datenschutz: <a href="https://world.openfoodfacts.org/privacy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">openfoodfacts.org/privacy</a></P>
                 </div>
               </div>
             </Section>
@@ -185,12 +185,12 @@ export function Legal() {
                 'Recht auf Widerspruch (Art. 21)',
                 'Recht auf Widerruf der Einwilligung (Art. 7 Abs. 3): Sie können Einwilligungen jederzeit in den Einstellungen widerrufen. Der Widerruf berührt nicht die Rechtmäßigkeit der vor dem Widerruf erfolgten Verarbeitung.',
               ]} />
-              <P>Zur Ausübung Ihrer Rechte wenden Sie sich an: <a href={`mailto:${BETREIBER_EMAIL}`} className="text-primary hover:underline">{BETREIBER_EMAIL}</a></P>
+              <P>Zur Ausübung Ihrer Rechte wenden Sie sich an: <a href={`mailto:${BETREIBER_EMAIL}`} className="text-brand hover:underline">{BETREIBER_EMAIL}</a></P>
             </Section>
 
             <Section id="beschwerde" title="6. Beschwerderecht bei der Aufsichtsbehörde (Art. 13 Abs. 2 lit. d DSGVO)">
               <P>Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, insbesondere in dem Mitgliedstaat Ihres Aufenthaltsortes, Ihres Arbeitsplatzes oder des Ortes des mutmaßlichen Verstoßes.</P>
-              <P>Zuständige Behörde (Deutschland): Bundesbeauftragter für den Datenschutz und die Informationsfreiheit (BfDI), <a href="https://www.bfdi.bund.de" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">www.bfdi.bund.de</a></P>
+              <P>Zuständige Behörde (Deutschland): Bundesbeauftragter für den Datenschutz und die Informationsfreiheit (BfDI), <a href="https://www.bfdi.bund.de" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">www.bfdi.bund.de</a></P>
             </Section>
 
             <Section id="sicherheit" title="7. Datensicherheit">

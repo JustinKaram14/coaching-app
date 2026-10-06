@@ -128,7 +128,7 @@ export function CoachDashboard() {
                   className="flex items-center gap-4 p-4 rounded-xl hover:bg-bg-elevated border border-transparent hover:border-border cursor-pointer transition-all group"
                 >
                   {/* Avatar */}
-                  <div className="w-11 h-11 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-lg shrink-0">
                     {client.name?.charAt(0)?.toUpperCase() ?? '?'}
                   </div>
 

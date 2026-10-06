@@ -185,8 +185,8 @@ export function TrainingVorlagen() {
           return (
             <div key={v.id} className="card">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <BookOpen size={18} className="text-primary" />
+                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
+                  <BookOpen size={18} className="text-brand" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-text-primary">{v.name}</div>
@@ -195,7 +195,7 @@ export function TrainingVorlagen() {
                     {days.length > 0 && (
                       <div className="flex gap-1">
                         {WEEKDAYS.map((d, i) => (
-                          <span key={d} className={`text-xs w-5 h-5 rounded flex items-center justify-center font-medium ${days.includes(i + 1) ? 'bg-primary/20 text-primary' : 'text-text-muted'}`}>
+                          <span key={d} className={`text-xs w-5 h-5 rounded flex items-center justify-center font-medium ${days.includes(i + 1) ? 'bg-brand/20 text-brand' : 'text-text-muted'}`}>
                             {d[0]}
                           </span>
                         ))}
@@ -268,7 +268,7 @@ export function TrainingVorlagen() {
                   onClick={() => toggleDay(i + 1)}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all border ${
                     form.wochentage.includes(i + 1)
-                      ? 'bg-primary/20 text-primary border-primary/40'
+                      ? 'bg-brand/20 text-brand border-brand/40'
                       : 'bg-bg-elevated text-text-muted border-border hover:border-border-light'
                   }`}
                 >
@@ -329,7 +329,7 @@ export function TrainingVorlagen() {
       <Modal open={!!calModalVorlage} onClose={() => setCalModalVorlage(null)} title="Im Kalender eintragen">
         {calModalVorlage && (
           <div className="space-y-4">
-            <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
+            <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl">
               <div className="font-medium text-text-primary">{calModalVorlage.name}</div>
               <div className="text-xs text-text-muted mt-0.5">
                 Tage: {parseDays(calModalVorlage.wochentage).map(d => WEEKDAYS[d - 1]).join(', ')}

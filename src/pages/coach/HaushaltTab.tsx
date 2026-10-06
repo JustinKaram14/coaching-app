@@ -169,7 +169,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
     <div className="space-y-6 max-w-2xl">
       <div>
         <h2 className="font-semibold text-text-primary flex items-center gap-2 text-lg">
-          <Home size={20} className="text-primary" /> Haushalt
+          <Home size={20} className="text-brand" /> Haushalt
         </h2>
         <p className="text-sm text-text-muted mt-1">
           Verknüpfe {clientName} mit einer anderen Person für gemeinsame Meal Prep Planung mit angepassten Präferenzen.
@@ -193,7 +193,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
             {haushalt.mitglieder.map(m => (
               <div key={m.id} className="card border border-border space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-brand/20 flex items-center justify-center text-brand font-bold shrink-0">
                     {m.anzeige_name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -206,7 +206,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
                   <button onClick={() => refreshFromMasterplan(m.id, m.user_id)}
                     disabled={refreshingId === m.id}
                     title="Kalorien & Präferenzen vom Masterplan aktualisieren"
-                    className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-primary transition-colors shrink-0 disabled:opacity-50">
+                    className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-brand transition-colors shrink-0 disabled:opacity-50">
                     {refreshingId === m.id ? <Spinner size={14} /> : <RefreshCw size={14} />}
                   </button>
                 </div>
@@ -226,7 +226,7 @@ export function HaushaltTab({ clientId, clientName }: { clientId: string; client
         </div>
       ) : creating ? (
         // Create form
-        <div className="card border border-primary/30 space-y-4">
+        <div className="card border border-brand/30 space-y-4">
           <div className="flex items-center justify-between">
             <div className="font-semibold text-text-primary">Haushalt erstellen</div>
             <button onClick={() => setCreating(false)} className="text-text-muted hover:text-text-primary">

@@ -7,6 +7,7 @@ import { formatDate, calcSleepHours } from '../../lib/utils'
 import { Spinner } from '../../components/ui/Spinner'
 import type { Profile, GewichtEntry, TrainingEntry, SchlafEntry, ErnaehrungEntry, ClientSettings, CoachPlan } from '../../types/database'
 import { HaushaltTab } from './HaushaltTab'
+import { useTheme } from '../../hooks/useTheme'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 
 const CT = ({ active, payload, label }: any) => {
@@ -262,15 +263,15 @@ function MasterplanTab({ clientId, settings, onApplied }: { clientId: string; se
       {/* Upload + Analyse */}
       <div className="card space-y-4">
         <h3 className="font-semibold text-text-primary flex items-center gap-2">
-          <Upload size={18} className="text-primary" />
+          <Upload size={18} className="text-brand" />
           {existingPlan ? 'Plan ersetzen' : 'Masterplan hochladen'}
         </h3>
 
         <div
           onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group"
+          className="border-2 border-dashed border-border hover:border-brand/50 rounded-xl p-8 text-center cursor-pointer transition-colors group"
         >
-          <FileText size={32} className="mx-auto text-text-muted group-hover:text-primary mb-2 transition-colors" />
+          <FileText size={32} className="mx-auto text-text-muted group-hover:text-brand mb-2 transition-colors" />
           {pdfFile ? (
             <div>
               <div className="font-medium text-text-primary">{pdfFile.name}</div>
@@ -460,6 +461,7 @@ function MasterplanTab({ clientId, settings, onApplied }: { clientId: string; se
 
 export function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>()
+  const { colors } = useTheme()
   const navigate = useNavigate()
   const [client, setClient] = useState<Profile | null>(null)
   const [settings, setSettings] = useState<ClientSettings | null>(null)
@@ -561,7 +563,7 @@ export function ClientDetail() {
       {/* Client Header */}
       <div className="card">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-2xl shrink-0">
+          <div className="w-16 h-16 rounded-2xl bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-2xl shrink-0">
             {client?.name?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
           <div>
@@ -610,10 +612,10 @@ export function ClientDetail() {
       {tab === 'overview' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Aktuelles Gewicht', value: currentWeight ? `${currentWeight} kg` : '--', icon: Scale, color: 'text-primary bg-primary/10' },
+            { label: 'Aktuelles Gewicht', value: currentWeight ? `${currentWeight} kg` : '--', icon: Scale, color: 'text-brand bg-brand/10' },
             { label: 'Gewichtsveränderung', value: weightChange !== null ? `${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} kg` : '--', icon: Target, color: 'text-accent bg-accent/10' },
             { label: 'Trainingseinheiten', value: trainings.length || '--', icon: Dumbbell, color: 'text-success bg-success/10' },
-            { label: 'Ø Schlafdauer', value: avgSleep ? `${avgSleep}h` : '--', icon: Moon, color: 'text-primary bg-primary/10' },
+            { label: 'Ø Schlafdauer', value: avgSleep ? `${avgSleep}h` : '--', icon: Moon, color: 'text-brand bg-brand/10' },
           ].map(s => (
             <div key={s.label} className="card">
               <div className={`p-2.5 rounded-xl ${s.color} inline-flex mb-3`}>
@@ -632,15 +634,15 @@ export function ClientDetail() {
                 <AreaChart data={weightChartData}>
                   <defs>
                     <linearGradient id="wg2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor={colors.brand} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={colors.brand} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2d38" vertical={false} />
-                  <XAxis dataKey="datum" tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
+                  <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                   <Tooltip content={<CT />} />
-                  <Area type="monotone" dataKey="gewicht" stroke="#6366f1" strokeWidth={2} fill="url(#wg2)" dot={false} />
+                  <Area type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2} fill="url(#wg2)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -651,11 +653,11 @@ export function ClientDetail() {
               <h3 className="font-semibold text-text-primary mb-4">Schlafverlauf</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={sleepChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2d38" vertical={false} />
-                  <XAxis dataKey="datum" tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
+                  <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
                   <Tooltip content={<CT />} />
-                  <Bar dataKey="stunden" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="stunden" fill={colors.accent} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -665,7 +667,7 @@ export function ClientDetail() {
           <div className="col-span-2 lg:col-span-4 card space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-text-primary flex items-center gap-2">
-                <Apple size={16} className="text-primary" /> Ernährungsnotizen & Präferenzen
+                <Apple size={16} className="text-brand" /> Ernährungsnotizen & Präferenzen
               </h3>
               <span className="text-xs text-text-muted">Wird im Haushalt & KI-Planer verwendet</span>
             </div>
@@ -779,7 +781,7 @@ export function ClientDetail() {
                       <td className="py-2.5 px-3 text-center">
                         {(w as any).foto_url ? (
                           <a href={(w as any).foto_url} target="_blank" rel="noopener noreferrer"
-                            className="w-8 h-8 rounded-lg overflow-hidden border border-border hover:border-primary transition-colors inline-block">
+                            className="w-8 h-8 rounded-lg overflow-hidden border border-border hover:border-brand transition-colors inline-block">
                             <img src={(w as any).foto_url} alt="" className="w-full h-full object-cover" />
                           </a>
                         ) : <span className="text-text-muted text-xs">–</span>}
@@ -825,7 +827,7 @@ export function ClientDetail() {
 
             {/* Detail modal */}
             {selectedT && (
-              <div className="card border border-primary/30 bg-primary/5">
+              <div className="card border border-brand/30 bg-brand/5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="font-bold text-text-primary">{selectedT.trainingstyp ?? 'Training'} — {formatDate(selectedT.datum)}</div>
@@ -890,7 +892,7 @@ export function ClientDetail() {
                     <div
                       key={t.id}
                       onClick={() => setSelectedTrainingId(isSelected ? null : t.id)}
-                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${isSelected ? 'border-primary/40 bg-primary/5' : 'border-transparent hover:bg-bg-elevated'}`}
+                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors border ${isSelected ? 'border-brand/40 bg-brand/5' : 'border-transparent hover:bg-bg-elevated'}`}
                     >
                       <div>
                         <div className="flex items-center gap-2">

@@ -137,20 +137,20 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
 
   return (
     <div onClick={onOpenDetail}
-      className="bg-bg-elevated rounded-xl border border-border overflow-hidden group cursor-pointer hover:border-primary/40 transition-colors">
+      className="bg-bg-elevated rounded-xl border border-border overflow-hidden group cursor-pointer hover:border-brand/40 transition-colors">
       <div className="flex items-center gap-3 p-3">
         {r.bild_url ? (
           <img src={r.bild_url} alt={r.name}
             className="w-12 h-12 rounded-lg object-cover shrink-0" />
         ) : (
           <button onClick={generateImage} disabled={generatingImg}
-            className="w-12 h-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center shrink-0 hover:bg-primary/20 transition-colors group/img"
+            className="w-12 h-12 rounded-lg bg-brand/10 flex flex-col items-center justify-center shrink-0 hover:bg-brand/20 transition-colors group/img"
             title="Bild generieren">
             {generatingImg
               ? <Spinner size={16} />
               : <>
-                  <Image size={14} className="text-primary/50 group-hover/img:text-primary transition-colors" />
-                  <span className="text-[9px] text-primary/50 group-hover/img:text-primary mt-0.5">KI</span>
+                  <Image size={14} className="text-brand/50 group-hover/img:text-brand transition-colors" />
+                  <span className="text-[9px] text-brand/50 group-hover/img:text-brand mt-0.5">KI</span>
                 </>}
           </button>
         )}
@@ -159,9 +159,9 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
           <div className="font-medium text-sm text-text-primary truncate">{r.name}</div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-xs text-text-muted">{r.kalorien} kcal · {r.portionen} Port.</span>
-            <MacroRow label="P" value={r.protein_g} color="text-blue-400" />
-            <MacroRow label="K" value={r.kohlenhydrate_g} color="text-yellow-400" />
-            <MacroRow label="F" value={r.fett_g} color="text-orange-400" />
+            <MacroRow label="P" value={r.protein_g} color="text-info" />
+            <MacroRow label="K" value={r.kohlenhydrate_g} color="text-warning" />
+            <MacroRow label="F" value={r.fett_g} color="text-success" />
           </div>
           {(r.zutaten_text || r.kochanleitung) && (
             <div className="flex items-center gap-1.5 mt-1">
@@ -272,10 +272,10 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
             <img src={r.bild_url} alt={r.name} className="w-16 h-16 rounded-xl object-cover shrink-0" />
           ) : (
             <button onClick={generateImage} disabled={generatingImg}
-              className="w-16 h-16 rounded-xl bg-primary/10 flex flex-col items-center justify-center shrink-0 hover:bg-primary/20 transition-colors">
+              className="w-16 h-16 rounded-xl bg-brand/10 flex flex-col items-center justify-center shrink-0 hover:bg-brand/20 transition-colors">
               {generatingImg ? <Spinner size={20} /> : <>
-                <Image size={18} className="text-primary/60" />
-                <span className="text-[9px] text-primary/60 mt-0.5">KI Bild</span>
+                <Image size={18} className="text-brand/60" />
+                <span className="text-[9px] text-brand/60 mt-0.5">KI Bild</span>
               </>}
             </button>
           )}
@@ -283,9 +283,9 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
             <div className="font-semibold text-text-primary text-base">{r.name}</div>
             <div className="text-sm text-text-muted mt-0.5">
               {scaledKal} kcal
-              {scaledProt != null && <span className="text-blue-400"> · P {scaledProt}g</span>}
-              {scaledKarbs != null && <span className="text-yellow-400"> · K {scaledKarbs}g</span>}
-              {scaledFett != null && <span className="text-orange-400"> · F {scaledFett}g</span>}
+              {scaledProt != null && <span className="text-info"> · P {scaledProt}g</span>}
+              {scaledKarbs != null && <span className="text-warning"> · K {scaledKarbs}g</span>}
+              {scaledFett != null && <span className="text-success"> · F {scaledFett}g</span>}
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0">
@@ -300,14 +300,14 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
           <div className="flex items-center gap-3 p-3 bg-bg-elevated rounded-xl border border-border">
             <span className="text-sm text-text-secondary flex-1">Portionen</span>
             <button onClick={() => setPortionen(p => Math.max(0.5, parseFloat((p - 0.5).toFixed(1))))}
-              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-primary/50 transition-colors">
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-brand/50 transition-colors">
               <Minus size={14} className="text-text-secondary" />
             </button>
             <span className="w-14 text-center font-semibold text-text-primary">
               {portionen % 1 === 0 ? portionen : portionen.toFixed(1)}
             </span>
             <button onClick={() => setPortionen(p => parseFloat((p + 0.5).toFixed(1)))}
-              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-primary/50 transition-colors">
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-brand/50 transition-colors">
               <Plus size={14} className="text-text-secondary" />
             </button>
           </div>
@@ -318,7 +318,7 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
               <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <ShoppingCart size={12} /> Zutaten
                 {scale !== 1 && (
-                  <span className="text-primary font-medium normal-case tracking-normal ml-1">
+                  <span className="text-brand font-medium normal-case tracking-normal ml-1">
                     (×{scale % 1 === 0 ? scale : scale.toFixed(1)} für {portionen} Port.)
                   </span>
                 )}
@@ -495,7 +495,7 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
   }
 
   return (
-    <div className="p-4 bg-bg-elevated rounded-xl border border-primary/30 space-y-4">
+    <div className="p-4 bg-bg-elevated rounded-xl border border-brand/30 space-y-4">
       <div className="font-semibold text-sm text-text-primary">Neues Rezept</div>
 
       {/* URL Import */}
@@ -538,11 +538,11 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
       {/* Image generation toggle */}
       <label className="flex items-center gap-2.5 cursor-pointer select-none">
         <div onClick={() => setGenerateImage(g => !g)}
-          className={`w-9 h-5 rounded-full transition-colors relative ${generateImage ? 'bg-primary' : 'bg-border'}`}>
+          className={`w-9 h-5 rounded-full transition-colors relative ${generateImage ? 'bg-primary ring-1 ring-brand/40' : 'bg-border-input'}`}>
           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${generateImage ? 'translate-x-4' : 'translate-x-0.5'}`} />
         </div>
         <span className="text-sm text-text-secondary flex items-center gap-1.5">
-          <Image size={14} className="text-primary" /> KI-Bild automatisch generieren
+          <Image size={14} className="text-brand" /> KI-Bild automatisch generieren
         </span>
       </label>
 
@@ -599,7 +599,7 @@ function RecipePickerModal({ rezepte, slot, datum, userId, onAdded, onClose }: {
           {rezepte.map(r => (
             <button key={r.id} onClick={() => setSelected(r)}
               className={`w-full text-left p-3 rounded-xl border transition-colors ${
-                selected?.id === r.id ? 'border-primary bg-primary/10' : 'border-border hover:border-border-light bg-bg-elevated'
+                selected?.id === r.id ? 'border-brand bg-brand/10' : 'border-border hover:border-border-light bg-bg-elevated'
               }`}>
               <div className="font-medium text-sm text-text-primary">{r.name}</div>
               <div className="text-xs text-text-muted mt-0.5">{r.kalorien} kcal · {r.portionen} Port.</div>
@@ -660,7 +660,7 @@ function WochenplanTab({ rezepte, userId }: { rezepte: Rezept[]; userId: string 
         </button>
         <div className="text-center">
           <div className="font-semibold text-text-primary text-sm">{fmtWeekRange(monday)}</div>
-          {weekOffset === 0 && <div className="text-xs text-primary mt-0.5">Diese Woche</div>}
+          {weekOffset === 0 && <div className="text-xs text-brand mt-0.5">Diese Woche</div>}
         </div>
         <button onClick={() => setWeekOffset(w => w + 1)} className="p-2 rounded-xl hover:bg-bg-elevated border border-border text-text-secondary">
           <ChevronRight size={18} />
@@ -674,9 +674,9 @@ function WochenplanTab({ rezepte, userId }: { rezepte: Rezept[]; userId: string 
             const total = entries.filter(e => e.datum === datum).reduce((s, e) => s + (e.kalorien ?? 0), 0)
             const isToday = datum === todayISO()
             return (
-              <div key={datum} className={`card border ${isToday ? 'border-primary/40' : 'border-border'}`}>
+              <div key={datum} className={`card border ${isToday ? 'border-brand/40' : 'border-border'}`}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className={`font-semibold text-sm ${isToday ? 'text-primary' : 'text-text-primary'}`}>
+                  <span className={`font-semibold text-sm ${isToday ? 'text-brand' : 'text-text-primary'}`}>
                     {fmtDayHeader(datum)}{isToday && <span className="ml-2 text-xs font-medium">Heute</span>}
                   </span>
                   {total > 0 && <span className="text-xs text-text-muted">{total.toLocaleString('de')} kcal</span>}
@@ -697,7 +697,7 @@ function WochenplanTab({ rezepte, userId }: { rezepte: Rezept[]; userId: string 
                             </button>
                           </div>
                         ))}
-                        <button onClick={() => setPicker({ slot, datum })} className="flex items-center gap-1 text-xs text-text-muted hover:text-primary transition-colors py-1">
+                        <button onClick={() => setPicker({ slot, datum })} className="flex items-center gap-1 text-xs text-text-muted hover:text-brand transition-colors py-1">
                           <Plus size={12} /> Hinzufügen
                         </button>
                       </div>
@@ -767,7 +767,7 @@ function EinkaufslisteView({ liste }: { liste: Einkaufsliste }) {
             {copied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
             {copied ? 'Kopiert!' : 'Kopieren'}
           </button>
-          <button onClick={share} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary hover:bg-primary/20 transition-colors">
+          <button onClick={share} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/10 border border-brand/30 text-xs text-brand hover:bg-brand/20 transition-colors">
             <Share2 size={13} /> Teilen
           </button>
         </div>
@@ -797,9 +797,9 @@ function EinkaufslisteView({ liste }: { liste: Einkaufsliste }) {
                 return (
                   <label key={key} className="flex items-center gap-3 cursor-pointer group">
                     <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors shrink-0 ${
-                      done ? 'bg-success border-success' : 'border-border group-hover:border-primary/50'
+                      done ? 'bg-success border-success' : 'border-border group-hover:border-brand/50'
                     }`} onClick={() => toggle(key)}>
-                      {done && <Check size={11} className="text-white" />}
+                      {done && <Check size={11} className="text-bg" />}
                     </div>
                     <span className={`text-sm transition-colors flex-1 ${done ? 'text-text-muted line-through' : 'text-text-primary'}`}>
                       <span className="font-medium">{a.menge}</span> {a.name}
@@ -853,7 +853,7 @@ function KochplanView({ guide }: { guide: string }) {
       {/* Cooking guide */}
       <div className="card border border-border space-y-4">
         <div className="flex items-center gap-2 font-semibold text-text-primary">
-          <ChefHat size={18} className="text-primary" /> Meal Prep Anleitung
+          <ChefHat size={18} className="text-brand" /> Meal Prep Anleitung
         </div>
         {sections.map((section, si) => {
           const lines = section.split('\n').filter(Boolean)
@@ -861,14 +861,14 @@ function KochplanView({ guide }: { guide: string }) {
           const steps = lines.slice(1)
           return (
             <div key={si}>
-              <div className="text-sm font-semibold text-primary mb-2">{heading}</div>
+              <div className="text-sm font-semibold text-brand mb-2">{heading}</div>
               <div className="space-y-2">
                 {steps.map((step, i) => {
                   const match = step.match(/^(\d+)\.\s*(.*)/)
                   if (match) {
                     return (
                       <div key={i} className="flex gap-3">
-                        <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="w-6 h-6 rounded-full bg-brand/20 text-brand text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                           {match[1]}
                         </span>
                         <span className="text-sm text-text-secondary leading-relaxed">{match[2]}</span>
@@ -886,7 +886,7 @@ function KochplanView({ guide }: { guide: string }) {
       {/* Chat */}
       <div className="card border border-border space-y-3">
         <div className="flex items-center gap-2 font-semibold text-sm text-text-primary">
-          <MessageCircle size={16} className="text-primary" /> Fragen während dem Kochen
+          <MessageCircle size={16} className="text-brand" /> Fragen während dem Kochen
         </div>
         <p className="text-xs text-text-muted">
           Hast du eine Zutat nicht zur Hand? Frage hier — z.B. "Womit kann ich Brokkoli ersetzen?" oder "Wie lange hält das im Kühlschrank?"
@@ -939,7 +939,7 @@ function KochplanView({ guide }: { guide: string }) {
           <button
             onClick={sendQuestion}
             disabled={!input.trim() || loading}
-            className="p-2.5 rounded-xl bg-primary text-white disabled:opacity-50 hover:bg-primary/90 transition-colors"
+            className="p-2.5 rounded-xl bg-primary text-white disabled:opacity-50 hover:bg-primary-hover transition-colors"
           >
             {loading ? <Spinner size={16} /> : <Send size={16} />}
           </button>
@@ -1078,7 +1078,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
       {options.map(o => (
         <button key={o} onClick={() => onChange(o)}
           className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-            value === o ? 'bg-primary text-white border-primary' : 'bg-bg-elevated text-text-secondary border-border hover:border-primary/50'
+            value === o ? 'bg-primary text-white border-brand' : 'bg-bg-elevated text-text-secondary border-border hover:border-brand/50'
           }`}>
           {o}{suffix}
         </button>
@@ -1158,7 +1158,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
                           </div>
                           <div className="flex gap-2 mt-0.5">
                             <span className="text-xs text-text-muted">{m.kalorien} kcal</span>
-                            {m.protein_g > 0 && <span className="text-xs text-blue-400">P {m.protein_g}g</span>}
+                            {m.protein_g > 0 && <span className="text-xs text-info">P {m.protein_g}g</span>}
                           </div>
                         </div>
                       </div>
@@ -1195,9 +1195,9 @@ function KiPlanerTab({ rezepte, userId, settings }: {
     <div className="space-y-6 max-w-lg">
       {/* Haushalt toggle (if available) */}
       {myHaushalt && (
-        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
+        <div className="p-4 bg-brand/5 border border-brand/20 rounded-xl space-y-3">
           <div className="flex items-center gap-2 font-semibold text-sm text-text-primary">
-            <Home size={16} className="text-primary" /> Haushalt: {myHaushalt.haushalt_name}
+            <Home size={16} className="text-brand" /> Haushalt: {myHaushalt.haushalt_name}
           </div>
           <p className="text-xs text-text-muted">
             Soll die KI den Plan für beide Personen mit ihren individuellen Präferenzen erstellen?
@@ -1205,13 +1205,13 @@ function KiPlanerTab({ rezepte, userId, settings }: {
           <div className="flex gap-2">
             <button onClick={() => setFuerHaushalt(false)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                !fuerHaushalt ? 'bg-primary text-white border-primary' : 'bg-bg-elevated text-text-secondary border-border hover:border-primary/50'
+                !fuerHaushalt ? 'bg-primary text-white border-brand' : 'bg-bg-elevated text-text-secondary border-border hover:border-brand/50'
               }`}>
               Nur für mich
             </button>
             <button onClick={() => setFuerHaushalt(true)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                fuerHaushalt ? 'bg-primary text-white border-primary' : 'bg-bg-elevated text-text-secondary border-border hover:border-primary/50'
+                fuerHaushalt ? 'bg-primary text-white border-brand' : 'bg-bg-elevated text-text-secondary border-border hover:border-brand/50'
               }`}>
               🏠 Für uns beide
             </button>
@@ -1235,14 +1235,14 @@ function KiPlanerTab({ rezepte, userId, settings }: {
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => setPlanModus('abwechslungsreich')}
             className={`p-3 rounded-xl text-left border transition-colors ${
-              planModus === 'abwechslungsreich' ? 'bg-primary/10 border-primary' : 'bg-bg-elevated border-border hover:border-primary/40'
+              planModus === 'abwechslungsreich' ? 'bg-brand/10 border-brand' : 'bg-bg-elevated border-border hover:border-brand/40'
             }`}>
             <div className={`font-medium text-sm ${planModus === 'abwechslungsreich' ? 'text-text-primary' : 'text-text-secondary'}`}>🔄 Abwechslungsreich</div>
             <div className="text-xs text-text-muted mt-0.5">Täglich unterschiedliche Gerichte</div>
           </button>
           <button onClick={() => setPlanModus('baukasten')}
             className={`p-3 rounded-xl text-left border transition-colors ${
-              planModus === 'baukasten' ? 'bg-primary/10 border-primary' : 'bg-bg-elevated border-border hover:border-primary/40'
+              planModus === 'baukasten' ? 'bg-brand/10 border-brand' : 'bg-bg-elevated border-border hover:border-brand/40'
             }`}>
             <div className={`font-medium text-sm ${planModus === 'baukasten' ? 'text-text-primary' : 'text-text-secondary'}`}>🧱 Baukasten</div>
             <div className="text-xs text-text-muted mt-0.5">Wenig kochen, mehrere Tage gleich</div>
@@ -1274,7 +1274,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
           {MEAL_SLOTS.map(slot => (
             <button key={slot} onClick={() => toggleMeal(slot)}
               className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                selectedMeals.includes(slot) ? 'bg-primary text-white border-primary' : 'bg-bg-elevated text-text-secondary border-border hover:border-primary/50'
+                selectedMeals.includes(slot) ? 'bg-primary text-white border-brand' : 'bg-bg-elevated text-text-secondary border-border hover:border-brand/50'
               }`}>
               {selectedMeals.includes(slot) && <Check size={11} className="inline mr-1" />}
               {slot}
@@ -1408,7 +1408,7 @@ export function Rezepte() {
     <div className="space-y-6">
       <div>
         <h1 className="section-title text-2xl flex items-center gap-2">
-          <ChefHat size={24} className="text-primary" /> Rezepte & Meal Prep
+          <ChefHat size={24} className="text-brand" /> Rezepte & Meal Prep
         </h1>
         <p className="text-text-secondary text-sm mt-0.5">
           Rezepte verwalten, Woche planen oder KI-Meal-Plan mit Einkaufsliste erstellen.
