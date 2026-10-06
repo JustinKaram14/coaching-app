@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Pill, Check, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import { todayISO, formatDate } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -34,6 +35,7 @@ interface SupplementWithLog extends Supplement {
 
 export function Supplements() {
   const { user } = useAuth()
+  const { colors } = useTheme()
   const [supplements, setSupplements] = useState<SupplementWithLog[]>([])
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
@@ -119,12 +121,12 @@ export function Supplements() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="section-title text-2xl">Supplements</h1>
           <p className="text-text-secondary text-sm mt-0.5">Tägliche Einnahme-Tracking</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setPresetOpen(true)} className="btn-secondary flex items-center gap-2">
             <Zap size={16} /> Schnell hinzufügen
           </button>
@@ -158,7 +160,7 @@ export function Supplements() {
                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                       taken ? 'border-success bg-success' : 'border-border'
                     }`}>
-                      {taken && <Check size={12} className="text-white" />}
+                      {taken && <Check size={12} className="text-bg" />}
                     </div>
                   </div>
                   <div className="font-medium text-text-primary text-sm">{s.name}</div>
@@ -186,8 +188,8 @@ export function Supplements() {
           <div className="space-y-3">
             {supplements.map(s => (
               <div key={s.id} className="flex items-center gap-4 p-4 bg-bg-elevated rounded-xl border border-border">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Pill size={18} className="text-primary" />
+                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
+                  <Pill size={18} className="text-brand" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-text-primary">{s.name}</div>
@@ -205,7 +207,7 @@ export function Supplements() {
                       className="h-full rounded-full transition-all"
                       style={{
                         width: `${s.consistency}%`,
-                        backgroundColor: (s.consistency ?? 0) >= 80 ? '#10b981' : (s.consistency ?? 0) >= 50 ? '#f59e0b' : '#ef4444',
+                        backgroundColor: (s.consistency ?? 0) >= 80 ? colors.success : (s.consistency ?? 0) >= 50 ? colors.warning : colors.danger,
                       }}
                     />
                   </div>
@@ -259,17 +261,17 @@ export function Supplements() {
               <button
                 key={preset.name}
                 onClick={async () => { await addFromPreset(preset) }}
-                className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left group"
+                className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-brand/50 hover:bg-brand/5 transition-all text-left group"
               >
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20">
-                  <Pill size={14} className="text-primary" />
+                <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center shrink-0 group-hover:bg-brand/20">
+                  <Pill size={14} className="text-brand" />
                 </div>
                 <div className="min-w-0">
                   <div className="font-medium text-text-primary text-sm">{preset.name}</div>
                   <div className="text-xs text-text-muted">{preset.dosierung} · {preset.zeitpunkt}</div>
                   <div className="text-xs text-text-muted opacity-70">{preset.beschreibung}</div>
                 </div>
-                <Plus size={14} className="text-text-muted group-hover:text-primary transition-colors shrink-0 mt-0.5" />
+                <Plus size={14} className="text-text-muted group-hover:text-brand transition-colors shrink-0 mt-0.5" />
               </button>
             ))}
           </div>

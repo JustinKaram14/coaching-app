@@ -3,6 +3,7 @@ import { Plus, Trash2, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, Activity,
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import { formatDate, todayISO } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -501,11 +502,11 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
             <div className="font-bold text-text-primary capitalize text-base">{name}</div>
             {tip ? (
               <>
-                <div className="text-xs text-primary font-medium mt-0.5">{tip.muskel}</div>
+                <div className="text-xs text-brand font-medium mt-0.5">{tip.muskel}</div>
                 <div className="text-xs text-text-muted">{tip.sekundaer}</div>
               </>
             ) : localEx?.target ? (
-              <div className="text-xs text-primary font-medium mt-0.5 capitalize">
+              <div className="text-xs text-brand font-medium mt-0.5 capitalize">
                 {localEx.target}{localEx.body_part ? ` · ${localEx.body_part}` : ''}
               </div>
             ) : null}
@@ -517,7 +518,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
           {/* GIF from local dataset */}
           {localLoading ? (
             <div className="w-full rounded-xl bg-bg-elevated flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
             </div>
           ) : localEx?.gif_url ? (
             <div className="w-full rounded-xl overflow-hidden bg-bg-elevated" style={{ aspectRatio: '4/3' }}>
@@ -530,7 +531,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
               {/* Muscle chips */}
               <div className="flex flex-wrap gap-1.5">
                 {tip.muskeln.map(m => (
-                  <span key={m} className="text-[11px] px-2.5 py-1 rounded-full bg-primary/20 text-primary font-medium">
+                  <span key={m} className="text-[11px] px-2.5 py-1 rounded-full bg-brand/20 text-brand font-medium">
                     {MUSKEL_LABELS[m] ?? m}
                   </span>
                 ))}
@@ -548,7 +549,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
                 <ul className="space-y-2">
                   {tip.tipps.map((t, i) => (
                     <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
-                      <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                      <span className="w-5 h-5 rounded-full bg-brand/20 text-brand text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                       {t}
                     </li>
                   ))}
@@ -573,7 +574,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
               <ul className="space-y-2">
                 {localEx!.instruction_steps.map((step, i) => (
                   <li key={i} className="flex gap-2.5 text-sm text-text-secondary">
-                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="w-5 h-5 rounded-full bg-brand/20 text-brand text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                     {step}
                   </li>
                 ))}
@@ -585,7 +586,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
 
           {/* YouTube */}
           <a href={ytUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 text-sm text-text-secondary hover:text-primary transition-colors">
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-brand/50 hover:bg-brand/5 text-sm text-text-secondary hover:text-brand transition-colors">
             <span>▶</span> Videodemonstration ansehen
           </a>
         </div>
@@ -743,7 +744,7 @@ function UebungForm({ entries, onChange }: {
           <div className="flex gap-2">
             <ExerciseNameInput value={e.uebungsname} onChange={v => update(i, 'uebungsname', v)} />
             <button onClick={() => setTipFor(e.uebungsname || null)} title="Tipps anzeigen"
-              className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
+              className="p-2 rounded-lg border border-border hover:bg-brand/10 hover:text-brand text-text-muted transition-colors">
               <HelpCircle size={14} />
             </button>
             <button onClick={() => remove(i)} className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted"><Trash2 size={14} /></button>
@@ -869,7 +870,7 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
           <div className="text-xs text-text-muted flex items-center gap-1.5 mt-0.5">
             <Timer size={11} /> {mm}:{ss} · {doneCount}/{totalCount} Sätze
             {rest && (
-              <span className="ml-2 text-primary font-semibold">
+              <span className="ml-2 text-brand font-semibold">
                 Pause {Math.floor(rest.remaining / 60)}:{String(rest.remaining % 60).padStart(2, '0')}
               </span>
             )}
@@ -897,7 +898,7 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => setTipFor(ex.name)}
-                    className="p-1.5 rounded-lg border border-border hover:bg-primary/10 hover:text-primary text-text-muted transition-colors"
+                    className="p-1.5 rounded-lg border border-border hover:bg-brand/10 hover:text-brand text-text-muted transition-colors"
                   >
                     <HelpCircle size={14} />
                   </button>
@@ -951,7 +952,7 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
                       <button
                         onClick={() => toggleDone(exIdx, setIdx)}
                         className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                          set.done ? 'bg-success text-white' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'
+                          set.done ? 'bg-success text-bg' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'
                         }`}
                       >
                         <Check size={16} />
@@ -961,7 +962,7 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
                     {setIdx < ex.sets.length - 1 && (
                       <div className="flex items-center gap-2 my-1 px-1">
                         <div className="flex-1 h-px bg-border" />
-                        <span className={`text-xs font-semibold ${isRestAfter ? 'text-primary' : 'text-text-muted'}`}>
+                        <span className={`text-xs font-semibold ${isRestAfter ? 'text-brand' : 'text-text-muted'}`}>
                           {isRestAfter
                             ? `${Math.floor(rest!.remaining / 60)}:${String(rest!.remaining % 60).padStart(2, '0')}`
                             : '2:00'}
@@ -1011,6 +1012,7 @@ function ActiveWorkoutView({ workout, onFinish, onAbort }: {
 
 export function Training() {
   const { user } = useAuth()
+  const { colors } = useTheme()
   const navigate = useNavigate()
   const [entries, setEntries] = useState<TrainingWithExercises[]>([])
   const [loading, setLoading] = useState(true)
@@ -1302,12 +1304,12 @@ export function Training() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="section-title text-2xl">Training</h1>
           <p className="text-text-secondary text-sm mt-0.5">Einheiten & Übungslog</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => navigate('/training/vorlagen')} className="btn-secondary flex items-center gap-2">
             <BookOpen size={16} /> Vorlagen
           </button>
@@ -1319,7 +1321,7 @@ export function Training() {
 
       {/* Resume banner for interrupted workout */}
       {savedWorkout && (
-        <div className="card border-primary/40 bg-primary/5 flex items-center justify-between gap-4 p-4">
+        <div className="card border-brand/40 bg-brand/5 flex items-center justify-between gap-4 p-4">
           <div className="min-w-0">
             <div className="font-semibold text-text-primary">Workout pausiert: {savedWorkout.vorlage?.name}</div>
             <div className="text-xs text-text-muted mt-0.5">{savedWorkout.exercises.length} Übungen · Fortsetzen oder verwerfen</div>
@@ -1388,11 +1390,11 @@ export function Training() {
           <h2 className="section-title mb-6">Trainingsdauer (letzte 14 Einheiten)</h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2d38" vertical={false} />
-              <XAxis dataKey="datum" tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#4a5568', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
+              <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="dauer" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="dauer" fill={colors.brand} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -1409,13 +1411,13 @@ export function Training() {
         ) : entries.map(t => (
           <div key={t.id} className="card">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Dumbbell size={18} className="text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
+                <Dumbbell size={18} className="text-brand" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-text-primary">{t.trainingstyp ?? 'Training'}</span>
-                  <span className="badge bg-primary/10 text-primary text-xs">{t.einheit_id}</span>
+                  <span className="badge bg-brand/10 text-brand text-xs">{t.einheit_id}</span>
                   <span className="text-xs text-text-muted">{formatDate(t.datum)}</span>
                 </div>
                 <div className="flex items-center gap-4 mt-1 text-xs text-text-secondary">
@@ -1430,7 +1432,7 @@ export function Training() {
                     {t.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                 )}
-                <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary text-text-muted transition-colors">
+                <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-brand/10 hover:text-brand text-text-muted transition-colors">
                   <Pencil size={16} />
                 </button>
                 <button onClick={() => handleDelete(t.id)} className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
@@ -1480,14 +1482,14 @@ export function Training() {
           <div
             onClick={() => fileRef.current?.click()}
             className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
-              ${photoPreview ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-primary/5'}`}
+              ${photoPreview ? 'border-brand/50 bg-brand/5' : 'border-border hover:border-brand/40 hover:bg-brand/5'}`}
           >
             {photoPreview ? (
               <>
                 <img src={photoPreview} alt="Workout" className="w-14 h-14 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   {analyzing ? (
-                    <div className="flex items-center gap-2 text-sm text-primary"><Spinner size={14} /><span>Analysiere Workout...</span></div>
+                    <div className="flex items-center gap-2 text-sm text-brand"><Spinner size={14} /><span>Analysiere Workout...</span></div>
                   ) : (
                     <div className="text-sm text-success font-medium flex items-center gap-1.5"><Sparkles size={14} />Daten automatisch ausgefüllt</div>
                   )}
@@ -1500,8 +1502,8 @@ export function Training() {
               </>
             ) : (
               <>
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Camera size={18} className="text-primary" />
+                <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center shrink-0">
+                  <Camera size={18} className="text-brand" />
                 </div>
                 <div>
                   <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
@@ -1568,7 +1570,7 @@ export function Training() {
                   const puls = pulsMap[form.trainingstyp] ?? 120
                   setForm(f => ({ ...f, kalorien_verbrannt: kcal > 0 ? String(kcal) : f.kalorien_verbrannt, avg_puls: String(puls) }))
                 }}
-                  className="mt-1.5 text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors">
+                  className="mt-1.5 text-xs text-brand hover:text-brand/80 flex items-center gap-1 transition-colors">
                   <Sparkles size={11} /> Von KI schätzen lassen
                 </button>
               )}

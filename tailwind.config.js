@@ -1,40 +1,54 @@
 /** @type {import('tailwindcss').Config} */
+// Alle Farben kommen aus CSS-Variablen (src/index.css), damit Hell/Dunkel per
+// data-theme umgeschaltet werden kann. `<alpha-value>` hält Klassen wie
+// bg-brand/10 funktionsfähig.
+const c = (name) => `rgb(var(--c-${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
         bg: {
-          DEFAULT: '#0a0b0f',
-          card: '#111318',
-          elevated: '#1a1d26',
+          DEFAULT: c('bg'),
+          card: c('card'),
+          elevated: c('elevated'),
         },
         border: {
-          DEFAULT: '#2a2d38',
-          light: '#363a47',
+          DEFAULT: c('border'),
+          light: c('border-light'),
+          input: c('input-border'),
         },
+        // Markenfarbe als Fläche (Buttons, FAB, aktive Chips) – immer mit weißem Text
         primary: {
-          DEFAULT: '#6366f1',
-          hover: '#4f52d9',
-          light: '#818cf8',
+          DEFAULT: c('primary'),
+          hover: c('primary-hover'),
         },
-        accent: '#8b5cf6',
-        success: '#10b981',
-        warning: '#f59e0b',
-        danger: '#ef4444',
+        // Markenfarbe für Text, Icons, Ringe, Tönungen – passt sich dem Theme an
+        brand: c('brand'),
+        bar: c('bar'),
+        accent: c('accent'),
+        info: c('info'),
+        success: c('success'),
+        warning: c('warning'),
+        danger: c('danger'),
         text: {
-          primary: '#f1f5f9',
-          secondary: '#94a3b8',
-          muted: '#4a5568',
+          primary: c('text'),
+          secondary: c('text-2'),
+          muted: c('text-muted'),
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        '4xl': '2rem',
       },
       boxShadow: {
-        card: '0 4px 24px rgba(0,0,0,0.4)',
-        glow: '0 0 20px rgba(99,102,241,0.3)',
-        'glow-sm': '0 0 10px rgba(99,102,241,0.2)',
+        card: 'var(--shadow-card)',
+        glow: 'var(--shadow-glow)',
+        'glow-sm': 'var(--shadow-glow-sm)',
+        nav: 'var(--shadow-nav)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

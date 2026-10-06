@@ -66,8 +66,8 @@ export function Register() {
 
       <div className="w-full max-w-md relative">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/20 border border-primary/30 shadow-glow mb-4">
-            <Zap size={28} className="text-primary" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand/20 border border-brand/30 shadow-glow mb-4">
+            <Zap size={28} className="text-brand" />
           </div>
           <h1 className="text-2xl font-bold text-text-primary">Account erstellen</h1>
           <p className="text-text-secondary mt-1 text-sm">Du brauchst einen Einladungscode von deinem Coach</p>
@@ -141,11 +141,11 @@ export function Register() {
                   type="checkbox"
                   checked={consentDsgvo}
                   onChange={e => setConsentDsgvo(e.target.checked)}
-                  className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
+                  className="mt-0.5 shrink-0 w-4 h-4 accent-brand"
                 />
                 <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
                   * Ich habe die{' '}
-                  <Link to="/legal" target="_blank" className="text-primary hover:underline">Datenschutzerklärung</Link>
+                  <Link to="/legal" target="_blank" className="text-brand hover:underline">Datenschutzerklärung</Link>
                   {' '}gelesen und stimme der Verarbeitung meiner personenbezogenen Daten (Name, E-Mail) zur Bereitstellung des Coaching-Dienstes zu (Art. 6 Abs. 1 lit. b DSGVO).
                 </span>
               </label>
@@ -155,7 +155,7 @@ export function Register() {
                   type="checkbox"
                   checked={consentCoach}
                   onChange={e => setConsentCoach(e.target.checked)}
-                  className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
+                  className="mt-0.5 shrink-0 w-4 h-4 accent-brand"
                 />
                 <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
                   * Ich willige ausdrücklich ein, dass meine <strong className="text-text-primary">Gesundheits- und Fitnessdaten</strong> (Gewicht, Training, Ernährung, Schlaf, Anamnese) verarbeitet und meinem Coach zur Betreuung zugänglich gemacht werden (Art. 9 Abs. 2 lit. a DSGVO). Diese Einwilligung kann ich jederzeit widerrufen.
@@ -163,12 +163,12 @@ export function Register() {
               </label>
 
               {/* Pflicht: KI-Analyse */}
-              <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl bg-primary/5 border border-primary/20">
+              <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl bg-brand/5 border border-brand/20">
                 <input
                   type="checkbox"
                   checked={consentAi}
                   onChange={e => setConsentAi(e.target.checked)}
-                  className="mt-0.5 shrink-0 w-4 h-4 accent-primary"
+                  className="mt-0.5 shrink-0 w-4 h-4 accent-brand"
                 />
                 <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
                   <span className="font-medium text-text-primary">* </span>Ich willige ein, dass Fotos und Screenshots zur KI-Analyse (Ernährung, Training) an Google Gemini (USA) übermittelt werden. Diese Einwilligung ist für die Nutzung der App erforderlich und kann jederzeit in den Einstellungen widerrufen werden (Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO).
@@ -194,7 +194,7 @@ export function Register() {
 
           <p className="text-center text-sm text-text-secondary mt-4">
             Bereits registriert?{' '}
-            <Link to="/login" className="text-primary hover:text-primary-light font-medium">Anmelden</Link>
+            <Link to="/login" className="text-brand hover:text-brand font-medium">Anmelden</Link>
           </p>
         </div>
       </div>

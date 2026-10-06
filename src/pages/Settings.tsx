@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, AlertTriangle, Shield, Calculator, Zap } from 'lucide-react'
+import { Save, Copy, Plus, Trash2, Settings as SettingsIcon, Key, Bell, CheckCircle, FileText, AlertTriangle, Shield, Calculator, Zap, Moon, Sun } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bmi, bmiCategory, generateCode, berechneTDEE, type TDEEResult } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
 import { subscribeToPush } from '../hooks/usePushNotifications'
+import { useTheme, type Theme } from '../hooks/useTheme'
 import type { ClientSettings, InviteCode, CoachPlan } from '../types/database'
 
 export function Settings() {
   const { user, profile, refreshProfile } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [settings, setSettings] = useState<Partial<ClientSettings>>({})
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [loading, setLoading] = useState(true)
@@ -136,7 +138,7 @@ export function Settings() {
       {/* Profile */}
       <div className="card space-y-4">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
-          <SettingsIcon size={18} className="text-primary" /> Profil
+          <SettingsIcon size={18} className="text-brand" /> Profil
         </h2>
         <div>
           <label className="label">Name</label>
@@ -148,8 +150,31 @@ export function Settings() {
         </div>
         <div>
           <label className="label">Rolle</label>
-          <div className="input opacity-60 cursor-not-allowed capitalize">{profile?.role === 'coach' ? 'Coach' : 'Athlet / Klient'}</div>
+          <div className="input text-text-secondary cursor-default capitalize">{profile?.role === 'coach' ? 'Coach' : 'Athlet / Klient'}</div>
         </div>
+      </div>
+
+      {/* Darstellung */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          {theme === 'dark' ? <Moon size={18} className="text-brand" /> : <Sun size={18} className="text-brand" />} Darstellung
+        </h2>
+        <div role="group" aria-label="Farbschema" className="grid grid-cols-2 gap-2 p-1 rounded-full bg-bg-elevated border border-border">
+          {([['dark', 'Dunkel', Moon], ['light', 'Hell', Sun]] as [Theme, string, typeof Moon][]).map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={theme === value}
+              onClick={() => setTheme(value)}
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                theme === value ? 'bg-primary text-white ring-1 ring-inset ring-brand/30' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-text-muted">Standard ist der dunkle Modus. Die Auswahl wird auf diesem Gerät gespeichert.</p>
       </div>
 
       {/* Goals & Stats (only for clients) */}
@@ -210,7 +235,7 @@ export function Settings() {
       {!isCoach && (
         <div className="card space-y-5">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
-            <Calculator size={18} className="text-primary" /> Ernährungsberechnung
+            <Calculator size={18} className="text-brand" /> Ernährungsberechnung
           </h2>
           <p className="text-xs text-text-muted -mt-2">Wähle deine Ziele — die Kalorien & Makros werden automatisch berechnet.</p>
 
@@ -231,12 +256,12 @@ export function Settings() {
                   onClick={() => setSettings(s => ({ ...s, aktivitaetsniveau: val }))}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
                     (settings.aktivitaetsniveau ?? 'maessig_aktiv') === val
-                      ? 'border-primary bg-primary/10 text-text-primary'
-                      : 'border-border text-text-secondary hover:border-primary/40'
+                      ? 'border-brand bg-brand/10 text-text-primary'
+                      : 'border-border text-text-secondary hover:border-brand/40'
                   }`}
                 >
                   <div className={`w-3 h-3 rounded-full border-2 shrink-0 ${
-                    (settings.aktivitaetsniveau ?? 'maessig_aktiv') === val ? 'border-primary bg-primary' : 'border-border'
+                    (settings.aktivitaetsniveau ?? 'maessig_aktiv') === val ? 'border-brand bg-brand' : 'border-border'
                   }`} />
                   <div>
                     <div className="text-sm font-medium">{label}</div>
@@ -262,8 +287,8 @@ export function Settings() {
                   onClick={() => setSettings(s => ({ ...s, sport_ziel: val }))}
                   className={`py-3 rounded-xl border text-center transition-colors ${
                     (settings.sport_ziel ?? 'halten') === val
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border text-text-secondary hover:border-primary/40'
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-border text-text-secondary hover:border-brand/40'
                   }`}
                 >
                   <div className="text-sm font-semibold">{label}</div>
@@ -291,8 +316,8 @@ export function Settings() {
                   onClick={() => setSettings(s => ({ ...s, ernaehrungs_typ: val }))}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                     (settings.ernaehrungs_typ ?? 'standard') === val
-                      ? 'bg-primary border-primary text-white'
-                      : 'border-border text-text-secondary hover:border-primary/40'
+                      ? 'bg-primary border-brand text-white'
+                      : 'border-border text-text-secondary hover:border-brand/40'
                   }`}
                 >
                   {label}
@@ -317,8 +342,8 @@ export function Settings() {
                   onClick={() => setSettings(s => ({ ...s, intervall_fasten: val }))}
                   className={`px-3 py-2.5 rounded-xl border text-left transition-colors ${
                     (settings.intervall_fasten ?? 'kein') === val
-                      ? 'border-primary bg-primary/10 text-text-primary'
-                      : 'border-border text-text-secondary hover:border-primary/40'
+                      ? 'border-brand bg-brand/10 text-text-primary'
+                      : 'border-border text-text-secondary hover:border-brand/40'
                   }`}
                 >
                   <div className="text-sm font-semibold">{label}</div>
@@ -372,7 +397,7 @@ export function Settings() {
                 checked={!!settings.coach_foto_freigabe}
                 onChange={e => setSettings(s => ({ ...s, coach_foto_freigabe: e.target.checked }))}
               />
-              <div className={`w-11 h-6 rounded-full transition-colors ${settings.coach_foto_freigabe ? 'bg-primary' : 'bg-border'}`} />
+              <div className={`w-11 h-6 rounded-full transition-colors ${settings.coach_foto_freigabe ? 'bg-primary ring-1 ring-brand/40' : 'bg-border-input'}`} />
               <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.coach_foto_freigabe ? 'translate-x-5' : ''}`} />
             </div>
           </label>
@@ -383,7 +408,7 @@ export function Settings() {
       {!isCoach && masterplan && (
         <div className="card space-y-3">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
-            <FileText size={18} className="text-primary" /> Mein Masterplan
+            <FileText size={18} className="text-brand" /> Mein Masterplan
           </h2>
           <div className="flex items-center gap-4">
             <div className="flex-1 min-w-0">
@@ -401,7 +426,7 @@ export function Settings() {
         <div className="card space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-text-primary flex items-center gap-2">
-              <Key size={18} className="text-primary" /> Einladungscodes
+              <Key size={18} className="text-brand" /> Einladungscodes
             </h2>
             <button onClick={createInviteCode} className="btn-primary flex items-center gap-2 text-sm">
               <Plus size={16} /> Code erstellen
@@ -425,7 +450,7 @@ export function Settings() {
                         : 'Unbegrenzt gültig'}
                     </div>
                   </div>
-                  <button onClick={() => copyCode(code.code)} className="p-2 rounded-lg hover:bg-primary/10 hover:text-primary text-text-muted transition-colors" title="Kopieren">
+                  <button onClick={() => copyCode(code.code)} className="p-2 rounded-lg hover:bg-brand/10 hover:text-brand text-text-muted transition-colors" title="Kopieren">
                     <Copy size={14} />
                   </button>
                   <button onClick={() => deleteCode(code.id)} className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors">
@@ -441,7 +466,7 @@ export function Settings() {
       {/* Notification Settings */}
       <div className="card space-y-4">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
-          <Bell size={18} className="text-primary" /> Benachrichtigungen
+          <Bell size={18} className="text-brand" /> Benachrichtigungen
         </h2>
 
         <div className="flex items-center justify-between">
@@ -451,7 +476,7 @@ export function Settings() {
           </div>
           <button
             onClick={() => setSettings(s => ({ ...s, notif_daily_reminder: !s.notif_daily_reminder }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_daily_reminder ? 'bg-primary' : 'bg-bg-elevated border border-border'}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_daily_reminder ? 'bg-primary ring-1 ring-brand/40' : 'bg-border-input'}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.notif_daily_reminder ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
@@ -477,7 +502,7 @@ export function Settings() {
           </div>
           <button
             onClick={() => setSettings(s => ({ ...s, notif_appointments: !s.notif_appointments }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_appointments !== false ? 'bg-primary' : 'bg-bg-elevated border border-border'}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.notif_appointments !== false ? 'bg-primary ring-1 ring-brand/40' : 'bg-border-input'}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.notif_appointments !== false ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
@@ -515,7 +540,7 @@ export function Settings() {
       {/* DSGVO / Legal section */}
       <div className="card space-y-4 border-border/60">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
-          <Shield size={18} className="text-primary" /> Datenschutz & Rechtliches
+          <Shield size={18} className="text-brand" /> Datenschutz & Rechtliches
         </h2>
 
         {!isCoach && settings.consent_given_at && (
@@ -528,20 +553,20 @@ export function Settings() {
         )}
 
         {!isCoach && (
-          <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-2 text-xs text-text-secondary">
-            <Zap size={14} className="text-primary shrink-0 mt-0.5" />
+          <div className="p-3 rounded-xl bg-brand/5 border border-brand/20 flex items-start gap-2 text-xs text-text-secondary">
+            <Zap size={14} className="text-brand shrink-0 mt-0.5" />
             <div>
-              <div className="font-semibold text-primary mb-0.5">KI-Analyse aktiv</div>
+              <div className="font-semibold text-brand mb-0.5">KI-Analyse aktiv</div>
               Fotos werden zur automatischen Ernährungs- und Trainingsanalyse an Google Gemini übermittelt (gemäß deiner Einwilligung bei der Registrierung).
             </div>
           </div>
         )}
 
         <div className="flex gap-3 text-sm">
-          <Link to="/legal" className="text-primary hover:underline flex items-center gap-1">
+          <Link to="/legal" className="text-brand hover:underline flex items-center gap-1">
             <FileText size={14} /> Impressum
           </Link>
-          <Link to="/legal" onClick={() => setTimeout(() => document.getElementById('datenschutz-tab')?.click(), 50)} className="text-primary hover:underline flex items-center gap-1">
+          <Link to="/legal" onClick={() => setTimeout(() => document.getElementById('datenschutz-tab')?.click(), 50)} className="text-brand hover:underline flex items-center gap-1">
             <Shield size={14} /> Datenschutzerklärung
           </Link>
         </div>
@@ -570,7 +595,7 @@ export function Settings() {
         <button
           onClick={handleDeleteAccount}
           disabled={deleteConfirm !== 'LÖSCHEN' || deletingAccount}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger/10 text-danger border border-danger/30 hover:bg-danger hover:text-white transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger/10 text-danger border border-danger/30 hover:bg-danger hover:text-bg transition-colors text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {deletingAccount ? <Spinner size={16} /> : <Trash2 size={16} />}
           {deletingAccount ? 'Wird gelöscht...' : 'Konto und alle Daten löschen'}

@@ -15,7 +15,7 @@ import {
 import { de } from 'date-fns/locale'
 
 const EVENT_COLORS: Record<string, string> = {
-  coaching: 'bg-primary/20 text-primary border-primary/30',
+  coaching: 'bg-brand/20 text-brand border-brand/30',
   training: 'bg-success/20 text-success border-success/30',
   sonstiges: 'bg-warning/20 text-warning border-warning/30',
 }
@@ -209,8 +209,8 @@ export function Calendar() {
                   key={day.toISOString()}
                   onClick={() => setSelectedDay(isSelected ? null : day)}
                   className={`min-h-[64px] p-1.5 rounded-lg cursor-pointer transition-all border
-                    ${isCurrentMonth ? 'text-text-primary' : 'text-text-muted opacity-40'}
-                    ${isToday ? 'bg-primary/10 border-primary/30' : isSelected ? 'bg-bg-elevated border-border-light' : 'border-transparent hover:bg-bg-elevated'}`}
+                    ${isCurrentMonth ? 'text-text-primary' : 'text-text-muted'}
+                    ${isToday ? 'bg-brand/10 border-brand/30' : isSelected ? 'bg-bg-elevated border-border-light' : 'border-transparent hover:bg-bg-elevated'}`}
                 >
                   <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isToday ? 'bg-primary text-white' : ''}`}>
                     {format(day, 'd')}
@@ -371,10 +371,10 @@ export function Calendar() {
           {isCoach && !editingId && (
             <div className="border border-border rounded-xl p-3 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="accent-primary" checked={form.recurring}
+                <input type="checkbox" className="accent-brand" checked={form.recurring}
                   onChange={e => setForm(f => ({ ...f, recurring: e.target.checked }))} />
                 <span className="text-sm font-medium text-text-primary flex items-center gap-1.5">
-                  <RefreshCw size={14} className="text-primary" /> Wiederkehrender Termin
+                  <RefreshCw size={14} className="text-brand" /> Wiederkehrender Termin
                 </span>
               </label>
               {form.recurring && (
