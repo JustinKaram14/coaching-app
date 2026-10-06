@@ -1,4 +1,4 @@
-// Erzeugt alle App-Icons (PWA, iOS, Favicon, Android) aus assets/app-icon.jpg.
+// Erzeugt alle App-Icons (PWA, iOS, Favicon, Android inkl. Splash-Logo) aus assets/app-icon.jpg.
 // Aufruf: npm run icons
 //
 // Das Quellbild darf beliebig groß/nicht quadratisch sein: erwartet wird weiße
@@ -19,13 +19,14 @@ const TEXT_ROUND = 0.62 // rundes Android-Icon
 const TEXT_MASKABLE = 0.6 // PWA maskable: Safe-Zone ist ein Kreis mit 80 % Durchmesser
 const TEXT_ADAPTIVE = 0.5 // Android adaptive: Safe-Zone ist ein Kreis mit ~61 % Durchmesser
 const CORNER_RADIUS = 0.22
+const SPLASH_LOGO_DP = 160 // Breite der Schrift auf dem Android-Splashscreen (in dp)
 
 const ANDROID_DENSITIES = {
-  mdpi: { legacy: 48, foreground: 108 },
-  hdpi: { legacy: 72, foreground: 162 },
-  xhdpi: { legacy: 96, foreground: 216 },
-  xxhdpi: { legacy: 144, foreground: 324 },
-  xxxhdpi: { legacy: 192, foreground: 432 },
+  mdpi: { scale: 1, legacy: 48, foreground: 108 },
+  hdpi: { scale: 1.5, legacy: 72, foreground: 162 },
+  xhdpi: { scale: 2, legacy: 96, foreground: 216 },
+  xxhdpi: { scale: 3, legacy: 144, foreground: 324 },
+  xxxhdpi: { scale: 4, legacy: 192, foreground: 432 },
 }
 
 const hex = ({ r, g, b }) =>
@@ -151,6 +152,14 @@ async function main() {
     write(
       path.join(dir, 'ic_launcher_foreground.png'),
       await render(src, sizes.foreground, { text: TEXT_ADAPTIVE, transparent: true }),
+    )
+    // Splashscreen: nur die Schrift, wird per drawable/splash.xml auf die Hintergrundfarbe gesetzt
+    write(
+      path.join(ANDROID_RES, `drawable-${density}`, 'splash_logo.png'),
+      await sharp(src.glyph)
+        .resize({ width: Math.round(SPLASH_LOGO_DP * sizes.scale), kernel: 'lanczos3' })
+        .png()
+        .toBuffer(),
     )
   }
   fs.writeFileSync(
