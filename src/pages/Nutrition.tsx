@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { todayISO } from '../lib/utils'
+import { todayISO, toLocalISO } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
 import type { FoodLogItem, WasserLogEntry, Rezept } from '../types/database'
 
@@ -60,7 +60,7 @@ const WATER_GLASS_ML = 250
 function shiftDate(iso: string, days: number): string {
   const d = new Date(iso + 'T00:00:00')
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return toLocalISO(d)
 }
 
 function formatDateLabel(iso: string): string {

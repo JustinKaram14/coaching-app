@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { todayISO } from '../lib/utils'
 import type { Profile } from '../types/database'
 
 interface AuthContextType {
@@ -121,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       kalorie_tagesziel: 2000,
       trainings_pro_woche: 4,
       schlaf_ziel: 8,
-      startdatum: new Date().toISOString().split('T')[0],
+      startdatum: todayISO(),
       consent_dsgvo: true,
       consent_ai: consentAi,
       consent_given_at: consentNow,

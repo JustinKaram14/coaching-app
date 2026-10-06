@@ -8,6 +8,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Spinner } from '../components/ui/Spinner'
+import { toLocalISO, todayISO as localTodayISO } from '../lib/utils'
 import type { Rezept, ClientSettings, MealPlanEntry } from '../types/database'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -80,8 +81,8 @@ function addDays(d: Date, n: number): Date {
   const r = new Date(d); r.setDate(r.getDate() + n); return r
 }
 
-function toISO(d: Date): string { return d.toISOString().split('T')[0] }
-function todayISO(): string { return new Date().toISOString().split('T')[0] }
+const toISO = toLocalISO
+const todayISO = localTodayISO
 
 function fmtDayHeader(iso: string): string {
   return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', {

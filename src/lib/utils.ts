@@ -42,9 +42,13 @@ export function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
-export function todayISO() {
-  const d = new Date()
+// Lokales Datum als YYYY-MM-DD (toISOString() würde nach UTC umrechnen und das Datum verschieben)
+export function toLocalISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function todayISO() {
+  return toLocalISO(new Date())
 }
 
 export interface TDEEResult {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Users, Clock, Scale, Dumbbell, Moon, TrendingUp, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { formatDate } from '../../lib/utils'
+import { formatDate, todayISO } from '../../lib/utils'
 import { Spinner } from '../../components/ui/Spinner'
 import type { Profile } from '../../types/database'
 
@@ -97,7 +97,7 @@ export function CoachDashboard() {
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-success">
-            {(() => { const today = new Date().toISOString().split('T')[0]; return clients.filter(c => c.lastTrainingDate === today).length })()}
+            {(() => { const today = todayISO(); return clients.filter(c => c.lastTrainingDate === today).length })()}
           </div>
           <div className="text-xs text-text-muted mt-1">Heute aktiv</div>
         </div>
