@@ -9,13 +9,24 @@
     <meta http-equiv="Permissions-Policy" content="camera=*, microphone=(), geolocation=()" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://images.openfoodfacts.org https://static.openfoodfacts.org https://raw.githubusercontent.com https://api.workoutxapp.com; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://generativelanguage.googleapis.com wss://*.supabase.co https://world.openfoodfacts.org https://api.pexels.com https://api.workoutxapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
     <meta http-equiv="X-Frame-Options" content="DENY" />
-    <title>Coaching App</title>
+    <title>HLX Together</title>
     <link rel="manifest" href="/coaching-app/manifest.json" />
     <link rel="apple-touch-icon" href="/coaching-app/apple-touch-icon.png" />
+    <!-- Systemstartbild iOS (einfarbig Markengrün, erzeugt mit npm run splash) -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone 16 Pro Max -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone 14/15/16 Plus & Pro Max -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone 12/13 Pro Max, 14 Plus -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone 16 Pro -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone 14 Pro, 15, 15 Pro, 16 -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone 12/13/14, 12/13 Pro -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone XS Max, 11 Pro Max -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" /> <!-- iPhone XR, 11 -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" /> <!-- iPhone X, XS, 11 Pro, 12/13 mini -->
+    <link rel="apple-touch-startup-image" href="/coaching-app/splash/ios-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" /> <!-- iPhone SE (2./3. Gen.), 8 -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Coaching" />
+    <meta name="apple-mobile-web-app-title" content="HLX Together" />
     <meta name="theme-color" content="#075640" />
     <meta name="color-scheme" content="dark light" />
     <script>
@@ -26,8 +37,130 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* Startanimation „HLX Together – Healthy & Athletic". Steht inline, damit sie sichtbar ist,
+         noch bevor das App-Bundle geladen ist. Der Hintergrund der Seite gilt nur bis die App-CSS greift. */
+      body { background: #075640; }
+      #splash {
+        position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; overflow: hidden;
+        background: #075640; color: #fff; cursor: pointer;
+        font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+        transition: opacity .4s ease, transform .4s ease;
+      }
+      #splash.sp-out { opacity: 0; transform: scale(1.03); pointer-events: none; }
+      #splash::before {
+        content: ""; position: absolute; inset: 0; opacity: 0;
+        background: radial-gradient(circle at 50% 42%, #0b6f52 0%, #075640 48%, #04392a 100%);
+        animation: sp-fade .9s ease-out .1s forwards;
+      }
+      .sp-art { position: relative; width: auto; height: min(76dvh, 510px); max-width: 90vw; overflow: visible; }
+      /* Puls-Linie läuft durchs Bild */
+      .sp-pulse {
+        fill: none; stroke: #3bd4a6; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round;
+        stroke-dasharray: 100; stroke-dashoffset: 100; filter: drop-shadow(0 0 6px rgb(59 212 166 / .7));
+        animation: sp-draw .8s cubic-bezier(.4,.1,.2,1) .05s forwards, sp-dim .5s ease 1s forwards;
+      }
+      /* HLX wächst Balken für Balken nach oben */
+      .sp-bar, .sp-barx {
+        fill: #fff; transform-box: fill-box; animation-duration: .5s;
+        animation-timing-function: cubic-bezier(.2,.9,.25,1.15); animation-fill-mode: both;
+      }
+      .sp-bar { transform-origin: 50% 100%; animation-name: sp-grow-y; }
+      .sp-barx { transform-origin: 0 50%; animation-name: sp-grow-x; }
+      .b1 { animation-delay: .45s } .b2 { animation-delay: .53s } .b3 { animation-delay: .66s }
+      .b4 { animation-delay: .58s } .b5 { animation-delay: .72s } .b6 { animation-delay: .62s } .b7 { animation-delay: .70s }
+      .sp-tg { font-size: 13px; font-weight: 700; letter-spacing: .5em; fill: #c4ecdd; animation: sp-up .5s ease-out .95s both; }
+      .sp-ic {
+        fill: none; stroke: #3bd4a6; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+        stroke-dasharray: 100; stroke-dashoffset: 100; animation: sp-draw .6s ease-out both;
+      }
+      .ic1 { animation-delay: 1s } .ic2 { animation-delay: 1.18s }
+      .sp-lbl { font-size: 14px; font-weight: 800; letter-spacing: .2em; fill: #fff; animation: sp-up .45s ease-out both; }
+      .l1 { animation-delay: 1.1s } .l2 { animation-delay: 1.28s }
+      .sp-amp {
+        font-size: 30px; font-weight: 300; fill: #3bd4a6; transform-box: fill-box; transform-origin: center;
+        animation: sp-pop .4s cubic-bezier(.2,1.2,.3,1) 1.15s both;
+      }
+      .sp-foot {
+        position: absolute; left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+        display: grid; justify-items: center; gap: 12px;
+      }
+      .sp-hint { font-size: 12.5px; font-weight: 600; letter-spacing: .02em; color: #cfeee3; animation: sp-fade .5s ease .7s both; }
+      .sp-track { width: 120px; height: 3px; border-radius: 3px; background: rgb(255 255 255 / .18); overflow: hidden; }
+      .sp-fill { display: block; height: 100%; background: #3bd4a6; transform-origin: 0 50%; animation: sp-bar 1.6s linear both; }
+      @keyframes sp-draw { to { stroke-dashoffset: 0 } }
+      @keyframes sp-dim { to { opacity: .5 } }
+      @keyframes sp-grow-y { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+      @keyframes sp-grow-x { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+      @keyframes sp-up { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+      @keyframes sp-pop { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: none } }
+      @keyframes sp-fade { from { opacity: 0 } to { opacity: 1 } }
+      @keyframes sp-bar { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+      /* „Bewegung reduzieren": ruhiges Endbild statt Animation */
+      @media (prefers-reduced-motion: reduce) {
+        #splash, #splash *, #splash::before { animation: none !important; transition: none !important; }
+        #splash::before { opacity: 1; }
+        .sp-pulse, .sp-ic { stroke-dashoffset: 0; }
+      }
+    </style>
+    <noscript><style>#splash { display: none; }</style></noscript>
   </head>
   <body>
+    <!-- Startanimation: HLX-Wortmarke (Geometrie aus dem App-Icon), Symbole aus Lucide (ISC-Lizenz) -->
+    <div id="splash" aria-hidden="true">
+      <svg class="sp-art" viewBox="0 0 360 540" focusable="false">
+        <path class="sp-pulse" pathLength="100" d="M0 100 H100 L112 90 L124 100 H140 L150 118 L168 34 L186 150 L198 100 H360" />
+        <g transform="translate(36.5 188) scale(.78)">
+          <rect class="sp-bar b1" x="0" y="0" width="34" height="212" />
+          <rect class="sp-bar b2" x="77" y="0" width="36" height="212" />
+          <rect class="sp-barx b3" x="33" y="85" width="45" height="34" />
+          <rect class="sp-bar b4" x="142" y="0" width="36" height="212" />
+          <rect class="sp-barx b5" x="177" y="177" width="56" height="35" />
+          <polygon class="sp-bar b6" points="246,0 282,0 367,212 330,212" />
+          <polygon class="sp-bar b7" points="329,0 364,0 279,212 244,212" />
+        </g>
+        <text class="sp-tg" x="183" y="388" text-anchor="middle">TOGETHER</text>
+        <g transform="translate(84.6 424) scale(1.7)">
+          <path class="sp-ic ic1" pathLength="100" d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" />
+          <path class="sp-ic ic1" pathLength="100" d="M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />
+        </g>
+        <g transform="translate(234.6 424) scale(1.7)">
+          <path class="sp-ic ic2" pathLength="100" d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" />
+          <path class="sp-ic ic2" pathLength="100" d="m2.5 21.5 1.4-1.4" />
+          <path class="sp-ic ic2" pathLength="100" d="m20.1 3.9 1.4-1.4" />
+          <path class="sp-ic ic2" pathLength="100" d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" />
+          <path class="sp-ic ic2" pathLength="100" d="m9.6 14.4 4.8-4.8" />
+        </g>
+        <text class="sp-lbl l1" x="105" y="502" text-anchor="middle">HEALTHY</text>
+        <text class="sp-amp" x="180" y="478" text-anchor="middle">&amp;</text>
+        <text class="sp-lbl l2" x="255" y="502" text-anchor="middle">ATHLETIC</text>
+      </svg>
+      <div class="sp-foot">
+        <span class="sp-hint">Tippen zum Überspringen</span>
+        <span class="sp-track"><span class="sp-fill"></span></span>
+      </div>
+    </div>
+    <script>
+      // Mindestdauer 1,6 s (0,7 s bei „Bewegung reduzieren"); danach weg, sobald die App bereit ist.
+      // Tippen/Enter/Esc überspringt die Mindestdauer. Notausgang nach 8 s.
+      (function () {
+        var el = document.getElementById('splash')
+        if (!el) return
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        var minDone = false, ready = !!window.__hlxReady, gone = false
+        function remove() { if (!gone) { gone = true; if (el.parentNode) el.parentNode.removeChild(el) } }
+        function hide() { if (!gone) { el.classList.add('sp-out'); setTimeout(remove, 450) } }
+        function check() { if (minDone && ready) hide() }
+        function skip() { minDone = true; check() }
+        setTimeout(skip, reduce ? 700 : 1600)
+        setTimeout(hide, 8000)
+        window.addEventListener('app-ready', function () { ready = true; check() })
+        el.addEventListener('pointerdown', skip)
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') skip()
+        })
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
