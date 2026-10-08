@@ -7,7 +7,7 @@
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
     <meta http-equiv="Permissions-Policy" content="camera=*, microphone=(), geolocation=()" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://images.openfoodfacts.org https://static.openfoodfacts.org https://raw.githubusercontent.com https://api.workoutxapp.com; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://generativelanguage.googleapis.com wss://*.supabase.co https://world.openfoodfacts.org https://api.pexels.com https://api.workoutxapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://images.openfoodfacts.org https://static.openfoodfacts.org https://raw.githubusercontent.com https://api.workoutxapp.com; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://generativelanguage.googleapis.com wss://*.supabase.co https://world.openfoodfacts.org https://api.pexels.com https://api.workoutxapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
     <meta http-equiv="X-Frame-Options" content="DENY" />
     <title>HLX Together</title>
     <link rel="manifest" href="/coaching-app/manifest.json" />
@@ -34,171 +34,104 @@
       try { document.documentElement.dataset.theme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark' }
       catch (e) { document.documentElement.dataset.theme = 'dark' }
     </script>
+    <link rel="preload" href="splash/hlx-splash.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-      /* Startanimation „HLX Together – Healthy & Athletic". Steht inline, damit sie sichtbar ist,
-         noch bevor das App-Bundle geladen ist. Der Hintergrund der Seite gilt nur bis die App-CSS greift.
-         Ablauf: HLX wächst → wandert nach oben → HEALTHY & ATHLETIC groß → Kreis öffnet die App. */
+      /* Startanimation „HLX Together · Healthy & Athletic". Steht inline, damit sie sichtbar ist,
+         noch bevor das App-Bundle geladen ist. Schrift: Plus Jakarta Sans (OFL), nur die benötigten Zeichen.
+         Ablauf: langsamer Push-In, Wörter fahren aus Masken ein, am Ende Durchflug in die App. */
+      @font-face {
+        font-family: "HLX Splash"; font-style: normal; font-weight: 300 800; font-display: block;
+        src: url(splash/hlx-splash.woff2) format("woff2");
+      }
       body { background: #075640; }
       #splash {
         position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; overflow: hidden;
-        background: #075640; color: #fff; cursor: pointer;
-        font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #fff; cursor: pointer; font-family: "HLX Splash", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
         transition: opacity .4s ease;
       }
       #splash.sp-out { opacity: 0; pointer-events: none; }
-      #splash::before {
+      .sp-bg { position: absolute; inset: 0; background: #075640; }
+      .sp-bg::before {
         content: ""; position: absolute; inset: 0; opacity: 0;
-        background: radial-gradient(circle at 50% 40%, #0b6f52 0%, #075640 50%, #04392a 100%);
-        animation: sp-fade 1s ease-out .1s forwards;
+        background: radial-gradient(circle at 50% 46%, rgb(255 255 255 / .08) 0%, rgb(255 255 255 / 0) 62%);
+        animation: sp-fade 1.4s ease-out .2s forwards;
       }
-      /* Weiche Lichtpunkte, die langsam steigen */
-      .sp-bokeh { position: absolute; inset: 0; pointer-events: none; }
-      .sp-bokeh i {
-        position: absolute; border-radius: 50%; opacity: 0;
-        background: radial-gradient(circle, rgb(255 255 255 / .26) 0%, rgb(255 255 255 / 0) 68%);
-        animation: sp-fade 1.4s ease .3s forwards, sp-float var(--d, 7s) ease-in-out infinite alternate;
-      }
-      .sp-art { position: relative; width: auto; height: min(70dvh, 560px); max-width: 94vw; overflow: visible; }
-      .sp-leaving .sp-art { animation: sp-zoom .9s cubic-bezier(.45, 0, .7, .2) forwards; }
-
-      /* HLX: Balken wachsen, dann wandert die Marke nach oben */
-      .sp-mark {
-        transform-origin: 0 0; transform: translate(36.5px, 190px) scale(.78);
-        animation: sp-mark-move .65s cubic-bezier(.65, 0, .25, 1) .95s both;
-      }
-      .sp-bar, .sp-barx {
-        fill: #fff; transform-box: fill-box; animation-duration: .45s;
-        animation-timing-function: cubic-bezier(.2, .9, .25, 1.12); animation-fill-mode: both;
-      }
-      .sp-bar { transform-origin: 50% 100%; animation-name: sp-grow-y; }
-      .sp-barx { transform-origin: 0 50%; animation-name: sp-grow-x; }
-      .b1 { animation-delay: .15s } .b2 { animation-delay: .23s } .b3 { animation-delay: .36s }
-      .b4 { animation-delay: .29s } .b5 { animation-delay: .42s } .b6 { animation-delay: .33s } .b7 { animation-delay: .40s }
-      .sp-tg { font-size: 11px; font-weight: 700; letter-spacing: .5em; fill: #c4ecdd; animation: sp-up .5s ease-out 1.5s both; }
-
-      /* Hauptmotiv: Wörter fahren aus einer Maske nach oben */
-      .sp-hero { font-size: 66px; font-weight: 800; letter-spacing: -.01em; animation: sp-rise .7s cubic-bezier(.16, 1, .3, 1) both; }
-      .h1 { fill: #fff; animation-delay: 1.1s; }
-      .h2 { fill: #3bd4a6; animation-delay: 1.85s; }
-      .sp-pulse {
-        fill: none; stroke: #3bd4a6; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
-        stroke-dasharray: 100; stroke-dashoffset: 100; filter: drop-shadow(0 0 6px rgb(59 212 166 / .65));
-        animation: sp-draw .7s cubic-bezier(.4, .1, .2, 1) 1.5s forwards;
-      }
-      .sp-amp {
-        font-size: 44px; font-weight: 300; fill: #fff; transform-box: fill-box; transform-origin: center;
-        animation: sp-pop .45s cubic-bezier(.2, 1.3, .3, 1) 1.7s both;
-      }
-      .sp-ic {
-        fill: none; stroke: #3bd4a6; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
-        stroke-dasharray: 100; stroke-dashoffset: 100; animation: sp-draw .6s ease-out both;
-      }
-      .ic1 { animation-delay: 1.75s } .ic2 { animation-delay: 2.05s }
-      .sp-beat { transform-box: fill-box; transform-origin: center; animation: sp-beat .7s ease-in-out 2.2s 2 both; }
-      .sp-lift { transform-box: fill-box; transform-origin: center; animation: sp-lift .8s cubic-bezier(.3, 0, .2, 1) 2.35s both; }
-
+      .sp-art { position: relative; width: min(94vw, 420px); }
+      .sp-cam { display: block; width: 100%; height: auto; overflow: visible; transform-origin: 50% 50%; animation: sp-push 2.8s cubic-bezier(.22, .61, .36, 1) both; }
+      .sp-tg { font-size: 15px; font-weight: 600; letter-spacing: .4em; fill: #fff; animation: sp-rise-soft .8s cubic-bezier(.16, 1, .3, 1) .35s both; }
+      .sp-hero { font-size: 74px; font-weight: 700; fill: #fff; animation: sp-rise .95s cubic-bezier(.16, 1, .3, 1) both; }
+      .h1 { animation-delay: .6s; }
+      .h2 { animation-delay: .85s; }
+      .sp-amp { font-size: 30px; font-weight: 300; fill: #fff; animation: sp-fade-amp .7s ease-out .95s both; }
       .sp-foot {
-        position: absolute; left: 0; right: 0; bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-        display: grid; justify-items: center; gap: 12px; transition: opacity .25s ease;
+        position: absolute; left: 0; right: 0; bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+        display: grid; justify-items: center; transition: opacity .25s ease;
       }
+      .sp-hint { font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: #cfeee3; animation: sp-fade .6s ease 1.4s both; }
+
+      /* Durchflug: Buchstaben wachsen auf den Betrachter zu, lösen sich auf, dahinter ist die App */
+      .sp-leaving .sp-art { animation: sp-fly 1s linear forwards; will-change: transform, opacity; }
+      .sp-leaving .sp-bg { animation: sp-bgout 1s cubic-bezier(.3, 0, .5, 1) forwards; }
       .sp-leaving .sp-foot { opacity: 0; }
-      .sp-hint { font-size: 12.5px; font-weight: 600; letter-spacing: .02em; color: #cfeee3; animation: sp-fade .5s ease .8s both; }
-      .sp-track { width: 120px; height: 3px; border-radius: 3px; background: rgb(255 255 255 / .18); overflow: hidden; }
-      .sp-fill { display: block; height: 100%; background: #3bd4a6; transform-origin: 0 50%; animation: sp-bar 2.9s linear both; }
+      html.sp-reveal #root { animation: sp-settle 1s cubic-bezier(.2, .7, .2, 1) both; }
 
-      /* Übergang: Die App öffnet sich als wachsender Kreis über dem Startbild */
-      html.sp-reveal #root { position: relative; z-index: 100000; animation: sp-circle .9s cubic-bezier(.55, 0, .2, 1) both; }
-
-      @keyframes sp-draw { to { stroke-dashoffset: 0 } }
-      @keyframes sp-grow-y { from { transform: scaleY(0) } to { transform: scaleY(1) } }
-      @keyframes sp-grow-x { from { transform: scaleX(0) } to { transform: scaleX(1) } }
-      @keyframes sp-mark-move { from { transform: translate(36.5px, 190px) scale(.78) } to { transform: translate(143px, 40px) scale(.2) } }
-      @keyframes sp-up { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
-      @keyframes sp-rise { from { transform: translateY(90px) } to { transform: none } }
-      @keyframes sp-pop { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: none } }
-      @keyframes sp-beat { 0%, 100% { transform: scale(1) } 30% { transform: scale(1.22) } 55% { transform: scale(.96) } }
-      @keyframes sp-lift { 0%, 100% { transform: translateY(0) rotate(0) } 40% { transform: translateY(-7px) rotate(-8deg) } 70% { transform: translateY(1px) rotate(2deg) } }
+      @keyframes sp-push { from { transform: scale(.9) } to { transform: scale(1) } }
+      @keyframes sp-rise { from { transform: translateY(100px) } to { transform: none } }
+      @keyframes sp-rise-soft { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
       @keyframes sp-fade { from { opacity: 0 } to { opacity: 1 } }
-      @keyframes sp-bar { from { transform: scaleX(0) } to { transform: scaleX(1) } }
-      @keyframes sp-float { from { transform: translateY(0) } to { transform: translateY(-34px) } }
-      @keyframes sp-zoom { to { transform: scale(1.18); opacity: 0 } }
-      @keyframes sp-circle { from { clip-path: circle(0% at 50% 42%) } to { clip-path: circle(125% at 50% 42%) } }
-      /* „Bewegung reduzieren": ruhiges Endbild, Wechsel nur per Einblenden */
+      @keyframes sp-fade-amp { from { opacity: 0 } to { opacity: .55 } }
+      @keyframes sp-fly {
+        0% { transform: scale(1.000); opacity: 1 }
+        10% { transform: scale(1.075); opacity: 1 }
+        20% { transform: scale(1.246); opacity: 1 }
+        30% { transform: scale(1.524); opacity: 1 }
+        40% { transform: scale(1.949); opacity: 0.88 }
+        50% { transform: scale(2.595); opacity: 0.62 }
+        60% { transform: scale(3.584); opacity: 0.36 }
+        70% { transform: scale(5.122); opacity: 0.15 }
+        80% { transform: scale(7.558); opacity: 0.04 }
+        90% { transform: scale(11.496); opacity: 0 }
+        100% { transform: scale(18.000); opacity: 0 }
+      }
+      @keyframes sp-bgout { 0%, 28% { opacity: 1 } 100% { opacity: 0 } }
+      @keyframes sp-settle { from { transform: scale(1.06) } to { transform: none } }
+      /* „Bewegung reduzieren": ruhiges Endbild, danach nur Ausblenden */
       @media (prefers-reduced-motion: reduce) {
-        #splash, #splash *, #splash::before { animation: none !important; transition: none !important; }
-        #splash::before { opacity: 1; }
-        .sp-bokeh i { opacity: .6; }
-        .sp-pulse, .sp-ic { stroke-dashoffset: 0; }
-        .sp-mark { transform: translate(143px, 40px) scale(.2); }
+        #splash, #splash *, #splash .sp-bg::before { animation: none !important; transition: none !important; }
+        .sp-bg::before { opacity: 1; }
+        .sp-amp { opacity: .55; }
       }
     </style>
     <noscript><style>#splash { display: none; }</style></noscript>
   </head>
   <body>
-    <!-- Startanimation: HLX-Wortmarke (Geometrie aus dem App-Icon), Symbole aus Lucide (ISC-Lizenz) -->
+    <!-- Startanimation: nur Schrift. Wörter als SVG-Text mit fester Breite (textLength) -->
     <div id="splash" aria-hidden="true">
-      <div class="sp-bokeh">
-        <i style="left:6%;top:70%;width:96px;height:96px;--d:7s"></i>
-        <i style="left:58%;top:78%;width:120px;height:120px;--d:9s"></i>
-        <i style="left:30%;top:86%;width:70px;height:70px;--d:6s"></i>
-        <i style="left:78%;top:62%;width:64px;height:64px;--d:8s"></i>
-        <i style="left:14%;top:48%;width:54px;height:54px;--d:10s"></i>
-        <i style="left:70%;top:36%;width:80px;height:80px;--d:11s"></i>
-        <i style="left:44%;top:94%;width:88px;height:88px;--d:7.5s"></i>
-      </div>
-      <svg class="sp-art" viewBox="0 0 360 520" focusable="false">
-        <defs>
-          <clipPath id="spc1"><rect x="0" y="150" width="360" height="74" /></clipPath>
-          <clipPath id="spc2"><rect x="0" y="362" width="360" height="80" /></clipPath>
-        </defs>
-        <g class="sp-mark">
-          <rect class="sp-bar b1" x="0" y="0" width="34" height="212" />
-          <rect class="sp-bar b2" x="77" y="0" width="36" height="212" />
-          <rect class="sp-barx b3" x="33" y="85" width="45" height="34" />
-          <rect class="sp-bar b4" x="142" y="0" width="36" height="212" />
-          <rect class="sp-barx b5" x="177" y="177" width="56" height="35" />
-          <polygon class="sp-bar b6" points="246,0 282,0 367,212 330,212" />
-          <polygon class="sp-bar b7" points="329,0 364,0 279,212 244,212" />
-        </g>
-        <text class="sp-tg" x="182" y="104" text-anchor="middle">TOGETHER</text>
-
-        <g clip-path="url(#spc1)">
-          <text class="sp-hero h1" x="30" y="210" textLength="300" lengthAdjust="spacingAndGlyphs">HEALTHY</text>
-        </g>
-        <path class="sp-pulse" pathLength="100" d="M30 252 H118 L130 241 L142 252 H158 L168 268 L186 226 L204 284 L216 252 H330" />
-
-        <g transform="translate(86 296) scale(1.7)">
-          <g class="sp-beat">
-            <path class="sp-ic ic1" pathLength="100" d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" />
-            <path class="sp-ic ic1" pathLength="100" d="M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />
+      <div class="sp-bg"></div>
+      <div class="sp-art">
+        <svg class="sp-cam" viewBox="0 0 360 400" focusable="false">
+          <defs>
+            <clipPath id="spc1"><rect x="0" y="112" width="360" height="76" /></clipPath>
+            <clipPath id="spc2"><rect x="0" y="252" width="360" height="72" /></clipPath>
+          </defs>
+          <text class="sp-tg" x="183" y="76" text-anchor="middle">HLX TOGETHER</text>
+          <g clip-path="url(#spc1)">
+            <text class="sp-hero h1" x="24" y="178" textLength="312" lengthAdjust="spacingAndGlyphs">HEALTHY</text>
           </g>
-        </g>
-        <text class="sp-amp" x="180" y="334" text-anchor="middle">&amp;</text>
-        <g transform="translate(233 296) scale(1.7)">
-          <g class="sp-lift">
-            <path class="sp-ic ic2" pathLength="100" d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z" />
-            <path class="sp-ic ic2" pathLength="100" d="m2.5 21.5 1.4-1.4" />
-            <path class="sp-ic ic2" pathLength="100" d="m20.1 3.9 1.4-1.4" />
-            <path class="sp-ic ic2" pathLength="100" d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z" />
-            <path class="sp-ic ic2" pathLength="100" d="m9.6 14.4 4.8-4.8" />
+          <text class="sp-amp" x="180" y="232" text-anchor="middle">&amp;</text>
+          <g clip-path="url(#spc2)">
+            <text class="sp-hero h2" x="24" y="315" textLength="312" lengthAdjust="spacingAndGlyphs">ATHLETIC</text>
           </g>
-        </g>
-
-        <g clip-path="url(#spc2)">
-          <text class="sp-hero h2" x="30" y="428" textLength="300" lengthAdjust="spacingAndGlyphs">ATHLETIC</text>
-        </g>
-      </svg>
-      <div class="sp-foot">
-        <span class="sp-hint">Tippen zum Überspringen</span>
-        <span class="sp-track"><span class="sp-fill"></span></span>
+        </svg>
       </div>
+      <div class="sp-foot"><span class="sp-hint">Tippen zum Überspringen</span></div>
     </div>
     <script>
-      // Ablauf: ca. 2,9 s Animation (0,9 s bei „Bewegung reduzieren"), dann öffnet sich die App als Kreis,
-      // sobald sie bereit ist. Tippen/Enter/Esc überspringt direkt zum Übergang. Notausgang nach 8 s.
+      // Ablauf: ca. 2,5 s Animation (0,9 s bei „Bewegung reduzieren"), dann Durchflug in die App,
+      // sobald diese bereit ist. Tippen/Enter/Esc springt direkt zum Durchflug. Notausgang nach 8 s.
       (function () {
         var el = document.getElementById('splash')
         if (!el) return
@@ -217,11 +150,11 @@
           if (reduce) { el.classList.add('sp-out'); setTimeout(remove, 450); return }
           root.classList.add('sp-reveal')
           el.classList.add('sp-leaving')
-          setTimeout(remove, 1000)
+          setTimeout(remove, 1100)
         }
         function check() { if (minDone && ready) reveal() }
         function skip() { minDone = true; check() }
-        setTimeout(skip, reduce ? 900 : 2900)
+        setTimeout(skip, reduce ? 900 : 2500)
         setTimeout(reveal, 8000)
         window.addEventListener('app-ready', function () { ready = true; check() })
         el.addEventListener('pointerdown', skip)
