@@ -62,7 +62,7 @@
         animation: sp-fade 1.4s ease .3s forwards, sp-float var(--d, 7s) ease-in-out infinite alternate;
       }
       .sp-art { position: relative; width: auto; height: min(70dvh, 560px); max-width: 94vw; overflow: visible; }
-      .sp-leaving .sp-art { animation: sp-zoom .75s cubic-bezier(.5, 0, .75, 0) forwards; }
+      .sp-leaving .sp-art { animation: sp-zoom .9s cubic-bezier(.45, 0, .7, .2) forwards; }
 
       /* HLX: Balken wachsen, dann wandert die Marke nach oben */
       .sp-mark {
@@ -110,7 +110,7 @@
       .sp-fill { display: block; height: 100%; background: #3bd4a6; transform-origin: 0 50%; animation: sp-bar 2.9s linear both; }
 
       /* Übergang: Die App öffnet sich als wachsender Kreis über dem Startbild */
-      html.sp-reveal #root { position: relative; z-index: 100000; animation: sp-circle .75s cubic-bezier(.7, 0, .2, 1) both; }
+      html.sp-reveal #root { position: relative; z-index: 100000; animation: sp-circle .9s cubic-bezier(.55, 0, .2, 1) both; }
 
       @keyframes sp-draw { to { stroke-dashoffset: 0 } }
       @keyframes sp-grow-y { from { transform: scaleY(0) } to { transform: scaleY(1) } }
@@ -217,7 +217,7 @@
           if (reduce) { el.classList.add('sp-out'); setTimeout(remove, 450); return }
           root.classList.add('sp-reveal')
           el.classList.add('sp-leaving')
-          setTimeout(remove, 800)
+          setTimeout(remove, 1000)
         }
         function check() { if (minDone && ready) reveal() }
         function skip() { minDone = true; check() }
