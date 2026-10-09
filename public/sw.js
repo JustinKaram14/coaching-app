@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coaching-app-v1'
+const CACHE_NAME = 'coaching-app-v2'
 const BASE = '/coaching-app'
 
 self.addEventListener('install', (e) => {
@@ -47,7 +47,11 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       const existing = list.find(c => c.url.includes(BASE))
-      if (existing) return existing.focus()
+      if (existing) {
+        // Bereits offene App: zur Zielseite wechseln lassen und nach vorn holen
+        existing.postMessage({ type: 'hlx-navigate', url })
+        return existing.focus()
+      }
       return clients.openWindow(url)
     })
   )

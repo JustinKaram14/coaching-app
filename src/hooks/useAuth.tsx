@@ -30,7 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .single()
     setProfile(data)
-    import('./usePushNotifications').then(m => m.subscribeToPush(userId))
+    // Bestehendes Push-Abo dieses Geräts erneuern (fragt nie nach der Erlaubnis; das geschieht in den Einstellungen)
+    import('../lib/push').then(m => m.refreshPushSubscription(userId))
   }
 
   function updateLastActive(userId: string) {
@@ -132,6 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    // Dieses Gerät erhält nach dem Abmelden keine Nachrichten mehr für das Konto
+    if (user) await import('../lib/push').then(m => m.forgetThisDevice(user.id)).catch(() => {})
     await supabase.auth.signOut()
   }
 

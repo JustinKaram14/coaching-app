@@ -8,6 +8,8 @@ import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
 import { todayISO, toLocalISO, tokenColor } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
+import { WaterTracker } from '../components/WaterTracker'
+import { useGame } from '../hooks/useGame'
 import type { FoodLogItem, WasserLogEntry, Rezept } from '../types/database'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -54,7 +56,7 @@ const MEALS = [
 ] as const
 
 const WATER_GOAL_ML = 2000
-const WATER_GLASS_ML = 250
+const BOTTLE_KEY = 'hlx-bottle-ml'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -177,60 +179,6 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
       <div className="h-1.5 bg-bg rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, backgroundColor: over ? tokenColor('danger') : tokenColor(color) }} />
-      </div>
-    </div>
-  )
-}
-
-// ─── WaterTracker ─────────────────────────────────────────────────────────────
-
-function WaterTracker({ entries, onAdd, onRemoveLast }: {
-  entries: WasserLogEntry[]
-  onAdd: () => void
-  onRemoveLast: () => void
-}) {
-  const totalMl = entries.reduce((a, e) => a + e.menge_ml, 0)
-  const glasses = entries.length
-  const goalGlasses = WATER_GOAL_ML / WATER_GLASS_ML
-
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Droplets size={16} className="text-info" />
-          <span className="font-semibold text-text-primary text-sm">Wasser</span>
-        </div>
-        <span className="text-xs text-text-secondary">{totalMl} / {WATER_GOAL_ML} ml</span>
-      </div>
-      <div className="flex gap-1.5 flex-wrap mb-3">
-        {Array.from({ length: goalGlasses }).map((_, i) => (
-          <div
-            key={i}
-            className={`flex items-center justify-center rounded-lg border transition-all ${
-              i < glasses
-                ? 'bg-info/20 border-info text-info'
-                : 'bg-bg border-border text-border'
-            }`}
-            style={{ width: 36, height: 44 }}
-          >
-            <Droplets size={14} />
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-between items-center">
-        <span className="text-xs text-text-muted">{glasses} von {goalGlasses} Gläsern</span>
-        <div className="flex gap-1">
-          {glasses > 0 && (
-            <button onClick={onRemoveLast}
-              className="text-xs text-text-muted hover:text-danger transition-colors px-2 py-1 rounded">
-              entfernen
-            </button>
-          )}
-          <button onClick={onAdd}
-            className="text-xs text-info hover:underline font-medium flex items-center gap-0.5 px-2 py-1 rounded">
-            <Plus size={11} /> 250 ml
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -1296,6 +1244,15 @@ export function Nutrition() {
   })
   const [loading, setLoading] = useState(true)
   const [addingToMeal, setAddingToMeal] = useState<string | null>(null)
+  const { character } = useGame()
+  const [waterGoalMl, setWaterGoalMl] = useState(WATER_GOAL_ML)
+  // Flaschengröße: lokal gemerkt und (wenn die Spalte existiert) auch im Profil gespeichert
+  const [bottleMl, setBottleMl] = useState(() => {
+    try {
+      const v = parseInt(localStorage.getItem(BOTTLE_KEY) ?? '')
+      return v >= 100 && v <= 2000 ? v : 500
+    } catch { return 500 }
+  })
 
   const today = todayISO()
 
@@ -1305,7 +1262,7 @@ export function Nutrition() {
       supabase.from('food_log').select('*').eq('user_id', user.id).eq('datum', date).order('created_at'),
       supabase.from('wasser_log').select('*').eq('user_id', user.id).eq('datum', date).order('created_at'),
       supabase.from('client_settings')
-        .select('kalorie_tagesziel,protein_ziel,karbs_ziel,fett_ziel')
+        .select('kalorie_tagesziel,protein_ziel,karbs_ziel,fett_ziel,wasser_ziel_ml')
         .eq('user_id', user.id).single(),
       supabase.from('training').select('kalorien_verbrannt').eq('user_id', user.id).eq('datum', date),
     ])
@@ -1315,7 +1272,8 @@ export function Nutrition() {
       .reduce((sum, r) => sum + (r.kalorien_verbrannt ?? 0), 0)
     setBurnedKcal(burned)
     if (goalsRes.data) {
-      const d = goalsRes.data as Partial<NutritionGoals>
+      const d = goalsRes.data as Partial<NutritionGoals> & { wasser_ziel_ml?: number | null }
+      if (d.wasser_ziel_ml) setWaterGoalMl(d.wasser_ziel_ml)
       setGoals(g => ({
         kalorie_tagesziel: d.kalorie_tagesziel ?? g.kalorie_tagesziel,
         protein_ziel: d.protein_ziel ?? g.protein_ziel,
@@ -1358,19 +1316,40 @@ export function Nutrition() {
     setItems(prev => prev.filter(i => i.id !== id))
   }
 
-  async function handleAddWater() {
+  // Flaschengröße aus dem Profil holen (eigene Abfrage: fehlt die Spalte, bleibt der lokale Wert)
+  useEffect(() => {
     if (!user) return
+    supabase.from('client_settings').select('wasser_flasche_ml').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        const ml = (data as { wasser_flasche_ml?: number | null } | null)?.wasser_flasche_ml
+        if (ml && ml >= 100 && ml <= 2000) setBottleMl(ml)
+      })
+  }, [user])
+
+  function handleBottleChange(ml: number) {
+    setBottleMl(ml)
+    try { localStorage.setItem(BOTTLE_KEY, String(ml)) } catch { /* nur lokal nicht merken */ }
+    if (user) void supabase.from('client_settings').update({ wasser_flasche_ml: ml } as never).eq('user_id', user.id)
+  }
+
+  // Trinken erscheint sofort; der Eintrag bekommt seine echte ID, sobald die Datenbank antwortet
+  async function handleAddWater(ml: number) {
+    if (!user) return
+    const temp: WasserLogEntry = {
+      id: `tmp-${Date.now()}`, user_id: user.id, datum: date, menge_ml: ml, created_at: new Date().toISOString(),
+    } as WasserLogEntry
+    setWater(prev => [...prev, temp])
     const { data } = await supabase.from('wasser_log').insert({
-      user_id: user.id, datum: date, menge_ml: WATER_GLASS_ML,
+      user_id: user.id, datum: date, menge_ml: ml,
     }).select().single()
-    if (data) setWater(prev => [...prev, data as WasserLogEntry])
+    setWater(prev => prev.map(w => (w.id === temp.id ? ((data as WasserLogEntry) ?? w) : w)))
   }
 
   async function handleRemoveLastWater() {
     const last = water[water.length - 1]
     if (!last) return
-    await supabase.from('wasser_log').delete().eq('id', last.id)
     setWater(prev => prev.slice(0, -1))
+    if (!last.id.startsWith('tmp-')) await supabase.from('wasser_log').delete().eq('id', last.id)
   }
 
   return (
@@ -1446,9 +1425,15 @@ export function Nutrition() {
 
           {/* Water */}
           <WaterTracker
+            totalMl={water.reduce((sum, w) => sum + w.menge_ml, 0)}
+            goalMl={waterGoalMl}
             entries={water}
+            bottleMl={bottleMl}
+            onBottleChange={handleBottleChange}
             onAdd={handleAddWater}
             onRemoveLast={handleRemoveLastWater}
+            avatar={character?.config}
+            equipped={character?.equipped}
           />
         </>
       ) : (
