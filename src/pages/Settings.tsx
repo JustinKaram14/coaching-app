@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Übernommen aus dem Redesign-Paket. Typen und lokale Namen werden schrittweise verbessert.
 import { berechneTDEE, bmi, bmiCategory, cn, generateCode } from '../lib/utils'
+import { planAppointments, planNotifications } from '../lib/notificationPlan'
 import {
   Bell,
   BellRing,
@@ -59,215 +60,6 @@ export function R3_({ checked: e, onChange: t, label: n, disabled: r }) {
     </button>
   )
 }
-export const i3 = ['missing', 'praise', 'streak', 'water']
-export const a3 = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 300, 365, 500, 730, 1e3]
-export const o3 = 'Europe/Berlin'
-export function s3(e) {
-  if (!e) return o3
-  try {
-    return (
-      new Intl.DateTimeFormat('de-DE', {
-        timeZone: e,
-      }),
-      e
-    )
-  } catch {
-    return o3
-  }
-}
-export function c3(e, t) {
-  let n = new Intl.DateTimeFormat('en-CA', {
-      timeZone: t,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(e),
-    r = (e) => Number(n.find((t) => t.type === e)?.value ?? 0),
-    i = (e) => String(e).padStart(2, '0')
-  return {
-    date: `${r('year')}-${i(r('month'))}-${i(r('day'))}`,
-    minutes: r('hour') * 60 + r('minute'),
-  }
-}
-export function l3(e, t) {
-  let n = c3(e, t),
-    [r, i, a] = n.date.split('-').map(Number)
-  return Date.UTC(r, i - 1, a, Math.floor(n.minutes / 60), n.minutes % 60) - Math.floor(e.getTime() / 6e4) * 6e4
-}
-export function u3(e, t, n) {
-  let [r, i, a] = e.split('-').map(Number),
-    [o, s] = t.split(':').map(Number),
-    c = Date.UTC(r, i - 1, a, o, s || 0),
-    l = c - l3(new Date(c), n)
-  return ((l = c - l3(new Date(l), n)), new Date(l))
-}
-export function d3(e, t) {
-  let n = /^(\d{1,2}):(\d{2})/.exec(e ?? '')
-  if (!n) return t
-  let r = Number(n[1]),
-    i = Number(n[2])
-  return r > 23 || i > 59 ? t : r * 60 + i
-}
-export function f3(e, t) {
-  let [n, r, i] = e.split('-').map(Number),
-    a = new Date(Date.UTC(n, r - 1, i + t))
-  return `${a.getUTCFullYear()}-${String(a.getUTCMonth() + 1).padStart(2, '0')}-${String(a.getUTCDate()).padStart(2, '0')}`
-}
-export function p3(e) {
-  let t = []
-  return (
-    e.mealsMain < 3 && t.push('Ernährung'),
-    e.sleep || t.push('Schlaf'),
-    e.supplementsTotal > 0 && e.supplementsTaken < e.supplementsTotal && t.push('Supplements'),
-    t
-  )
-}
-export function m3(e) {
-  return e.weight || e.sleep || e.training || e.mealsMain > 0 || e.supplementsTaken > 0 || e.waterMl > 0
-}
-export function h3(e) {
-  return e.length <= 1 ? e.join('') : `${e.slice(0, -1).join(', ')} und ${e[e.length - 1]}`
-}
-export const g3 = (e) =>
-  (e / 1e3).toLocaleString('de-DE', {
-    maximumFractionDigits: 1,
-  })
-export function _3(e) {
-  let { now: t, settings: n, facts: r, streak: i, sent: a, appUrl: o } = e,
-    { date: s, minutes: c } = c3(t, s3(n.timezone))
-  if (c < 480 || c >= 1320) return []
-  let l = Math.min(3, Math.max(1, n.notif_max_per_day ?? 3)),
-    u = (e, t) => a.some((n) => n.kind === e && (t === undefined || n.ref === t)),
-    d = a.filter((e) => i3.includes(e.kind)).length,
-    f = [],
-    p = (e) => (e === 'missing' || e === 'streak' ? d < l : d < l - 1),
-    m = (e) => {
-      ;(f.push(e), d++)
-    },
-    h = d3(n.notif_reminder_time, 1200),
-    g = p3(r)
-  if (n.notif_daily_reminder !== false && c >= h && !u('missing') && p('missing')) {
-    let e = i.days >= 3 ? ` Deine ${i.days}-Tage-Serie wartet auf dich.` : ''
-    m3(r)
-      ? g.length > 0 &&
-        m({
-          kind: 'missing',
-          ref: s,
-          title: 'Fast geschafft',
-          body: `Heute fehlt dir noch: ${h3(g)}.${e}`,
-          url: `${o}#/dashboard`,
-        })
-      : m({
-          kind: 'missing',
-          ref: s,
-          title: 'Heute noch nichts eingetragen',
-          body: `Ein kurzer Eintrag reicht: Essen, Schlaf oder Gewicht.${e}`,
-          url: `${o}#/dashboard`,
-        })
-  }
-  if (
-    n.notif_streak !== false &&
-    i.includesToday &&
-    a3.includes(i.days) &&
-    !u('streak', `${i.days}@${f3(s, -(i.days - 1))}`) &&
-    p('streak')
-  ) {
-    let e = i.days,
-      t =
-        e >= 100
-          ? 'Das ist Disziplin auf Profi-Niveau.'
-          : e >= 30
-            ? 'Ein ganzer Monat Routine, richtig stark.'
-            : e >= 7
-              ? 'Genau so entstehen Gewohnheiten.'
-              : 'Der Anfang ist gemacht, bleib dran.'
-    m({
-      kind: 'streak',
-      ref: `${e}@${f3(s, -(e - 1))}`,
-      title: `${e} Tage am Stück`,
-      body: t,
-      url: `${o}#/dashboard`,
-    })
-  }
-  if (n.notif_praise !== false && !u('praise') && p('praise'))
-    if (r.training && (!r.trainingAt || t.getTime() - new Date(r.trainingAt).getTime() >= 10 * 6e4)) {
-      let e = r.trainingMin ? `${r.trainingMin} Minuten ` : '',
-        t = r.trainingType ? `${r.trainingType}` : 'Training'
-      m({
-        kind: 'praise',
-        ref: `train:${s}`,
-        title: 'Heute schon fleißig trainiert',
-        body: `${e}${t}, stark gemacht. Gönn dir jetzt Erholung und genug Eiweiß.`,
-        url: `${o}#/training`,
-      })
-    } else
-      c >= 1020 &&
-        m3(r) &&
-        g.length === 0 &&
-        (r.weight || r.sleep || r.mealsMain >= 3) &&
-        m({
-          kind: 'praise',
-          ref: `all:${s}`,
-          title: 'Alles eingetragen',
-          body: 'Starker Tag, du bist komplett dabei.',
-          url: `${o}#/dashboard`,
-        })
-  let _ = n.wasser_ziel_ml ?? 0
-  return (
-    n.notif_water !== false &&
-      _ > 0 &&
-      c >= 900 &&
-      c < 1140 &&
-      r.waterMl < _ * 0.5 &&
-      !u('water') &&
-      p('water') &&
-      m({
-        kind: 'water',
-        ref: s,
-        title: 'Zeit für ein Glas Wasser',
-        body: `Bisher ${g3(r.waterMl)} l von ${g3(_)} l. Ein Glas jetzt tut dir gut.`,
-        url: `${o}#/nutrition`,
-      }),
-    f
-  )
-}
-export function v3(e) {
-  return e >= 1440 && e % 1440 == 0
-    ? e === 1440
-      ? 'morgen'
-      : `in ${e / 1440} Tagen`
-    : e >= 60 && e % 60 == 0
-      ? e === 60
-        ? 'in 1 Stunde'
-        : `in ${e / 60} Stunden`
-      : `in ${e} Minuten`
-}
-export function y3(e, t, n, r, i) {
-  if (n.notif_appointments === false) return []
-  let a = s3(n.timezone),
-    o = []
-  for (let s of e) {
-    if (!s.uhrzeit) continue
-    let e = s.erinnerung_min ?? n.notif_appointment_minutes ?? 60
-    if (e <= 0) continue
-    let c = u3(s.datum, s.uhrzeit.slice(0, 5), a),
-      l = c.getTime() - e * 6e4
-    if (t.getTime() < l || t.getTime() >= c.getTime() || r.some((e) => e.kind === 'appointment' && e.ref === s.id))
-      continue
-    let u = v3(e)
-    o.push({
-      kind: 'appointment',
-      ref: s.id,
-      title: `Termin ${u}`,
-      body: `${s.titel} um ${s.uhrzeit.slice(0, 5)} Uhr${s.vorlage_name ? ` · Vorlage: ${s.vorlage_name}` : ''}`,
-      url: `${i}#/calendar`,
-    })
-  }
-  return o
-}
 export const b3 = {
   weight: false,
   sleep: false,
@@ -293,7 +85,7 @@ export function C3(
     includesToday: false,
   },
 ) {
-  return _3({
+  return planNotifications({
     now: new Date(e),
     settings: x3,
     facts: {
@@ -374,7 +166,7 @@ export function w3() {
         }),
       ),
     ],
-    t = y3(
+    t = planAppointments(
       [
         {
           id: 'x',

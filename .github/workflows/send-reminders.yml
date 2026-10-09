@@ -2,23 +2,16 @@ name: Send Push Reminders
 
 on:
   schedule:
-    - cron: '0 * * * *'  # every hour on the hour (UTC)
+    - cron: '*/15 * * * *'  # alle 15 Minuten (UTC); Termin-Erinnerungen brauchen einen engen Takt
   workflow_dispatch:
 
 jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
-      - name: Send daily reminders
+      - name: Plan and send reminders
         run: |
           curl -s -X POST "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/send-reminders" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"type":"daily"}'
-
-      - name: Send appointment reminders
-        run: |
-          curl -s -X POST "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/send-reminders" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"type":"appointments"}'
+            -d '{"type":"all"}'
