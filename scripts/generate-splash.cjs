@@ -1,11 +1,12 @@
-// Erzeugt die iOS-Startbilder (apple-touch-startup-image) für die als Web-App gespeicherte Startseite.
+// Erzeugt die Systemstartbilder für iPhone/iPad (apple-touch-startup-image) und Android (APK).
 // Aufruf: npm run splash
 //
-// iOS zeigt beim Start einer Web-App zuerst ein statisches Bild (weiß, wenn keins hinterlegt ist).
-// Die Startanimation in index.html beginnt mit der kompakten Hantel des HLX-Logos mittig auf Markengrün.
-// Diese Bilder zeigen exakt dieses erste Bild (gleiche Größe und Position wie in der Animation), damit der Übergang
-// vom Systemstartbild in die Animation ohne Sprung bleibt.
-// Gibt die passenden <link>-Zeilen für index.html aus.
+// iOS zeigt beim Start einer Web-App zuerst ein statisches Bild (weiß, wenn keins hinterlegt ist), die Android-App
+// zeigt vor dem Laden der Seite den System-Startbildschirm. Die Startanimation in index.html beginnt mit der
+// kompakten Hantel des HLX-Logos mittig auf Markengrün. Diese Bilder zeigen exakt dieses erste Bild (gleiche Größe
+// und Position wie in der Animation), damit der Übergang in die Animation ohne Sprung bleibt.
+// Schreibt public/splash/ios-*.png und android/app/src/main/res/drawable-*/splash_logo.png und gibt die passenden
+// <link>-Zeilen für index.html aus.
 const sharp = require('sharp')
 const fs = require('fs')
 const path = require('path')
@@ -15,11 +16,43 @@ const BRAND = '#075640'
 // Nachgezeichnetes Hantel-Logo (scripts/hlx-logo.json) und Skalierung des ersten Bildes der Animation
 const LOGO = require('./hlx-logo.json')
 const ART_UNITS = 360 // Breite der SVG-Zeichenfläche in index.html
-const ART_VW = 0.94 // Breite der Zeichenfläche: min(94vw, 420px, 120vh)
+// Breite der Zeichenfläche wie in index.html: min(94vw, max(420px, 50vmin), 720px, 120vh)
+const ART_VW = 0.94
+const ART_MIN_CSS = 420
+const ART_VMIN = 0.5
+const ART_MAX_CSS = 720
 const ART_VH = 1.2
-const ART_MAX_CSS = 420
 const PUSH_START = 0.94 // Startgröße des Push-Ins
 const OUT_DIR = path.join(__dirname, '..', 'public', 'splash')
+const ANDROID_RES = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res')
+const ANDROID_REF_DP = 390 // Referenzbreite eines Handys in dp für das Android-Startbild
+const ANDROID_ICON_DP = 288 // Fläche des System-Startbildschirms (Android 12+: Kreis mit 192 dp darin)
+const art = (vw, vh) => Math.min(ART_VW * vw, Math.max(ART_MIN_CSS, ART_VMIN * Math.min(vw, vh)), ART_MAX_CSS, ART_VH * vh)
+
+// Hantel (kompakt) als SVG-Gruppe in Einheiten der Zeichenfläche; Mitte der Zeichenfläche = (180, 200)
+function barbell(px, centerX, centerY) {
+  const [tx, ty] = LOGO.t0
+  return (
+    `<g transform="translate(${centerX} ${centerY}) scale(${px}) translate(-180 -200)">` +
+    `<g transform="translate(${tx} ${ty}) scale(${LOGO.k})" fill="#fff" fill-rule="evenodd">` +
+    `<path transform="translate(${LOGO.dx} 0)" d="${LOGO.left}"/><path transform="translate(${-LOGO.dx} 0)" d="${LOGO.right}"/>` +
+    `</g></g>`
+  )
+}
+
+// Android: quadratisches Bild (288 dp), Hantel in der Größe des ersten Animationsbildes auf einem 390-dp-Handy.
+// Dient als Symbol des System-Startbildschirms (Android 12+ und androidx-Kompatibilität) und als Fensterhintergrund.
+async function androidImages() {
+  const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 }
+  for (const [name, f] of Object.entries(dens)) {
+    const size = Math.round(ANDROID_ICON_DP * f)
+    const u = (art(ANDROID_REF_DP, 844) / ART_UNITS) * PUSH_START * f
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">${barbell(u, size / 2, size / 2)}</svg>`
+    const dir = path.join(ANDROID_RES, `drawable-${name}`)
+    fs.mkdirSync(dir, { recursive: true })
+    await sharp(Buffer.from(svg)).png({ compressionLevel: 9, palette: true }).toFile(path.join(dir, 'splash_logo.png'))
+  }
+}
 
 // CSS-Pixel (Breite x Höhe im Hochformat) und Pixeldichte der gängigen iPhones
 const PHONES = [
@@ -70,20 +103,18 @@ async function main() {
     const ph = vh * d.dpr
     const file = `ios-${pw}x${ph}.png`
     // px je Einheit der Zeichenfläche; Bildmitte entspricht der Mitte (180, 200) der Zeichenfläche
-    const u = (Math.min(ART_VW * vw, ART_MAX_CSS, ART_VH * vh) / ART_UNITS) * d.dpr * PUSH_START
-    const [tx, ty] = LOGO.t0
+    const u = (art(vw, vh) / ART_UNITS) * d.dpr * PUSH_START
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${pw}" height="${ph}"><rect width="100%" height="100%" fill="${BRAND}"/>` +
-      `<g transform="translate(${pw / 2} ${ph / 2}) scale(${u}) translate(-180 -200)">` +
-      `<g transform="translate(${tx} ${ty}) scale(${LOGO.k})" fill="#fff" fill-rule="evenodd">` +
-      `<path transform="translate(${LOGO.dx} 0)" d="${LOGO.left}"/><path transform="translate(${-LOGO.dx} 0)" d="${LOGO.right}"/>` +
-      `</g></g></svg>`
+      barbell(u, pw / 2, ph / 2) +
+      `</svg>`
     await sharp(Buffer.from(svg)).png({ compressionLevel: 9, palette: true }).toFile(path.join(OUT_DIR, file))
     links.push(
       `    <link rel="apple-touch-startup-image" href="/coaching-app/splash/${file}" ` +
         `media="(device-width: ${d.w}px) and (device-height: ${d.h}px) and (-webkit-device-pixel-ratio: ${d.dpr}) and (orientation: ${d.orient})" /> <!-- ${d.name}${landscape ? ', Querformat' : ''} -->`,
     )
   }
+  await androidImages()
   console.log(links.join('\n'))
 }
 

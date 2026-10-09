@@ -78,16 +78,19 @@
       html.sp-on { background-color: #075640; }
       html.sp-on.sp-end { background-color: rgb(var(--c-bg)); transition: background-color .3s cubic-bezier(.3, 0, .5, 1) .12s; }
       #splash {
-        position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; overflow: hidden;
+        position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; overflow: hidden;
         color: #fff; cursor: pointer; font-family: "HLX Splash", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
         transition: opacity .3s ease; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
         -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
       }
       #splash.sp-out { opacity: 0; }
-      .sp-bg { position: absolute; inset: 0; background: #075640; }
-      /* Zeichenfläche 360 x 400 Einheiten; --u = Pixel je Einheit */
-      .sp-art { --w: min(94vw, 420px, 120vh); --u: calc(var(--w) / 360); position: relative; width: var(--w); height: calc(var(--w) * 400 / 360); }
-      .sp-cam { position: absolute; inset: 0; transform-origin: 50% 50%; animation: sp-push 2.1s cubic-bezier(.25, .1, .25, 1) both; }
+      .sp-bg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: #075640; }
+      /* Zeichenfläche 360 x 400 Einheiten; --u = Pixel je Einheit.
+         Handy: 94 % der Breite (max. 420 px); iPad/Mac wachsen mit der kürzeren Seite (50 %), bis 720 px;
+         bei sehr niedrigen Fenstern begrenzt 120vh die Größe (Flex-Zentrierung lässt den leeren Rand oben/unten überstehen).
+         Dieselbe Formel steht in scripts/generate-splash.cjs. */
+      .sp-art { --w: min(94vw, max(420px, 50vmin), 720px, 120vh); --u: calc(var(--w) / 360); position: relative; flex: none; width: var(--w); height: calc(var(--w) * 400 / 360); }
+      .sp-cam { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform-origin: 50% 50%; animation: sp-push 2.1s cubic-bezier(.25, .1, .25, 1) both; }
       .sp-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; overflow: visible; }
       .sp-layer path { fill: #fff; fill-rule: evenodd; }
 
@@ -95,7 +98,7 @@
       .sp-left { animation: sp-open-l .5s cubic-bezier(.76, 0, .18, 1) .2s both, sp-exit-l .35s cubic-bezier(.5, 0, .8, .4) 1s forwards; }
       .sp-right { animation: sp-open-r .5s cubic-bezier(.76, 0, .18, 1) .2s both, sp-exit-r .35s cubic-bezier(.5, 0, .8, .4) 1s forwards; }
       /* HLX: erscheint in der Lücke, wandert dann nach oben und schrumpft zur kleinen Marke */
-      .sp-lmove { position: absolute; inset: 0; transform-origin: 0 0; animation: sp-letters-move .48s cubic-bezier(.25, .8, .25, 1) 1.12s both; }
+      .sp-lmove { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform-origin: 0 0; animation: sp-letters-move .48s cubic-bezier(.25, .8, .25, 1) 1.12s both; }
       .sp-letters { transform-origin: 52.12% 49.81%; animation: sp-letters-in .4s cubic-bezier(.16, 1, .3, 1) .46s both; }
       .sp-tgl { animation: sp-tg-in .4s cubic-bezier(.16, 1, .3, 1) 1.45s both; }
       .sp-tg { font-size: 14px; font-weight: 600; letter-spacing: .4em; fill: #fff; }
@@ -109,7 +112,8 @@
       .sp-ampl { animation: sp-fade-amp .35s ease-out 1.55s both; }
       .sp-amp { font-size: 30px; font-weight: 600; fill: #fff; }
 
-      /* Durchflug: Buchstaben wachsen auf den Betrachter zu, lösen sich auf, dahinter ist die App */
+      /* Durchflug: Buchstaben wachsen auf den Betrachter zu, lösen sich auf, dahinter ist die App.
+         Ab ca. 8-fach sind sie unsichtbar, deshalb endet die Skalierung bei 10,5 (spart Grafikspeicher in Safari). */
       .sp-leaving .sp-art { animation: sp-fly .42s linear forwards; will-change: transform, opacity; }
       .sp-leaving .sp-bg { animation: sp-bgout .42s cubic-bezier(.3, 0, .5, 1) forwards; }
       /* Nur der Inhalt setzt sich, nicht #root: Ein Transform auf #root würde die fixierte Tab-Bar mitnehmen */
@@ -135,8 +139,8 @@
         60% { transform: scale(3.584); opacity: 0.36 }
         70% { transform: scale(5.122); opacity: 0.15 }
         80% { transform: scale(7.558); opacity: 0.04 }
-        90% { transform: scale(11.496); opacity: 0 }
-        100% { transform: scale(18.000); opacity: 0 }
+        90% { transform: scale(9.000); opacity: 0 }
+        100% { transform: scale(10.500); opacity: 0 }
       }
       @keyframes sp-bgout { 0%, 28% { opacity: 1 } 100% { opacity: 0 } }
       @keyframes sp-settle { from { transform: scale(1.06) } to { transform: none } }
