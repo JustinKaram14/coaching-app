@@ -21,8 +21,8 @@ const ART_MAX_CSS = 420
 const PUSH_START = 0.94 // Startgröße des Push-Ins
 const OUT_DIR = path.join(__dirname, '..', 'public', 'splash')
 
-// CSS-Pixel (Breite x Höhe) und Pixeldichte der gängigen iPhones im Hochformat
-const DEVICES = [
+// CSS-Pixel (Breite x Höhe im Hochformat) und Pixeldichte der gängigen iPhones
+const PHONES = [
   { w: 440, h: 956, dpr: 3, name: 'iPhone 16 Pro Max' },
   { w: 430, h: 932, dpr: 3, name: 'iPhone 14/15/16 Plus & Pro Max' },
   { w: 428, h: 926, dpr: 3, name: 'iPhone 12/13 Pro Max, 14 Plus' },
@@ -38,15 +38,39 @@ const DEVICES = [
   { w: 375, h: 667, dpr: 2, name: 'iPhone SE (2./3. Gen.), 8' },
 ]
 
+// iPads gibt es im Hoch- und Querformat, in Safari bleiben device-width/-height die Hochformat-Maße
+const TABLETS = [
+  { w: 744, h: 1133, dpr: 2, name: 'iPad mini (6./7. Gen.)' },
+  { w: 768, h: 1024, dpr: 2, name: 'iPad 9,7", iPad mini 4/5' },
+  { w: 810, h: 1080, dpr: 2, name: 'iPad 10,2"' },
+  { w: 820, h: 1180, dpr: 2, name: 'iPad 10,9" (10. Gen.), iPad Air 10,9"/11"' },
+  { w: 834, h: 1112, dpr: 2, name: 'iPad Pro 10,5", iPad Air 3' },
+  { w: 834, h: 1194, dpr: 2, name: 'iPad Pro 11"' },
+  { w: 834, h: 1210, dpr: 2, name: 'iPad Pro 11" (M4)' },
+  { w: 1024, h: 1366, dpr: 2, name: 'iPad Pro 12,9", iPad Air 13"' },
+  { w: 1032, h: 1376, dpr: 2, name: 'iPad Pro 13" (M4)' },
+]
+
+const DEVICES = [
+  ...PHONES.map((d) => ({ ...d, orient: 'portrait' })),
+  ...TABLETS.flatMap((d) => [
+    { ...d, orient: 'portrait' },
+    { ...d, orient: 'landscape' },
+  ]),
+]
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
   const links = []
   for (const d of DEVICES) {
-    const pw = d.w * d.dpr
-    const ph = d.h * d.dpr
+    const landscape = d.orient === 'landscape'
+    const vw = landscape ? d.h : d.w // sichtbare Breite/Höhe der Seite in CSS-Pixeln
+    const vh = landscape ? d.w : d.h
+    const pw = vw * d.dpr
+    const ph = vh * d.dpr
     const file = `ios-${pw}x${ph}.png`
     // px je Einheit der Zeichenfläche; Bildmitte entspricht der Mitte (180, 200) der Zeichenfläche
-    const u = (Math.min(ART_VW * d.w, ART_MAX_CSS, ART_VH * d.h) / ART_UNITS) * d.dpr * PUSH_START
+    const u = (Math.min(ART_VW * vw, ART_MAX_CSS, ART_VH * vh) / ART_UNITS) * d.dpr * PUSH_START
     const [tx, ty] = LOGO.t0
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${pw}" height="${ph}"><rect width="100%" height="100%" fill="${BRAND}"/>` +
@@ -57,7 +81,7 @@ async function main() {
     await sharp(Buffer.from(svg)).png({ compressionLevel: 9, palette: true }).toFile(path.join(OUT_DIR, file))
     links.push(
       `    <link rel="apple-touch-startup-image" href="/coaching-app/splash/${file}" ` +
-        `media="(device-width: ${d.w}px) and (device-height: ${d.h}px) and (-webkit-device-pixel-ratio: ${d.dpr}) and (orientation: portrait)" /> <!-- ${d.name} -->`,
+        `media="(device-width: ${d.w}px) and (device-height: ${d.h}px) and (-webkit-device-pixel-ratio: ${d.dpr}) and (orientation: ${d.orient})" /> <!-- ${d.name}${landscape ? ', Querformat' : ''} -->`,
     )
   }
   console.log(links.join('\n'))
