@@ -1394,7 +1394,7 @@ export function Training() {
               <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="dauer" fill={colors.brand} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={false} dataKey="dauer" fill={colors.brand} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -5,7 +5,7 @@ import { Scale, Dumbbell, Moon, TrendingUp, TrendingDown, Target, Flame, FileTex
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
-import { useCountUp } from '../hooks/useCountUp'
+import { useCountUpText } from '../hooks/useCountUp'
 import { formatDate, calcSleepHours, calcStreak, toLocalISO, todayISO } from '../lib/utils'
 import type { CoachPlan, KalenderEvent, TrainingEntry } from '../types/database'
 import { Anamnese } from './Anamnese'
@@ -43,19 +43,31 @@ interface TodayData {
 // Verzögerung (ms) für die gestaffelte Einblendung, siehe .enter in index.css
 const d = (ms: number) => ({ '--d': ms }) as React.CSSProperties
 
+// Zahl, die weich hochzählt (siehe useCountUpText); rendert nur ein leeres Element, der Text kommt vom Hook
+function CountText({ value, format, delay, className }: { value: number; format: (n: number) => string; delay?: number; className?: string }) {
+  const ref = useCountUpText<HTMLSpanElement>(value, format, { delay })
+  return <span ref={ref} className={`tabular-nums ${className ?? ''}`} />
+}
+
+const fmtInt = (n: number) => String(Math.round(n))
+const fmtKcal = (n: number) => Math.round(n).toLocaleString('de-DE')
+const fmtHours = (target: number | null) => (n: number) =>
+  target !== null && n === target ? String(target).replace('.', ',') : String(Math.round(n * 10) / 10).replace('.', ',')
+
 const EMPTY_TODAY: TodayData = {
   kcalEaten: 0, trainingsThisWeek: 0, trainingsGoal: null, sleepHours: null, sleepGoal: null,
   weekMinutes: [0, 0, 0, 0, 0, 0, 0], streak: 0, doneTrainings: [], events: [],
 }
 
-function ActivityRings({ rings, label, value, unit, delay = 0 }: {
+function ActivityRings({ rings, label, kcal, unit, delay = 0 }: {
   rings: { color: string; progress: number }[]
   label: string
-  value: string
+  kcal: number
   unit: string
   delay?: number
 }) {
   const { colors } = useTheme()
+  const centerRef = useCountUpText<SVGTextElement>(kcal, fmtKcal, { delay: delay - 20 })
   const size = 120
   const stroke = 9
   const gap = 4
@@ -79,7 +91,7 @@ function ActivityRings({ rings, label, value, unit, delay = 0 }: {
           </g>
         )
       })}
-      <text x="60" y="62" textAnchor="middle" fontSize="15" fontWeight="800" fill="currentColor" className="text-text-primary">{value}</text>
+      <text x="60" y="62" textAnchor="middle" fontSize="15" fontWeight="800" fill="currentColor" className="text-text-primary tabular-nums" ref={centerRef} />
       <text x="60" y="74" textAnchor="middle" fontSize="7" fontWeight="700" letterSpacing="0.6" fill="currentColor" className="text-text-secondary">{unit}</text>
     </svg>
   )
@@ -196,11 +208,6 @@ export function Dashboard() {
   const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
   const [showBanner, setShowBanner] = useState(false)
   const [showAnamnese, setShowAnamnese] = useState(false)
-  // Zahlen zählen weich hoch, sobald die Seite sichtbar wird
-  const kcalShown = useCountUp(today.kcalEaten, { delay: 340 })
-  const trainShown = useCountUp(today.trainingsThisWeek, { delay: 440 })
-  const sleepShown = useCountUp(today.sleepHours ?? 0, { delay: 540 })
-  const streakShown = useCountUp(today.streak, { delay: 320 })
 
   useEffect(() => {
     if (!user) return
@@ -316,10 +323,7 @@ export function Dashboard() {
   const trainGoal = today.trainingsGoal
   const sleepGoal = today.sleepGoal
   const planCount = today.doneTrainings.length + today.events.length
-  const kcalText = Math.round(kcalShown).toLocaleString('de-DE')
-  const sleepText = today.sleepHours === null ? '--'
-    : sleepShown === today.sleepHours ? String(today.sleepHours).replace('.', ',')
-    : String(Math.round(sleepShown * 10) / 10).replace('.', ',')
+  const formatSleep = fmtHours(today.sleepHours)
   const eventMeta = (e: KalenderEvent) =>
     [e.dauer_min ? `${e.dauer_min} min` : null, e.uhrzeit ? `${e.uhrzeit.slice(0, 5)} Uhr` : null].filter(Boolean).join(' · ') || 'Termin'
 
@@ -343,7 +347,7 @@ export function Dashboard() {
           </span>
           {today.streak > 0 && (
             <span className="absolute -top-2 -right-2 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary text-white text-xs font-bold ring-2 ring-bg border border-brand/40">
-              <Flame size={11} aria-hidden="true" /> {Math.round(streakShown)}
+              <Flame size={11} aria-hidden="true" /> <CountText value={today.streak} format={fmtInt} delay={320} />
             </span>
           )}
         </Link>
@@ -356,7 +360,7 @@ export function Dashboard() {
           <div className="flex items-center gap-5">
             <ActivityRings
               label={`Heute ${today.kcalEaten} Kilokalorien gegessen, ${today.trainingsThisWeek} Trainings diese Woche, Schlaf ${today.sleepHours ?? 'keine Angabe'} Stunden`}
-              value={kcalText}
+              kcal={today.kcalEaten}
               unit="KCAL"
               delay={360}
               rings={[
@@ -367,9 +371,9 @@ export function Dashboard() {
             />
             <dl className="flex-1 min-w-0 space-y-3.5">
               {[
-                { color: 'bg-brand', label: 'Kalorien', value: kcalText, sub: kcalGoal ? `/ ${kcalGoal.toLocaleString('de-DE')} kcal` : 'kcal' },
-                { color: 'bg-warning', label: 'Training', value: String(Math.round(trainShown)), sub: trainGoal ? `/ ${trainGoal} diese Woche` : 'diese Woche' },
-                { color: 'bg-accent', label: 'Schlaf', value: sleepText, sub: sleepGoal ? `/ ${String(sleepGoal).replace('.', ',')} h` : 'h' },
+                { color: 'bg-brand', label: 'Kalorien', value: <CountText value={today.kcalEaten} format={fmtKcal} delay={340} />, sub: kcalGoal ? `/ ${kcalGoal.toLocaleString('de-DE')} kcal` : 'kcal' },
+                { color: 'bg-warning', label: 'Training', value: <CountText value={today.trainingsThisWeek} format={fmtInt} delay={440} />, sub: trainGoal ? `/ ${trainGoal} diese Woche` : 'diese Woche' },
+                { color: 'bg-accent', label: 'Schlaf', value: today.sleepHours === null ? '--' : <CountText value={today.sleepHours} format={formatSleep} delay={540} />, sub: sleepGoal ? `/ ${String(sleepGoal).replace('.', ',')} h` : 'h' },
               ].map(row => (
                 <div key={row.label}>
                   <dt className="flex items-center gap-2 text-[11px] font-bold tracking-wider text-text-secondary uppercase">
@@ -510,7 +514,7 @@ export function Dashboard() {
                 <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2} fill="url(#weightGrad)" dot={false} />
+                <Area isAnimationActive={false} type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2} fill="url(#weightGrad)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -536,7 +540,7 @@ export function Dashboard() {
                 <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="stunden" stroke={colors.accent} strokeWidth={2} fill="url(#sleepGrad)" dot={false} />
+                <Area isAnimationActive={false} type="monotone" dataKey="stunden" stroke={colors.accent} strokeWidth={2} fill="url(#sleepGrad)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (

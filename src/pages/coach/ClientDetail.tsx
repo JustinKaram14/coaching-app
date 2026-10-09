@@ -642,7 +642,7 @@ export function ClientDetail() {
                   <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                   <Tooltip content={<CT />} />
-                  <Area type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2} fill="url(#wg2)" dot={false} />
+                  <Area isAnimationActive={false} type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2} fill="url(#wg2)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -657,7 +657,7 @@ export function ClientDetail() {
                   <XAxis dataKey="datum" tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
                   <Tooltip content={<CT />} />
-                  <Bar dataKey="stunden" fill={colors.accent} radius={[4, 4, 0, 0]} />
+                  <Bar isAnimationActive={false} dataKey="stunden" fill={colors.accent} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

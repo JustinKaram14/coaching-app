@@ -195,8 +195,8 @@
 .page > :not([data-enter='manual']) > :nth-child(8) { --i: 7; }
 
 /* Während die Startanimation läuft, warten die Einblendungen darunter (index.html entfernt sp-hold kurz nach dem Durchflug) */
-html.sp-hold #root,
-html.sp-hold #root * { animation-play-state: paused !important; }
+html.sp-hold :is(#root .enter, #root .grow-y, #root .ring-draw, #root .fade-in, #root .sheet-in, #root .modal-in,
+  #root .page > :not([data-enter='manual']) > *) { animation-play-state: paused !important; }
 
 /* Themenwechsel: Farben blenden über, statt zu springen */
 html.theme-fade,

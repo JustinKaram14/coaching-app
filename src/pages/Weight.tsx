@@ -176,7 +176,7 @@ export function Weight() {
               {targetWeight && (
                 <ReferenceLine y={targetWeight} stroke={colors.success} strokeDasharray="6 3" label={{ value: 'Ziel', fill: colors.success, fontSize: 11 }} />
               )}
-              <Area type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2.5} fill="url(#wGrad)" dot={{ fill: colors.brand, r: 3 }} />
+              <Area isAnimationActive={false} type="monotone" dataKey="gewicht" stroke={colors.brand} strokeWidth={2.5} fill="url(#wGrad)" dot={{ fill: colors.brand, r: 3 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

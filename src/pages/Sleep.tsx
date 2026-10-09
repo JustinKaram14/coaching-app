@@ -167,7 +167,7 @@ export function Sleep() {
               <YAxis tick={{ fill: colors.tick, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 12]} />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine y={sleepGoal} stroke={colors.success} strokeDasharray="6 3" label={{ value: 'Ziel', fill: colors.success, fontSize: 11 }} />
-              <Bar dataKey="stunden" fill={colors.accent} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive={false} dataKey="stunden" fill={colors.accent} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
