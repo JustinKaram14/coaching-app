@@ -51,9 +51,9 @@
     <meta name="theme-color" content="#075640" />
     <meta name="color-scheme" content="dark light" />
     <script>
-      // Theme vor dem ersten Paint setzen (kein Aufblitzen). Dunkel ist Standard.
-      try { document.documentElement.dataset.theme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark' }
-      catch (e) { document.documentElement.dataset.theme = 'dark' }
+      // Theme vor dem ersten Paint setzen (kein Aufblitzen). Hell ist Standard, Dunkel nur nach eigener Wahl.
+      try { document.documentElement.dataset.theme = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light' }
+      catch (e) { document.documentElement.dataset.theme = 'light' }
       // Startanimation aktiv: Die Seite selbst ist grün (auch hinter Statusleiste und Home-Indikator).
       // sp-hold: Einblendungen der App warten, bis der Durchflug begonnen hat (siehe src/index.css).
       document.documentElement.classList.add('sp-on', 'sp-hold')

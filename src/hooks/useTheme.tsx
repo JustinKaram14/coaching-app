@@ -4,11 +4,12 @@ export type Theme = 'dark' | 'light'
 
 const STORAGE_KEY = 'theme'
 
+// Hell ist der Standard. Dunkel gilt nur, wenn der Nutzer es selbst eingestellt hat.
 function readStoredTheme(): Theme {
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'light' ? 'light' : 'dark'
+    return localStorage.getItem(STORAGE_KEY) === 'dark' ? 'dark' : 'light'
   } catch {
-    return 'dark'
+    return 'light'
   }
 }
 
