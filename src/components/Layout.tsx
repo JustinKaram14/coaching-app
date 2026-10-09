@@ -3,6 +3,8 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { LogOut, Plus, X, Zap } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '../lib/utils'
+import { DayStatusBadge } from './DayStatusBadge'
+import { STATUS_BY_ROUTE, statusText, useDayStatus } from '../hooks/useDayStatus'
 import {
   clientNav, coachNav, clientTabs, coachTabs, moreItems, quickActions, type NavItem,
 } from '../lib/navigation'
@@ -20,6 +22,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const nav = isCoach ? coachNav : clientNav
   const tabs = isCoach ? coachTabs : clientTabs
   const moreRoutes = moreItems(nav, tabs).map(i => i.to)
+
+  // Tagesstatus (heute gewogen, Schlaf, Training, Mahlzeiten, Supplements) als Punkt am jeweiligen Menüpunkt
+  const { status } = useDayStatus()
+  const statusKey = (to: string): string | undefined => (isCoach ? undefined : (STATUS_BY_ROUTE as Record<string, string>)[to])
+  const statusFor = (to: string) => { const key = statusKey(to); return key ? (status as Record<string, any>)[key] : undefined }
+  const dailyItems = isCoach ? [] : moreRoutes.map(statusFor).filter(s => s && s.total > 0)
+  const dailyDone = dailyItems.filter(s => s.level === 'done').length
 
   // Sheet gleitet beim Schließen nach unten weg, erst danach wird es entfernt
   const closeQuick = useCallback(() => {
@@ -53,17 +62,44 @@ export function Layout({ children }: { children: React.ReactNode }) {
     to === '/more' && (location.pathname === '/more' || moreRoutes.some(r => location.pathname.startsWith(r)))
 
   const TabLink = ({ to, icon: Icon, label }: NavItem) => {
-    const active = to === '/more' ? isMoreActive(to) : location.pathname.startsWith(to)
+    const isMore = to === '/more'
+    const active = isMore ? isMoreActive(to) : location.pathname.startsWith(to)
+    const key = statusKey(to)
+    const item = !isMore ? statusFor(to) : undefined
+    const allDone = isMore && dailyItems.length > 0 && dailyDone === dailyItems.length
+    const started = item ? item.level !== 'none' : isMore ? dailyDone > 0 : false
+    const spoken = item && key
+      ? `, ${statusText(key, item)}`
+      : isMore && dailyItems.length ? `, ${dailyDone} von ${dailyItems.length} Tagesaufgaben erledigt` : ''
     return (
       <Link
         to={to}
         aria-current={active ? 'page' : undefined}
+        aria-label={`${label}${spoken}`}
         className={cn(
-          'flex flex-col items-center justify-center gap-1 py-2 rounded-2xl text-[11px] font-semibold transition-all duration-200 active:scale-95',
-          active ? 'text-brand' : 'text-text-muted hover:text-text-primary',
+          'flex flex-col items-center justify-center gap-1 py-2 rounded-2xl text-[11px] max-[339px]:text-[10px] font-semibold transition-all duration-200 active:scale-95',
+          active && 'bg-brand/10',
+          allDone || started ? 'text-success' : active ? 'text-brand' : 'text-text-muted hover:text-text-primary',
         )}
       >
-        <Icon size={22} strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
+        <span className="relative inline-flex">
+          <Icon size={22} strokeWidth={active || started ? 2.4 : 2} aria-hidden="true" />
+          {item && <DayStatusBadge item={item} className="absolute -top-1 -right-2" />}
+          {isMore && dailyItems.length > 0 && (allDone ? (
+            <DayStatusBadge item={{ level: 'done', done: dailyDone, total: dailyItems.length }} className="absolute -top-1.5 -right-3" />
+          ) : (
+            <span
+              key={dailyDone}
+              aria-hidden="true"
+              className={cn(
+                'pop-in absolute -top-2 -right-4 min-w-[22px] h-4 px-1 rounded-full text-[10px] leading-4 font-bold text-center ring-2 ring-bg-card',
+                dailyDone > 0 ? 'bg-brand text-bg' : 'bg-bg-elevated text-text-muted',
+              )}
+            >
+              {dailyDone}/{dailyItems.length}
+            </span>
+          ))}
+        </span>
         <span>{label}</span>
       </Link>
     )
@@ -84,16 +120,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 pb-4 space-y-1 overflow-y-auto" aria-label="Hauptnavigation">
-        {nav.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => cn('nav-link', isActive && 'active')}
-          >
-            <Icon size={18} aria-hidden="true" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+        {nav.map(({ to, icon: Icon, label }) => {
+          const item = statusFor(to)
+          const started = !!item && item.level !== 'none'
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => cn('nav-link', isActive && 'active', started && '!text-success')}
+            >
+              <Icon size={18} aria-hidden="true" />
+              <span>{label}</span>
+              {started && <DayStatusBadge item={item} size={18} className="ml-auto !ring-0" />}
+            </NavLink>
+          )
+        })}
       </nav>
 
       {/* User */}
@@ -157,23 +198,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {quickActions.map(({ to, icon: Icon, label, hint }, i) => (
-                <Link
-                  key={to}
-                  to={to}
-                  autoFocus={i === 0}
-                  style={{ '--d': 120 + i * 55 } as React.CSSProperties}
-                  className="enter flex flex-col gap-3 p-4 rounded-3xl bg-bg-elevated border border-border hover:border-brand/50 transition-all active:scale-[0.97]"
-                >
-                  <span className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center">
-                    <Icon size={20} aria-hidden="true" />
-                  </span>
-                  <span>
-                    <span className="block text-sm font-bold text-text-primary">{label}</span>
-                    <span className="block text-xs text-text-secondary">{hint}</span>
-                  </span>
-                </Link>
-              ))}
+              {quickActions.map(({ to, icon: Icon, label, hint }, i) => {
+                const key = statusKey(to)
+                const item = statusFor(to)
+                const done = item?.level === 'done'
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    autoFocus={i === 0}
+                    style={{ '--d': 120 + i * 55 } as React.CSSProperties}
+                    className="enter flex flex-col gap-3 p-4 rounded-3xl bg-bg-elevated border border-border hover:border-brand/50 transition-all active:scale-[0.97]"
+                  >
+                    <span className={cn('relative w-10 h-10 rounded-2xl flex items-center justify-center', done ? 'bg-success/15 text-success' : 'bg-brand/10 text-brand')}>
+                      <Icon size={20} aria-hidden="true" />
+                      {item && <DayStatusBadge item={item} className="absolute -top-1 -right-1" />}
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-text-primary">{label}</span>
+                      <span className={cn('block text-xs', done ? 'text-success' : 'text-text-secondary')}>
+                        {done ? 'Heute erledigt' : item?.level === 'partial' && key ? statusText(key, item) : hint}
+                      </span>
+                    </span>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </div>
