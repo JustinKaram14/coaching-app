@@ -7,6 +7,8 @@ import { useAuth } from '../hooks/useAuth'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
+import { ExerciseNameInput } from '../components/ExerciseNameInput'
+import { resetMyExerciseNames } from '../lib/exercises'
 
 const TRAINING_TYPES = ['Kraft', 'Cardio', 'HIIT', 'Yoga', 'Stretching', 'Schwimmen', 'Radfahren', 'Laufen', 'Sonstiges']
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -97,6 +99,7 @@ export function TrainingVorlagen() {
       }
     }
 
+    resetMyExerciseNames()
     await load()
     setOpen(false)
     setForm({ name: '', trainingstyp: 'Kraft', wochentage: [] })
@@ -289,8 +292,8 @@ export function TrainingVorlagen() {
               {uebungen.map((u, i) => (
                 <div key={i} className="p-3 bg-bg-elevated rounded-lg space-y-2">
                   <div className="flex gap-2">
-                    <input className="input flex-1 text-sm py-2" placeholder="Übungsname (z.B. Bankdrücken)" value={u.uebungsname}
-                      onChange={e => updateUebung(i, 'uebungsname', e.target.value)} />
+                    <ExerciseNameInput placeholder="Übung suchen oder eigenen Namen eingeben" value={u.uebungsname}
+                      onChange={v => updateUebung(i, 'uebungsname', v)} />
                     <button onClick={() => removeUebung(i)} className="p-2 rounded hover:bg-danger/10 hover:text-danger text-text-muted"><Trash2 size={14} /></button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">

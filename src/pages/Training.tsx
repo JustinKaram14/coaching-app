@@ -8,6 +8,8 @@ import { formatDate, todayISO } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
+import { EX_BASE, loadLocalExercises, findLocalExercise, matchesExercise, resetMyExerciseNames, type LocalExercise } from '../lib/exercises'
+import { ExerciseNameInput } from '../components/ExerciseNameInput'
 import type { TrainingEntry, UebungEntry } from '../types/database'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -386,86 +388,6 @@ function getTip(name: string): UebungTip | null {
   return null
 }
 
-// ─── Local Exercise Dataset ───────────────────────────────────────────────────
-
-interface LocalExercise {
-  id: string; name: string; category: string; body_part: string
-  equipment: string; instructions: string; instruction_steps: string[]
-  muscle_group: string; secondary_muscles: string[]; target: string; image: string; gif_url: string
-}
-
-const EX_BASE = import.meta.env.BASE_URL + 'exercises/'
-let _localExCache: LocalExercise[] | null = null
-
-async function loadLocalExercises(): Promise<LocalExercise[]> {
-  if (_localExCache) return _localExCache
-  try {
-    const r = await fetch(EX_BASE + 'data/exercises_clean.json')
-    _localExCache = await r.json()
-    return _localExCache!
-  } catch { _localExCache = []; return [] }
-}
-
-const DE_TO_EN_EX: Record<string, string> = {
-  'seitheben': 'side lateral raise',
-  'bankdrücken': 'barbell bench press',
-  'kniebeuge': 'barbell squat',
-  'kniebeugen': 'barbell squat',
-  'kreuzheben': 'barbell deadlift',
-  'klimmzug': 'wide-grip pullup',
-  'klimmzüge': 'wide-grip pullup',
-  'schulterdrücken': 'barbell shoulder press',
-  'rudern': 'bent over barbell row',
-  'kabelrudern': 'seated cable row',
-  'bizeps curl': 'barbell curl',
-  'bizepscurl': 'barbell curl',
-  'trizepsdrücken': 'triceps dip',
-  'beinstrecken': 'leg extension',
-  'beinbeugen': 'seated leg curl',
-  'plank': 'plank',
-  'dips': 'chest dip',
-  'liegestützen': 'push-up',
-  'liegestütze': 'push-up',
-  'latzug': 'cable lat pulldown',
-  'beinpresse': 'leg press',
-  'wadenheben': 'calf raise',
-  'hip thrust': 'barbell hip thrust',
-  'ausfallschritt': 'barbell lunge',
-  'ausfallschritte': 'barbell lunge',
-  'schrägbankdrücken': 'incline barbell bench press',
-  'crunch': 'crunch',
-  'sit-up': 'sit-up',
-  'situp': 'sit-up',
-  'hammer curl': 'hammer curl',
-  'hammercurl': 'hammer curl',
-  'goblet squat': 'goblet squat',
-  'arnold press': 'arnold press',
-  'beinheben': 'hanging leg raise',
-  'russian twist': 'russian twist',
-  'butterfly': 'peck deck fly',
-  'rückenstrecker': 'back extension',
-  'hyperextension': 'back extension',
-  'face pull': 'face pull',
-  'trizeps pushdown': 'triceps pushdown',
-  'rumänisches kreuzheben': 'romanian deadlift',
-  'bulgarian split squat': 'bulgarian split squat',
-}
-
-function findLocalExercise(name: string, list: LocalExercise[]): LocalExercise | null {
-  const q = name.toLowerCase().trim()
-  const exact = list.find(e => e.name.toLowerCase() === q)
-  if (exact) return exact
-  const contains = list.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()))
-  if (contains) return contains
-  const enTerm = DE_TO_EN_EX[q]
-  if (enTerm) {
-    return list.find(e => e.name.toLowerCase() === enTerm)
-      ?? list.find(e => e.name.toLowerCase().includes(enTerm.split(' ')[0]))
-      ?? null
-  }
-  return null
-}
-
 // ─── Exercise Tip Modal ───────────────────────────────────────────────────────
 
 const MUSKEL_LABELS: Record<string, string> = {
@@ -581,7 +503,7 @@ function UebungTipModal({ name, onClose }: { name: string; onClose: () => void }
               </ul>
             </div>
           ) : !localLoading ? (
-            <p className="text-sm text-text-muted">Für <span className="text-text-primary font-medium">"{name}"</span> sind noch keine Tipps hinterlegt.</p>
+            <p className="text-sm text-text-muted"><span className="text-text-primary font-medium">"{name}"</span> ist eine eigene Übung, dafür gibt es kein GIF und keine Anleitung.</p>
           ) : null}
 
           {/* YouTube */}
@@ -604,11 +526,9 @@ function ExercisePickerModal({ onSelect, onClose }: { onSelect: (name: string) =
   useEffect(() => { loadLocalExercises().then(setList) }, [])
 
   const filtered = list.length === 0 ? [] : (() => {
-    const q = query.toLowerCase()
-    return (q
-      ? list.filter(e => e.name.toLowerCase().includes(q) || e.body_part?.toLowerCase().includes(q))
-      : list
-    ).sort((a, b) => a.name.localeCompare(b.name, 'de')).slice(0, 80)
+    return list
+      .filter(e => matchesExercise(e, query))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de')).slice(0, 80)
   })()
 
   return (
@@ -649,67 +569,6 @@ function ExercisePickerModal({ onSelect, onClose }: { onSelect: (name: string) =
           ))}
         </div>
       </div>
-    </div>
-  )
-}
-
-// ─── Exercise Name Input with Autocomplete ────────────────────────────────────
-
-function ExerciseNameInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [suggestions, setSuggestions] = useState<LocalExercise[]>([])
-  const [open, setOpen] = useState(false)
-  const [allEx, setAllEx] = useState<LocalExercise[]>([])
-  const wrapRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { loadLocalExercises().then(setAllEx) }, [])
-
-  useEffect(() => {
-    const q = value.toLowerCase().trim()
-    if (q.length < 2 || allEx.length === 0) { setSuggestions([]); return }
-    const res = allEx
-      .filter(e => e.name.toLowerCase().includes(q) || e.body_part?.toLowerCase().includes(q) || e.target?.toLowerCase().includes(q))
-      .slice(0, 7)
-    setSuggestions(res)
-    setOpen(res.length > 0)
-  }, [value, allEx])
-
-  function select(name: string) {
-    onChange(name)
-    setSuggestions([])
-    setOpen(false)
-  }
-
-  return (
-    <div ref={wrapRef} className="relative flex-1">
-      <input
-        className="input w-full text-sm py-2"
-        placeholder="Übungsname"
-        value={value}
-        onChange={ev => { onChange(ev.target.value); setOpen(true) }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onFocus={() => suggestions.length > 0 && setOpen(true)}
-        autoComplete="off"
-      />
-      {open && suggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-bg-card border border-border rounded-xl shadow-lg overflow-hidden">
-          {suggestions.map(ex => (
-            <button
-              key={ex.id}
-              onMouseDown={() => select(ex.name)}
-              className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-bg-elevated transition-colors text-left"
-            >
-              <div className="w-8 h-8 rounded-lg bg-bg-elevated overflow-hidden shrink-0">
-                <img src={EX_BASE + ex.image} alt="" className="w-full h-full object-cover"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-text-primary truncate">{ex.name}</div>
-                <div className="text-[10px] text-text-muted">{ex.body_part}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -1145,6 +1004,7 @@ export function Training() {
           }
         })
       if (uebungenRows.length) await supabase.from('uebungen').insert(uebungenRows)
+      resetMyExerciseNames()
     }
 
     localStorage.removeItem(WORKOUT_KEY)
@@ -1269,6 +1129,7 @@ export function Training() {
           notizen: u.notizen || null,
         }))
       )
+      resetMyExerciseNames()
     }
 
     await load()

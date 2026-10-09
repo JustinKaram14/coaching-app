@@ -1,43 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, X, ChevronRight, Dumbbell, Info } from 'lucide-react'
 import { Spinner } from '../components/ui/Spinner'
+import { EX_BASE, loadLocalExercises, matchesExercise, norm, type LocalExercise } from '../lib/exercises'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Konstanten ───────────────────────────────────────────────────────────────
 
-interface Exercise {
-  id: string
-  name: string
-  category: string
-  body_part: string
-  equipment: string
-  instructions: string
-  instruction_steps: string[]
-  muscle_group: string
-  secondary_muscles: string[]
-  target: string
-  image: string
-  gif_url: string
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const BASE = import.meta.env.BASE_URL + 'exercises/'
+type Exercise = LocalExercise
 
 function gifUrl(ex: Exercise) {
-  return BASE + ex.gif_url
+  return EX_BASE + ex.gif_url
 }
 function imgUrl(ex: Exercise) {
-  return BASE + ex.image
-}
-
-const BODY_PART_DE: Record<string, string> = {
-  back: 'Rücken', chest: 'Brust', shoulders: 'Schultern',
-  'upper arms': 'Oberarme', 'lower arms': 'Unterarme',
-  'upper legs': 'Oberschenkel', 'lower legs': 'Unterschenkel',
-  waist: 'Bauch', cardio: 'Cardio', neck: 'Nacken',
-}
-function bpDe(bp: string) {
-  return BODY_PART_DE[bp?.toLowerCase()] ?? bp
+  return EX_BASE + ex.image
 }
 
 // ─── Exercise Detail Modal ────────────────────────────────────────────────────
@@ -61,7 +35,8 @@ function DetailModal({ ex, onClose }: { ex: Exercise; onClose: () => void }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-text-primary truncate">{ex.name}</h2>
-            <p className="text-xs text-text-muted mt-0.5">{bpDe(ex.body_part)} · {ex.equipment}</p>
+            <p className="text-xs text-text-muted mt-0.5">{ex.body_part} · {ex.equipment}</p>
+            {ex.name_en && <p className="text-[11px] text-text-muted truncate">Englischer Name: {ex.name_en}</p>}
           </div>
           <button onClick={onClose} className="ml-3 p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted">
             <X size={18} />
@@ -142,7 +117,7 @@ function ExRow({ ex, onClick }: { ex: Exercise; onClick: () => void }) {
       {/* Text */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-text-primary truncate">{ex.name}</div>
-        <div className="text-xs text-text-muted mt-0.5">{bpDe(ex.body_part)}</div>
+        <div className="text-xs text-text-muted mt-0.5">{ex.target}{ex.equipment ? ` · ${ex.equipment}` : ''}</div>
       </div>
 
       <ChevronRight size={14} className="text-text-muted opacity-40 group-hover:opacity-80 transition-opacity shrink-0" />
@@ -161,31 +136,21 @@ export function Uebungspool() {
   const letterRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
-    fetch(import.meta.env.BASE_URL + 'exercises/data/exercises_clean.json')
-      .then(r => r.json())
-      .then((data: Exercise[]) => { setExercises(data); setLoading(false) })
-      .catch(() => setLoading(false))
+    loadLocalExercises().then(data => { setExercises(data); setLoading(false) })
   }, [])
 
   // Body parts
   const bodyParts = useMemo(() => {
-    const set = new Set(exercises.map(e => e.body_part?.toLowerCase()).filter(Boolean))
-    return [...set].sort()
+    const set = new Set(exercises.map(e => e.body_part).filter(Boolean))
+    return [...set].sort((a, b) => a.localeCompare(b, 'de'))
   }, [exercises])
 
   // Filtered + sorted list
   const filtered = useMemo(() => {
-    const q = query.toLowerCase()
     return exercises
       .filter(e => {
-        if (selectedBodyPart && e.body_part?.toLowerCase() !== selectedBodyPart) return false
-        if (q) {
-          return e.name?.toLowerCase().includes(q)
-            || e.body_part?.toLowerCase().includes(q)
-            || e.category?.toLowerCase().includes(q)
-            || e.equipment?.toLowerCase().includes(q)
-        }
-        return true
+        if (selectedBodyPart && e.body_part !== selectedBodyPart) return false
+        return matchesExercise(e, query)
       })
       .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'de'))
   }, [exercises, query, selectedBodyPart])
@@ -194,7 +159,8 @@ export function Uebungspool() {
   const grouped = useMemo(() => {
     const map: Record<string, Exercise[]> = {}
     for (const ex of filtered) {
-      const letter = (ex.name?.[0] ?? '#').toUpperCase()
+      const first = norm(ex.name)[0]?.toUpperCase() ?? '#'
+      const letter = /[A-Z]/.test(first) ? first : '#'
       ;(map[letter] ??= []).push(ex)
     }
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
@@ -222,7 +188,7 @@ export function Uebungspool() {
           <Dumbbell size={40} className="text-text-muted mx-auto" />
           <p className="font-semibold text-text-primary">Noch keine Übungen geladen</p>
           <p className="text-sm text-text-secondary max-w-sm mx-auto">
-            Kopiere <code className="text-xs bg-bg-elevated px-1.5 py-0.5 rounded">exercises.json</code>,{' '}
+            Kopiere <code className="text-xs bg-bg-elevated px-1.5 py-0.5 rounded">exercises_de.json</code>,{' '}
             <code className="text-xs bg-bg-elevated px-1.5 py-0.5 rounded">videos/</code> und{' '}
             <code className="text-xs bg-bg-elevated px-1.5 py-0.5 rounded">images/</code> aus dem Repo in{' '}
             <code className="text-xs bg-bg-elevated px-1.5 py-0.5 rounded">public/exercises/</code>.
@@ -280,7 +246,7 @@ export function Uebungspool() {
                 selectedBodyPart === bp ? 'bg-primary border-brand text-white' : 'border-border text-text-secondary hover:border-brand/40'
               }`}
             >
-              {bpDe(bp)}
+              {bp}
             </button>
           ))}
         </div>
