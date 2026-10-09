@@ -5,12 +5,15 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, todayISO } from '../../lib/utils'
 import { Spinner } from '../../components/ui/Spinner'
+import { Avatar } from '../../components/game/Avatar'
+import { DEFAULT_CHARACTER, levelInfo } from '../../lib/game'
 import type { Profile } from '../../types/database'
 
 interface ClientWithStats extends Profile {
   lastWeight?: number | null
   totalTrainings?: number
   lastTrainingDate?: string | null
+  figur?: { name: string; config: any; equipped: any; level: number } | null
 }
 
 export function CoachDashboard() {
@@ -36,13 +39,18 @@ export function CoachDashboard() {
 
       const clientIds = clientProfiles.map(c => c.id)
 
-      const [weightsRes, trainingsRes] = await Promise.all([
+      const [weightsRes, trainingsRes, figurenRes, xpRes] = await Promise.all([
         supabase.from('gewicht').select('user_id, gewicht, datum').in('user_id', clientIds).order('datum', { ascending: false }),
         supabase.from('training').select('user_id, datum').in('user_id', clientIds).order('datum', { ascending: false }),
+        supabase.from('characters').select('user_id, name, config, equipped').in('user_id', clientIds),
+        supabase.from('character_stats').select('user_id, xp').in('user_id', clientIds),
       ])
 
       const weights = weightsRes.data ?? []
       const trainings = trainingsRes.data ?? []
+      // Figuren gibt es erst nach dem Datenbank-Update; bis dahin bleiben die Initialen
+      const figuren = new Map((figurenRes.error ? [] : figurenRes.data ?? []).map(f => [f.user_id, f]))
+      const xpByUser = new Map((xpRes.error ? [] : xpRes.data ?? []).map(x => [x.user_id, x.xp]))
 
       const enriched: ClientWithStats[] = clientProfiles.map(c => {
         const clientWeights = weights.filter(w => w.user_id === c.id)
@@ -52,6 +60,14 @@ export function CoachDashboard() {
           lastWeight: clientWeights[0]?.gewicht ?? null,
           totalTrainings: clientTrainings.length,
           lastTrainingDate: clientTrainings[0]?.datum ?? null,
+          figur: figuren.has(c.id)
+            ? {
+                name: figuren.get(c.id).name,
+                config: { ...DEFAULT_CHARACTER, ...figuren.get(c.id).config },
+                equipped: figuren.get(c.id).equipped ?? {},
+                level: levelInfo(xpByUser.get(c.id) ?? 0).level,
+              }
+            : null,
         }
       })
 
@@ -127,16 +143,29 @@ export function CoachDashboard() {
                   onClick={() => navigate(`/coach/client/${client.id}`)}
                   className="flex items-center gap-4 p-4 rounded-xl hover:bg-bg-elevated border border-transparent hover:border-border cursor-pointer transition-all group"
                 >
-                  {/* Avatar */}
-                  <div className="w-11 h-11 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-lg shrink-0">
-                    {client.name?.charAt(0)?.toUpperCase() ?? '?'}
-                  </div>
+                  {/* Avatar: Figur des Klienten, sonst Initiale */}
+                  {client.figur ? (
+                    <div className="relative shrink-0" role="img" aria-label={`${client.figur.name}, Level ${client.figur.level}`}>
+                      <div className="w-12 h-12 rounded-2xl bg-brand/10 border border-brand/30 overflow-hidden">
+                        <Avatar view="head" config={client.figur.config} equipped={client.figur.equipped} size={48} label="" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-lg shrink-0">
+                      {client.name?.charAt(0)?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-text-primary">{client.name ?? 'Unbekannt'}</span>
                       <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-success' : 'bg-border'}`} />
+                      {client.figur && (
+                        <span className="px-2 py-0.5 rounded-full bg-brand/10 text-brand text-[11px] font-bold tabular-nums">
+                          Level {client.figur.level}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-text-muted truncate">{client.email}</div>
                   </div>

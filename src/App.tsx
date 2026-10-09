@@ -20,12 +20,23 @@ import { Rezepte } from './pages/Rezepte'
 import { Legal } from './pages/Legal'
 import { Uebungspool } from './pages/Uebungspool'
 import { More } from './pages/More'
+import { Charakter } from './pages/Charakter'
+import { DayStatusProvider } from './hooks/useDayStatus'
+import { GameProvider } from './hooks/useGame'
+import { GameOverlay } from './components/game/GameOverlay'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return <PageLoader />
   if (!user) return <Navigate to="/login" replace />
-  return <Layout>{children}</Layout>
+  return (
+    <DayStatusProvider>
+      <GameProvider>
+        <Layout>{children}</Layout>
+        <GameOverlay />
+      </GameProvider>
+    </DayStatusProvider>
+  )
 }
 
 function CoachRoute({ children }: { children: React.ReactNode }) {
@@ -74,6 +85,9 @@ function AppRoutes() {
       <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
+      <Route path="/charakter" element={<ProtectedRoute>
+        {profile?.role === 'coach' ? <Navigate to="/coach" replace /> : <Charakter />}
+      </ProtectedRoute>} />
 
       {/* Coach Only */}
       <Route path="/coach" element={<ProtectedRoute><CoachRoute><CoachDashboard /></CoachRoute></ProtectedRoute>} />

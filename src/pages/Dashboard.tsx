@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, startOfWeek, subDays } from 'date-fns'
 import { Scale, Dumbbell, Moon, TrendingUp, TrendingDown, Target, Flame, FileText, X, Calendar as CalendarIcon, Check, ChevronRight, Users, Clock } from 'lucide-react'
@@ -9,6 +9,10 @@ import { useCountUpText } from '../hooks/useCountUp'
 import { formatDate, calcSleepHours, calcStreak, toLocalISO, todayISO } from '../lib/utils'
 import type { CoachPlan, KalenderEvent, TrainingEntry } from '../types/database'
 import { Anamnese } from './Anamnese'
+import { Spinner } from '../components/ui/Spinner'
+import { useGame } from '../hooks/useGame'
+import { Onboarding } from '../components/game/Onboarding'
+import { CharacterOffer } from '../components/game/CharacterOffer'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart,
 } from 'recharts'
@@ -208,6 +212,19 @@ export function Dashboard() {
   const [masterplan, setMasterplan] = useState<CoachPlan | null>(null)
   const [showBanner, setShowBanner] = useState(false)
   const [showAnamnese, setShowAnamnese] = useState(false)
+  const [anamneseDone, setAnamneseDone] = useState(false)
+  const game = useGame()
+  // Neue Klienten starten mit dem Kennenlernen und der Figur (inkl. Anamnese), sonst nur mit der Anamnese.
+  // Die Entscheidung fällt einmal, sobald klar ist, ob es die Figur schon gibt.
+  const [gameWaitedOut, setGameWaitedOut] = useState(false)
+  const onboardingRef = useRef(false)
+  const anamneseOnlyRef = useRef(false)
+
+  useEffect(() => {
+    if (!showAnamnese || game.loaded) return
+    const timer = window.setTimeout(() => setGameWaitedOut(true), 3500)
+    return () => window.clearTimeout(timer)
+  }, [showAnamnese, game.loaded])
 
   useEffect(() => {
     if (!user) return
@@ -232,7 +249,8 @@ export function Dashboard() {
       if (settings) {
         try {
           const note = settings.ernaehrungs_notizen ? JSON.parse(settings.ernaehrungs_notizen) : {}
-          if (!note.anamnese_done) setShowAnamnese(true)
+          if (note.anamnese_done) setAnamneseDone(true)
+          else setShowAnamnese(true)
         } catch { setShowAnamnese(true) }
       }
       if (planRes.data) {
@@ -313,7 +331,16 @@ export function Dashboard() {
   }
 
   if (showAnamnese && user && profile?.role === 'client') {
-    return <Anamnese userId={user.id} onDone={() => setShowAnamnese(false)} />
+    if (!onboardingRef.current && !anamneseOnlyRef.current) {
+      if (!game.loaded && !gameWaitedOut) {
+        return <div className="flex justify-center py-24"><Spinner size={32} /></div>
+      }
+      if (game.available && !game.character) onboardingRef.current = true
+      else anamneseOnlyRef.current = true
+    }
+    return onboardingRef.current
+      ? <Onboarding withAnamnese onSkip={undefined} onDone={() => { onboardingRef.current = false; setShowAnamnese(false) }} />
+      : <Anamnese userId={user.id} onDone={() => { anamneseOnlyRef.current = false; setShowAnamnese(false) }} />
   }
 
   const now = new Date()
@@ -550,6 +577,7 @@ export function Dashboard() {
           )}
         </div>
       </div>
+      {anamneseDone && <CharacterOffer />}
     </div>
   )
 }
