@@ -15,47 +15,47 @@ export const EMPTY_CLIENT_GAME = {
   xp: 0,
   punkte: 0,
 }
-export function useClientGame(e) {
-  let [t, n] = useState(EMPTY_CLIENT_GAME)
+export function useClientGame(userId) {
+  let [game, setGame] = useState(EMPTY_CLIENT_GAME)
   return (
     useEffect(() => {
-      if (!e) return
-      let t = false
+      if (!userId) return
+      let cancelled = false
       return (
         (async () => {
-          let [r, i] = await Promise.all([
-            supabase.from('characters').select('*').eq('user_id', e).maybeSingle(),
-            supabase.from('character_stats').select('xp,punkte').eq('user_id', e).maybeSingle(),
+          let [characterResult, statsResult] = await Promise.all([
+            supabase.from('characters').select('*').eq('user_id', userId).maybeSingle(),
+            supabase.from('character_stats').select('xp,punkte').eq('user_id', userId).maybeSingle(),
           ])
-          if (t) return
-          if (r.error && isMissingTable(r.error)) {
-            n({
+          if (cancelled) return
+          if (characterResult.error && isMissingTable(characterResult.error)) {
+            setGame({
               ...EMPTY_CLIENT_GAME,
               loaded: true,
             })
             return
           }
-          let a = r.data,
-            o = i.data ?? {}
-          n({
+          let characterRow = characterResult.data,
+            totals = statsResult.data ?? {}
+          setGame({
             loaded: true,
             available: true,
-            name: a?.name ?? null,
+            name: characterRow?.name ?? null,
             config: {
               ...DEFAULT_CHARACTER,
-              ...(a?.config ?? {}),
+              ...(characterRow?.config ?? {}),
             },
-            equipped: a?.equipped ?? {},
-            kennenlernen: a?.kennenlernen ?? null,
-            xp: o.xp ?? 0,
-            punkte: o.punkte ?? 0,
+            equipped: characterRow?.equipped ?? {},
+            kennenlernen: characterRow?.kennenlernen ?? null,
+            xp: totals.xp ?? 0,
+            punkte: totals.punkte ?? 0,
           })
         })(),
         () => {
-          t = true
+          cancelled = true
         }
       )
-    }, [e]),
-    t
+    }, [userId]),
+    game
   )
 }

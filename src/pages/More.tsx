@@ -59,42 +59,42 @@ export function More() {
       </div>
       <nav className="card !p-2" aria-label="Weitere Seiten">
         <ul>
-          {items.map(({ to: e, icon: T_, label: n }) => {
-            let i = !isCoach && statusLoaded ? STATUS_BY_ROUTE[e] : undefined,
-              s = i ? status[i] : undefined,
-              c = s?.level === 'done',
-              l = s?.level === 'partial',
-              u = !!s && s.total > 0
+          {items.map(({ to: route, icon: T_, label: itemLabel }) => {
+            let statusKey = !isCoach && statusLoaded ? STATUS_BY_ROUTE[route] : undefined,
+              dayItem = statusKey ? status[statusKey] : undefined,
+              isDone = dayItem?.level === 'done',
+              isPartial = dayItem?.level === 'partial',
+              hasTasks = !!dayItem && dayItem.total > 0
             return (
-              <li key={e}>
+              <li key={route}>
                 <Link
-                  to={e}
-                  aria-label={i && s ? `${n}, ${statusText(i, s)}` : undefined}
+                  to={route}
+                  aria-label={statusKey && dayItem ? `${itemLabel}, ${statusText(statusKey, dayItem)}` : undefined}
                   className="flex items-center gap-4 px-3 py-3.5 rounded-2xl hover:bg-bg-elevated transition-colors"
                 >
                   <span
                     className={cn(
                       'w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-colors duration-500',
-                      c || l ? 'bg-success/15 text-success' : 'bg-brand/10 text-brand',
+                      isDone || isPartial ? 'bg-success/15 text-success' : 'bg-brand/10 text-brand',
                     )}
                   >
                     <T_ size={20} aria-hidden="true" />
                   </span>
-                  <span className="flex-1 text-sm font-semibold text-text-primary">{n}</span>
-                  {u && (
+                  <span className="flex-1 text-sm font-semibold text-text-primary">{itemLabel}</span>
+                  {hasTasks && (
                     <span
                       className={cn(
                         'pop-in inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold',
-                        c
+                        isDone
                           ? 'bg-success/15 text-success'
-                          : l
+                          : isPartial
                             ? 'bg-success/10 text-success'
                             : 'bg-bg-elevated text-text-muted',
                       )}
-                      key={s.level}
+                      key={dayItem.level}
                     >
-                      {c && <Check size={12} strokeWidth={3} aria-hidden="true" />}
-                      {c ? 'Heute erledigt' : l ? `${s.done} von ${s.total}` : 'Heute offen'}
+                      {isDone && <Check size={12} strokeWidth={3} aria-hidden="true" />}
+                      {isDone ? 'Heute erledigt' : isPartial ? `${dayItem.done} von ${dayItem.total}` : 'Heute offen'}
                     </span>
                   )}
                   <ChevronRight size={18} className="text-text-muted" aria-hidden="true" />

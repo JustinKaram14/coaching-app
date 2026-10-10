@@ -3,24 +3,24 @@
 import { useEffect, useState } from 'react'
 import { proofUrl } from '../../lib/challenges'
 
-export function ProofImage({ path: e }) {
-  let [t, n] = useState(null)
+export function ProofImage({ path: proofPath }) {
+  let [url, setUrl] = useState(null)
   return (
     useEffect(() => {
-      let t = false
+      let cancelled = false
       return (
-        proofUrl(e).then((e) => {
-          t || n(e)
+        proofUrl(proofPath).then((signedUrl) => {
+          cancelled || setUrl(signedUrl)
         }),
         () => {
-          t = true
+          cancelled = true
         }
       )
-    }, [e]),
-    t ? (
-      <a href={t} target="_blank" rel="noreferrer">
+    }, [proofPath]),
+    url ? (
+      <a href={url} target="_blank" rel="noreferrer">
         <img
-          src={t}
+          src={url}
           alt="Nachweis des Klienten"
           className="w-24 h-24 rounded-2xl object-cover border border-border"
           loading="lazy"

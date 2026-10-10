@@ -1,23 +1,23 @@
 // @ts-nocheck
 // Übernommen aus dem Redesign-Paket. Typen und lokale Namen werden schrittweise verbessert.
 
-export async function compressImage(e, t = 1600, n = 0.85) {
+export async function compressImage(file, maxSize = 1600, quality = 0.85) {
   try {
-    let r = await createImageBitmap(e, {
+    let bitmap = await createImageBitmap(file, {
         imageOrientation: 'from-image',
       }),
-      i = Math.min(1, t / Math.max(r.width, r.height)),
-      a = Math.max(1, Math.round(r.width * i)),
-      o = Math.max(1, Math.round(r.height * i)),
-      s = document.createElement('canvas')
+      scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height)),
+      targetWidth = Math.max(1, Math.round(bitmap.width * scale)),
+      targetHeight = Math.max(1, Math.round(bitmap.height * scale)),
+      canvas = document.createElement('canvas')
     return (
-      (s.width = a),
-      (s.height = o),
-      s.getContext('2d').drawImage(r, 0, 0, a, o),
-      r.close?.(),
-      (await new Promise((e) => s.toBlob(e, 'image/jpeg', n))) ?? e
+      (canvas.width = targetWidth),
+      (canvas.height = targetHeight),
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, targetWidth, targetHeight),
+      bitmap.close?.(),
+      (await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))) ?? file
     )
   } catch {
-    return e
+    return file
   }
 }
