@@ -1,5 +1,6 @@
 -- Figur, XP, Challenges und Belohnungen
 -- Tabellen: characters, xp_events, challenges, belohnungen, einloesungen; Ansicht: character_stats; Bucket: challenge-proofs
+-- Die CHECK-Regeln entsprechen dem Stand in der Datenbank (Prüfung am 10.10.2026).
 
 -- ── Figur ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.characters (
@@ -10,11 +11,7 @@ CREATE TABLE IF NOT EXISTS public.characters (
   kennenlernen jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT characters_name_length CHECK (char_length(name) BETWEEN 1 AND 30),
-  CONSTRAINT characters_json_size CHECK (
-    pg_column_size(config) <= 2000 AND pg_column_size(equipped) <= 2000
-    AND (kennenlernen IS NULL OR pg_column_size(kennenlernen) <= 6000)
-  )
+  CONSTRAINT characters_name_check CHECK (char_length(name) BETWEEN 1 AND 16)
 );
 
 ALTER TABLE public.characters ENABLE ROW LEVEL SECURITY;
@@ -43,9 +40,8 @@ CREATE TABLE IF NOT EXISTS public.xp_events (
   created_at timestamptz NOT NULL DEFAULT now(),
   -- Jedes Ereignis zählt nur einmal (z. B. "wasser" am 2026-10-09)
   CONSTRAINT xp_events_einmalig UNIQUE (user_id, quelle, ref),
-  CONSTRAINT xp_events_laengen CHECK (
-    char_length(quelle) <= 40 AND char_length(ref) <= 120 AND (titel IS NULL OR char_length(titel) <= 160)
-  )
+  CONSTRAINT xp_events_punkte_check CHECK (punkte BETWEEN -5000 AND 500),
+  CONSTRAINT xp_events_xp_check CHECK (xp BETWEEN 0 AND 500)
 );
 
 CREATE INDEX IF NOT EXISTS xp_events_user_created_idx ON public.xp_events (user_id, created_at DESC);
@@ -142,15 +138,9 @@ CREATE TABLE IF NOT EXISTS public.challenges (
   nachweis_pfad text,
   erledigt_am timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT challenges_status CHECK (status IN ('aktiv', 'erledigt')),
-  CONSTRAINT challenges_punkte CHECK (punkte BETWEEN 1 AND 100),
-  CONSTRAINT challenges_laengen CHECK (
-    char_length(titel) BETWEEN 2 AND 120
-    AND (beschreibung IS NULL OR char_length(beschreibung) <= 500)
-    AND (nachweis_text IS NULL OR char_length(nachweis_text) <= 1000)
-    AND (kategorie IS NULL OR char_length(kategorie) <= 40)
-    AND (vorlage_id IS NULL OR char_length(vorlage_id) <= 60)
-  )
+  CONSTRAINT challenges_status_check CHECK (status IN ('aktiv', 'erledigt', 'abgebrochen')),
+  CONSTRAINT challenges_punkte_check CHECK (punkte BETWEEN 5 AND 100),
+  CONSTRAINT challenges_titel_check CHECK (char_length(titel) BETWEEN 1 AND 120)
 );
 
 CREATE INDEX IF NOT EXISTS challenges_user_created_idx ON public.challenges (user_id, created_at DESC);
@@ -234,8 +224,8 @@ CREATE TABLE IF NOT EXISTS public.belohnungen (
   preis integer NOT NULL,
   emoji text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT belohnungen_preis CHECK (preis BETWEEN 1 AND 100000),
-  CONSTRAINT belohnungen_laengen CHECK (char_length(titel) BETWEEN 1 AND 80 AND (emoji IS NULL OR char_length(emoji) <= 16))
+  CONSTRAINT belohnungen_preis_check CHECK (preis BETWEEN 10 AND 5000),
+  CONSTRAINT belohnungen_titel_check CHECK (char_length(titel) BETWEEN 1 AND 60)
 );
 
 CREATE TABLE IF NOT EXISTS public.einloesungen (
@@ -245,9 +235,7 @@ CREATE TABLE IF NOT EXISTS public.einloesungen (
   preis integer NOT NULL,
   emoji text,
   genutzt boolean NOT NULL DEFAULT false,
-  eingeloest_am timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT einloesungen_preis CHECK (preis BETWEEN 1 AND 100000),
-  CONSTRAINT einloesungen_laengen CHECK (char_length(titel) BETWEEN 1 AND 80 AND (emoji IS NULL OR char_length(emoji) <= 16))
+  eingeloest_am timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS belohnungen_user_idx ON public.belohnungen (user_id, preis);

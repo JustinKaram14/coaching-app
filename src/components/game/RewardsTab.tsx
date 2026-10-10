@@ -24,7 +24,7 @@ export function RewardsTab() {
     [addingIdea, setAddingIdea] = useState(false),
     reload = useCallback(async () => {
       if (!user) return
-      let [t, n] = await Promise.all([
+      let [rewardsResult, redemptionsResult] = await Promise.all([
         supabase.from('belohnungen').select('id,titel,preis,emoji').eq('user_id', user.id).order('preis', {
           ascending: true,
         }),
@@ -37,63 +37,65 @@ export function RewardsTab() {
           })
           .limit(60),
       ])
-      if (t.error) {
+      if (rewardsResult.error) {
         setUnavailable(true)
         return
       }
-      ;(setUnavailable(false), setRewards(t.data ?? []), setRedemptions((n.error ? [] : n.data) ?? []))
+      ;(setUnavailable(false),
+        setRewards(rewardsResult.data ?? []),
+        setRedemptions((redemptionsResult.error ? [] : redemptionsResult.data) ?? []))
     }, [user])
   useEffect(() => {
     reload()
   }, [reload])
-  async function redeem(t) {
+  async function redeem(reward) {
     if (!user || redeemingId) return
-    ;(setRedeemingId(t.id), setNotice(null))
-    let r = await redeemReward(t)
-    if (r.error) {
+    ;(setRedeemingId(reward.id), setNotice(null))
+    let result = await redeemReward(reward)
+    if (result.error) {
       ;(setRedeemingId(null),
         setNotice({
           tone: 'warn',
-          text: r.error,
+          text: result.error,
         }))
       return
     }
-    let i = r.id
+    let voucherId = result.id
     ;(setRedeemingId(null),
-      setNewVoucherId(i),
+      setNewVoucherId(voucherId),
       window.setTimeout(() => setNewVoucherId(null), 1200),
       setNotice({
         tone: 'ok',
-        text: `„${t.titel}“ ist jetzt dein Gutschein. Genieß es!`,
+        text: `„${reward.titel}“ ist jetzt dein Gutschein. Genieß es!`,
       }),
       await reload())
   }
-  async function markUsed(e) {
+  async function markUsed(voucher) {
     ;(await supabase
       .from('einloesungen')
       .update({
         genutzt: true,
       })
-      .eq('id', e.id),
+      .eq('id', voucher.id),
       await reload())
   }
-  async function saveReward(t) {
+  async function saveReward(reward) {
     if (!user) return false
-    let n = {
-        titel: t.titel.trim(),
-        preis: t.preis,
-        emoji: t.emoji,
+    let fields = {
+        titel: reward.titel.trim(),
+        preis: reward.preis,
+        emoji: reward.emoji,
       },
-      { error: r } = t.id
-        ? await supabase.from('belohnungen').update(n).eq('id', t.id)
+      { error } = reward.id
+        ? await supabase.from('belohnungen').update(fields).eq('id', reward.id)
         : await supabase.from('belohnungen').insert({
             user_id: user.id,
-            ...n,
+            ...fields,
           })
-    return r ? false : (await reload(), true)
+    return error ? false : (await reload(), true)
   }
-  async function removeReward(e) {
-    ;(await supabase.from('belohnungen').delete().eq('id', e.id), setEditTarget(null), await reload())
+  async function removeReward(reward) {
+    ;(await supabase.from('belohnungen').delete().eq('id', reward.id), setEditTarget(null), await reload())
   }
   if (unavailable)
     return (
@@ -107,10 +109,10 @@ export function RewardsTab() {
         <Spinner />
       </div>
     )
-  let vouchers = redemptions.filter((e) => !e.genutzt),
-    used = redemptions.filter((e) => e.genutzt),
-    ownTitles = new Set(rewards.map((e) => e.titel)),
-    ideas = REWARD_IDEAS.filter((e) => !ownTitles.has(e.titel))
+  let vouchers = redemptions.filter((redemption) => !redemption.genutzt),
+    used = redemptions.filter((redemption) => redemption.genutzt),
+    ownTitles = new Set(rewards.map((reward) => reward.titel)),
+    ideas = REWARD_IDEAS.filter((idea) => !ownTitles.has(idea.titel))
   return (
     <div className="space-y-5">
       <div className="card !p-4 flex items-center gap-3">
@@ -145,30 +147,30 @@ export function RewardsTab() {
           <h3 className="text-xs font-bold tracking-wider text-text-secondary uppercase flex items-center gap-1.5">
             <Ticket size={13} aria-hidden="true" /> Deine Gutscheine
           </h3>
-          {vouchers.map((e, t) => (
+          {vouchers.map((voucher, index) => (
             <div
               style={{
-                '--d': t * 50,
+                '--d': index * 50,
               }}
               className={cn(
                 'enter relative card !p-4 flex items-center gap-3 border-dashed border-brand/50 bg-brand/5',
-                newVoucherId === e.id && 'pop-in',
+                newVoucherId === voucher.id && 'pop-in',
               )}
-              key={e.id}
+              key={voucher.id}
             >
               <span className="text-3xl" aria-hidden="true">
-                {e.emoji ?? '🎁'}
+                {voucher.emoji ?? '🎁'}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-text-primary text-sm">{e.titel}</div>
+                <div className="font-bold text-text-primary text-sm">{voucher.titel}</div>
                 <div className="text-xs text-text-secondary">
-                  Eingelöst am {formatDate(e.eingeloest_am, 'dd.MM.yyyy')}
+                  Eingelöst am {formatDate(voucher.eingeloest_am, 'dd.MM.yyyy')}
                 </div>
               </div>
               <button
-                onClick={() => markUsed(e)}
+                onClick={() => markUsed(voucher)}
                 className="btn-secondary !px-3.5 !py-2 text-sm flex items-center gap-1.5 shrink-0"
-                aria-label={`${e.titel} als genutzt markieren`}
+                aria-label={`${voucher.titel} als genutzt markieren`}
               >
                 <Check size={14} aria-hidden="true" /> Genutzt
               </button>
@@ -193,24 +195,24 @@ export function RewardsTab() {
             Noch keine eigene Belohnung. Wähle unten eine Idee oder lege selbst eine an.
           </p>
         )}
-        {rewards.map((e, n) => {
-          let r = stats.punkte >= e.preis
+        {rewards.map((reward, index) => {
+          let affordable = stats.punkte >= reward.preis
           return (
             <div
               className="enter card !p-3.5 flex items-center gap-3"
               style={{
-                '--d': n * 40,
+                '--d': index * 40,
               }}
-              key={e.id}
+              key={reward.id}
             >
               <span className="text-2xl w-9 text-center" aria-hidden="true">
-                {e.emoji ?? '🎁'}
+                {reward.emoji ?? '🎁'}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="font-semibold text-text-primary text-sm">{e.titel}</div>
-                {r ? (
+                <div className="font-semibold text-text-primary text-sm">{reward.titel}</div>
+                {affordable ? (
                   <div className="text-xs font-semibold text-warning tabular-nums inline-flex items-center gap-1">
-                    <Coins size={11} aria-hidden="true" /> {e.preis}
+                    <Coins size={11} aria-hidden="true" /> {reward.preis}
                   </div>
                 ) : (
                   <div className="mt-1">
@@ -218,32 +220,32 @@ export function RewardsTab() {
                       <div
                         className="h-full bg-brand/70 rounded-full transition-[width] duration-700"
                         style={{
-                          width: `${Math.min(100, (stats.punkte / e.preis) * 100)}%`,
+                          width: `${Math.min(100, (stats.punkte / reward.preis) * 100)}%`,
                         }}
                       />
                     </div>
                     <div className="text-xs text-text-secondary mt-1 tabular-nums">
-                      Noch {e.preis - stats.punkte} Punkte ({e.preis})
+                      Noch {reward.preis - stats.punkte} Punkte ({reward.preis})
                     </div>
                   </div>
                 )}
               </div>
               <button
-                onClick={() => setEditTarget(e)}
-                aria-label={`${e.titel} bearbeiten`}
+                onClick={() => setEditTarget(reward)}
+                aria-label={`${reward.titel} bearbeiten`}
                 className="w-9 h-9 rounded-full text-text-secondary hover:text-brand hover:bg-bg-elevated flex items-center justify-center transition-colors"
               >
                 <Pencil size={15} aria-hidden="true" />
               </button>
               <button
-                onClick={() => redeem(e)}
-                disabled={!r || redeemingId === e.id}
+                onClick={() => redeem(reward)}
+                disabled={!affordable || redeemingId === reward.id}
                 className={cn(
                   'shrink-0 rounded-full px-4 py-2 text-sm font-semibold border transition-all active:scale-95 disabled:cursor-not-allowed',
-                  r ? 'bg-primary text-white border-brand' : 'bg-bg-elevated text-text-muted border-border',
+                  affordable ? 'bg-primary text-white border-brand' : 'bg-bg-elevated text-text-muted border-border',
                 )}
               >
-                {redeemingId === e.id ? <Spinner size={14} className="text-white" /> : 'Einlösen'}
+                {redeemingId === reward.id ? <Spinner size={14} className="text-white" /> : 'Einlösen'}
               </button>
             </div>
           )
@@ -253,25 +255,25 @@ export function RewardsTab() {
         <section aria-label="Ideen für Belohnungen" className="space-y-2">
           <h3 className="text-xs font-bold tracking-wider text-text-secondary uppercase">Ideen</h3>
           <div className="flex flex-wrap gap-2">
-            {ideas.map((e) => (
+            {ideas.map((idea) => (
               <button
                 disabled={addingIdea}
                 onClick={async () => {
                   addingIdea ||
                     (setAddingIdea(true),
                     await saveReward({
-                      titel: e.titel,
-                      preis: e.preis,
-                      emoji: e.emoji,
+                      titel: idea.titel,
+                      preis: idea.preis,
+                      emoji: idea.emoji,
                     }),
                     setAddingIdea(false))
                 }}
                 className="px-3 py-2 rounded-2xl border border-border bg-bg-elevated text-sm text-text-primary hover:border-brand/50 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-60"
-                aria-label={`${e.titel} für ${e.preis} Punkte hinzufügen`}
-                key={e.titel}
+                aria-label={`${idea.titel} für ${idea.preis} Punkte hinzufügen`}
+                key={idea.titel}
               >
-                <span aria-hidden="true">{e.emoji}</span> {e.titel}{' '}
-                <span className="text-xs text-warning font-semibold tabular-nums">{e.preis}</span>
+                <span aria-hidden="true">{idea.emoji}</span> {idea.titel}{' '}
+                <span className="text-xs text-warning font-semibold tabular-nums">{idea.preis}</span>
               </button>
             ))}
           </div>
@@ -280,11 +282,11 @@ export function RewardsTab() {
       {used.length > 0 && (
         <section aria-label="Genutzte Gutscheine" className="space-y-1.5">
           <h3 className="text-xs font-bold tracking-wider text-text-secondary uppercase">Schon genossen</h3>
-          {used.slice(0, 10).map((e) => (
-            <div className="flex items-center gap-3 px-1 text-sm text-text-secondary" key={e.id}>
-              <span aria-hidden="true">{e.emoji ?? '🎁'}</span>
-              <span className="flex-1 truncate">{e.titel}</span>
-              <span className="text-xs tabular-nums">{formatDate(e.eingeloest_am, 'dd.MM.')}</span>
+          {used.slice(0, 10).map((voucher) => (
+            <div className="flex items-center gap-3 px-1 text-sm text-text-secondary" key={voucher.id}>
+              <span aria-hidden="true">{voucher.emoji ?? '🎁'}</span>
+              <span className="flex-1 truncate">{voucher.titel}</span>
+              <span className="text-xs tabular-nums">{formatDate(voucher.eingeloest_am, 'dd.MM.')}</span>
             </div>
           ))}
         </section>
@@ -318,13 +320,13 @@ export function RewardSheet({ target, onClose, onSave, onDelete }) {
   async function save() {
     if (!valid || saving) return
     ;(setSaving(true), setError(null))
-    let r = await onSave({
+    let saved = await onSave({
       id: target && target !== 'new' ? target.id : undefined,
       titel: title,
       preis: priceNumber,
       emoji,
     })
-    if ((setSaving(false), !r)) {
+    if ((setSaving(false), !saved)) {
       setError('Das hat nicht geklappt. Versuche es noch einmal.')
       return
     }
@@ -342,7 +344,7 @@ export function RewardSheet({ target, onClose, onSave, onDelete }) {
             className="input"
             maxLength={60}
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(event) => setTitle(event.target.value)}
             placeholder="z. B. Ein Stück Kuchen"
             autoComplete="off"
           />
@@ -360,25 +362,25 @@ export function RewardSheet({ target, onClose, onSave, onDelete }) {
             max={5e3}
             step={5}
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(event) => setPrice(event.target.value)}
           />
         </div>
         <div>
           <div className="label">Symbol</div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Symbol">
-            {REWARD_EMOJIS.map((e) => (
+            {REWARD_EMOJIS.map((symbol) => (
               <button
                 type="button"
-                onClick={() => setEmoji(e)}
-                aria-pressed={emoji === e}
-                aria-label={`Symbol ${e}`}
+                onClick={() => setEmoji(symbol)}
+                aria-pressed={emoji === symbol}
+                aria-label={`Symbol ${symbol}`}
                 className={cn(
                   'w-11 h-11 rounded-2xl border text-xl transition-all active:scale-90',
-                  emoji === e ? 'border-brand bg-brand/10 scale-105' : 'border-border bg-bg-elevated',
+                  emoji === symbol ? 'border-brand bg-brand/10 scale-105' : 'border-border bg-bg-elevated',
                 )}
-                key={e}
+                key={symbol}
               >
-                {e}
+                {symbol}
               </button>
             ))}
           </div>

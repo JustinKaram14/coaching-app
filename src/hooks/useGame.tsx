@@ -32,19 +32,19 @@ export const GameContext = createContext({
   buy: async () => 'Nicht verfügbar',
   equip: async () => {},
 })
-export const eventKey = (e) => `${e.quelle}|${e.ref}`
-export const offerKey = (e) => `hlx-char-offer-${e}`
-export const streakCheckKey = (e) => `hlx-streak-checked-${e}`
-export function normalizeCharacter(e) {
-  return e
+export const eventKey = (event) => `${event.quelle}|${event.ref}`
+export const offerKey = (userId) => `hlx-char-offer-${userId}`
+export const streakCheckKey = (userId) => `hlx-streak-checked-${userId}`
+export function normalizeCharacter(row) {
+  return row
     ? {
-        name: String(e.name ?? ''),
+        name: String(row.name ?? ''),
         config: {
           ...DEFAULT_CHARACTER,
-          ...(e.config ?? {}),
+          ...(row.config ?? {}),
         },
-        equipped: e.equipped ?? {},
-        kennenlernen: e.kennenlernen ?? null,
+        equipped: row.equipped ?? {},
+        kennenlernen: row.kennenlernen ?? null,
       }
     : null
 }
@@ -67,7 +67,7 @@ export function GameProvider({ children }) {
     knownEvents = useRef(new Set()),
     statsRef = useRef(stats),
     updateStats = useCallback(
-      (e) => ((statsRef.current = e(statsRef.current)), setStats(statsRef.current), statsRef.current),
+      (change) => ((statsRef.current = change(statsRef.current)), setStats(statsRef.current), statsRef.current),
       [],
     ),
     toastCounter = useRef(0),
@@ -78,43 +78,43 @@ export function GameProvider({ children }) {
       ;(setAvailable(false), setLoaded(false), setCharacter(null))
       return
     }
-    let e = false
+    let cancelled = false
     return (
       (async () => {
-        let n = new Date(Date.now() - 4 * 864e5).toISOString(),
-          [r, i, a, o, c] = await Promise.all([
+        let recentSince = new Date(Date.now() - 4 * 864e5).toISOString(),
+          [characterResult, statsResult, shopResult, recentEventsResult, settingsResult] = await Promise.all([
             supabase.from('characters').select('*').eq('user_id', user.id).maybeSingle(),
             supabase.from('character_stats').select('xp,punkte').eq('user_id', user.id).maybeSingle(),
             supabase.from('xp_events').select('ref').eq('user_id', user.id).eq('quelle', 'shop'),
-            supabase.from('xp_events').select('quelle,ref').eq('user_id', user.id).gte('created_at', n),
+            supabase.from('xp_events').select('quelle,ref').eq('user_id', user.id).gte('created_at', recentSince),
             supabase.from('client_settings').select('wasser_ziel_ml').eq('user_id', user.id).maybeSingle(),
           ])
-        if (e) return
-        if (r.error && isMissingTable(r.error)) {
+        if (cancelled) return
+        if (characterResult.error && isMissingTable(characterResult.error)) {
           ;(setAvailable(false), setLoaded(true))
           return
         }
-        if (r.error || i.error) {
+        if (characterResult.error || statsResult.error) {
           ;(setAvailable(false),
             setLoaded(true),
             retryCount < 3 &&
               window.setTimeout(
                 () => {
-                  e || setRetryCount((e) => e + 1)
+                  cancelled || setRetryCount((count) => count + 1)
                 },
                 6e3 * (retryCount + 1),
               ))
           return
         }
-        ;(setAvailable(true), setCharacter(normalizeCharacter(r.data)))
-        let u = i.data ?? {}
+        ;(setAvailable(true), setCharacter(normalizeCharacter(characterResult.data)))
+        let totals = statsResult.data ?? {}
         ;(updateStats(() => ({
-          xp: u.xp ?? 0,
-          punkte: u.punkte ?? 0,
+          xp: totals.xp ?? 0,
+          punkte: totals.punkte ?? 0,
         })),
-          setOwned(new Set((a.data ?? []).map((e) => e.ref))),
-          (knownEvents.current = new Set((o.data ?? []).map(eventKey))),
-          setWaterGoalMl(c.data?.wasser_ziel_ml ?? 0))
+          setOwned(new Set((shopResult.data ?? []).map((event) => event.ref))),
+          (knownEvents.current = new Set((recentEventsResult.data ?? []).map(eventKey))),
+          setWaterGoalMl(settingsResult.data?.wasser_ziel_ml ?? 0))
         try {
           setOfferDismissed(localStorage.getItem(offerKey(user.id)) === '1')
         } catch {
@@ -123,21 +123,21 @@ export function GameProvider({ children }) {
         setLoaded(true)
       })(),
       () => {
-        e = true
+        cancelled = true
       }
     )
   }, [isClient, user, updateStats, retryCount])
   let award = useCallback(
-    async (e, n) => {
-      if (!user || !e.length) return []
-      e.forEach((e) => knownEvents.current.add(eventKey(e)))
-      let r = (e) =>
+    async (events, options) => {
+      if (!user || !events.length) return []
+      events.forEach((event) => knownEvents.current.add(eventKey(event)))
+      let save = (batch) =>
           supabase
             .from('xp_events')
             .upsert(
-              e.map((e) => ({
+              batch.map((event) => ({
                 user_id: user.id,
-                ...e,
+                ...event,
               })),
               {
                 onConflict: 'user_id,quelle,ref',
@@ -145,119 +145,124 @@ export function GameProvider({ children }) {
               },
             )
             .select('quelle,ref,xp,punkte,titel'),
-        i = await r(e),
-        a = []
-      if (!i.error) a = i.data ?? []
-      else if (e.length === 1) return (i.error.code !== 'P0001' && knownEvents.current.delete(eventKey(e[0])), null)
+        batchResult = await save(events),
+        saved = []
+      if (!batchResult.error) saved = batchResult.data ?? []
+      else if (events.length === 1)
+        return (batchResult.error.code !== 'P0001' && knownEvents.current.delete(eventKey(events[0])), null)
       else {
-        let t = false
-        for (let n of e) {
-          let e = await r([n])
-          e.error
-            ? e.error.code !== 'P0001' && (knownEvents.current.delete(eventKey(n)), (t = true))
-            : a.push(...(e.data ?? []))
+        let anyFailed = false
+        for (let event of events) {
+          let single = await save([event])
+          single.error
+            ? single.error.code !== 'P0001' && (knownEvents.current.delete(eventKey(event)), (anyFailed = true))
+            : saved.push(...(single.data ?? []))
         }
-        if (t && !a.length) return null
+        if (anyFailed && !saved.length) return null
       }
-      if (!a.length) return []
-      let o = a.reduce((e, t) => e + t.xp, 0),
-        s = a.reduce((e, t) => e + t.punkte, 0),
-        c = statsRef.current,
-        l = updateStats((e) => ({
-          xp: e.xp + o,
-          punkte: e.punkte + s,
+      if (!saved.length) return []
+      let gainedXp = saved.reduce((sum, event) => sum + event.xp, 0),
+        gainedPunkte = saved.reduce((sum, event) => sum + event.punkte, 0),
+        before = statsRef.current,
+        after = updateStats((current) => ({
+          xp: current.xp + gainedXp,
+          punkte: current.punkte + gainedPunkte,
         }))
-      if (!n?.silent) {
-        let e = ++toastCounter.current
-        ;(setToasts((t) => [
-          ...t.slice(-2),
+      if (!options?.silent) {
+        let toastId = ++toastCounter.current
+        ;(setToasts((current) => [
+          ...current.slice(-2),
           {
-            id: e,
-            xp: o,
-            punkte: s,
-            titel: a.map((e) => e.titel),
+            id: toastId,
+            xp: gainedXp,
+            punkte: gainedPunkte,
+            titel: saved.map((event) => event.titel),
           },
         ]),
-          window.setTimeout(() => setToasts((t) => t.filter((t) => t.id !== e)), 4200))
-        let t = levelInfo(c.xp).level,
-          n = levelInfo(l.xp).level
-        n > t && setLevelUp(n)
+          window.setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== toastId)), 4200))
+        let levelBefore = levelInfo(before.xp).level,
+          levelAfter = levelInfo(after.xp).level
+        levelAfter > levelBefore && setLevelUp(levelAfter)
       }
-      return a
+      return saved
     },
     [user, updateStats],
   )
   ;(useEffect(() => {
     if (!available || !character || !daysLoaded) return
-    let e = todayISO(),
-      t = Object.values(days)
-        .flatMap((t) =>
+    let today = todayISO(),
+      pending = Object.values(days)
+        .flatMap((day) =>
           dailyXpEvents({
-            ...t,
+            ...day,
             waterGoalMl,
-          }).map((n) =>
-            t.date === e
-              ? n
+          }).map((event) =>
+            day.date === today
+              ? event
               : {
-                  ...n,
-                  titel: `${n.titel} (gestern)`,
+                  ...event,
+                  titel: `${event.titel} (gestern)`,
                 },
           ),
         )
         .concat([WELCOME_EVENT])
-        .filter((e) => !knownEvents.current.has(eventKey(e)))
-    t.length && award(t)
+        .filter((event) => !knownEvents.current.has(eventKey(event)))
+    pending.length && award(pending)
   }, [available, character, daysLoaded, days, waterGoalMl, award]),
     useEffect(() => {
       if (!available || !character || !user || !daysLoaded) return
-      let e = todayISO(),
-        n = days[e]
-      if (!n || !(n.weight || n.sleep || n.mealsMain.length || n.trainingIds.length)) return
-      let a = null
+      let today = todayISO(),
+        todayStatus = days[today]
+      if (
+        !todayStatus ||
+        !(todayStatus.weight || todayStatus.sleep || todayStatus.mealsMain.length || todayStatus.trainingIds.length)
+      )
+        return
+      let checkedDay = null
       try {
-        a = localStorage.getItem(streakCheckKey(user.id))
+        checkedDay = localStorage.getItem(streakCheckKey(user.id))
       } catch {}
-      a === e ||
-        streakCheckedDay.current === e ||
-        ((streakCheckedDay.current = e),
+      checkedDay === today ||
+        streakCheckedDay.current === today ||
+        ((streakCheckedDay.current = today),
         (async () => {
-          let n = new Set()
-          for (let e of ['gewicht', 'schlaf', 'training', 'food_log']) {
-            let { data: r } = await supabase
-              .from(e)
+          let dates = new Set()
+          for (let table of ['gewicht', 'schlaf', 'training', 'food_log']) {
+            let { data: rows } = await supabase
+              .from(table)
               .select('datum')
               .eq('user_id', user.id)
               .order('datum', {
                 ascending: false,
               })
               .limit(1e3)
-            for (let e of r ?? []) n.add(e.datum)
+            for (let row of rows ?? []) dates.add(row.datum)
           }
-          let r = calcStreak(n)
+          let streak = calcStreak(dates)
           try {
-            localStorage.setItem(streakCheckKey(user.id), e)
+            localStorage.setItem(streakCheckKey(user.id), today)
           } catch {}
-          if (STREAK_BONUS[r] && n.has(e)) {
-            let e = new Date()
-            e.setDate(e.getDate() - (r - 1))
-            let t = streakEvent(r, toLocalISO(e))
-            t && (await award([t]))
+          if (STREAK_BONUS[streak] && dates.has(today)) {
+            let startDate = new Date()
+            startDate.setDate(startDate.getDate() - (streak - 1))
+            let bonusEvent = streakEvent(streak, toLocalISO(startDate))
+            bonusEvent && (await award([bonusEvent]))
           }
         })())
     }, [available, character, user, daysLoaded, days, award]))
   let createCharacter = useCallback(
-      async (e) => {
+      async (newCharacter) => {
         if (!user) return false
-        let { error: n } = await supabase.from('characters').insert({
+        let { error } = await supabase.from('characters').insert({
           user_id: user.id,
-          name: e.name,
-          config: e.config,
-          equipped: e.equipped,
-          kennenlernen: e.kennenlernen ?? null,
+          name: newCharacter.name,
+          config: newCharacter.config,
+          equipped: newCharacter.equipped,
+          kennenlernen: newCharacter.kennenlernen ?? null,
         })
-        return n
+        return error
           ? false
-          : (setCharacter(e),
+          : (setCharacter(newCharacter),
             await award([WELCOME_EVENT], {
               silent: true,
             }),
@@ -266,46 +271,46 @@ export function GameProvider({ children }) {
       [user, award],
     ),
     updateCharacter = useCallback(
-      async (e) => {
+      async (changes) => {
         if (!user || !character) return false
-        let n = {
+        let updated = {
           ...character,
-          ...e,
+          ...changes,
         }
-        setCharacter(n)
-        let { error: r } = await supabase
+        setCharacter(updated)
+        let { error } = await supabase
           .from('characters')
           .update({
-            name: n.name,
-            config: n.config,
-            equipped: n.equipped,
-            kennenlernen: n.kennenlernen ?? null,
+            name: updated.name,
+            config: updated.config,
+            equipped: updated.equipped,
+            kennenlernen: updated.kennenlernen ?? null,
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', user.id)
-        return !r
+        return !error
       },
       [user, character],
     ),
     spend = useCallback(
-      async (e, n, r, i) => {
+      async (source, ref, price, title) => {
         if (!user) return 'Nicht angemeldet'
-        if (statsRef.current.punkte < r) return 'Dafür reichen deine Punkte noch nicht.'
-        let { error: a } = await supabase.from('xp_events').insert({
+        if (statsRef.current.punkte < price) return 'Dafür reichen deine Punkte noch nicht.'
+        let { error } = await supabase.from('xp_events').insert({
           user_id: user.id,
-          quelle: e,
-          ref: n,
+          quelle: source,
+          ref,
           xp: 0,
-          punkte: -r,
-          titel: i,
+          punkte: -price,
+          titel: title,
         })
-        return a
-          ? /Nicht genug/i.test(a.message)
+        return error
+          ? /Nicht genug/i.test(error.message)
             ? 'Dafür reichen deine Punkte noch nicht.'
             : 'Das hat nicht geklappt. Versuche es noch einmal.'
-          : (updateStats((e) => ({
-              ...e,
-              punkte: e.punkte - r,
+          : (updateStats((current) => ({
+              ...current,
+              punkte: current.punkte - price,
             })),
             null)
       },
@@ -313,38 +318,38 @@ export function GameProvider({ children }) {
     ),
     // Einlösen läuft in einem Schritt in der Datenbank: Gutschein anlegen und Punkte abziehen, oder beides nicht
     redeemReward = useCallback(
-      async (e) => {
+      async (reward) => {
         if (!user) return { error: 'Nicht angemeldet' }
-        if (statsRef.current.punkte < e.preis) return { error: 'Dafür reichen deine Punkte noch nicht.' }
-        let { data: a, error: r } = await supabase.rpc('belohnung_einloesen', { p_belohnung: e.id })
-        if (r || !a)
+        if (statsRef.current.punkte < reward.preis) return { error: 'Dafür reichen deine Punkte noch nicht.' }
+        let { data: voucherId, error } = await supabase.rpc('belohnung_einloesen', { p_belohnung: reward.id })
+        if (error || !voucherId)
           return {
-            error: /Nicht genug/i.test(r?.message ?? '')
+            error: /Nicht genug/i.test(error?.message ?? '')
               ? 'Dafür reichen deine Punkte noch nicht.'
               : 'Das hat nicht geklappt. Versuche es noch einmal.',
           }
-        updateStats((t) => ({
-          ...t,
-          punkte: t.punkte - e.preis,
+        updateStats((current) => ({
+          ...current,
+          punkte: current.punkte - reward.preis,
         }))
-        return { id: a }
+        return { id: voucherId }
       },
       [user, updateStats],
     ),
     buy = useCallback(
-      async (e) =>
-        owned.has(e.id)
+      async (item) =>
+        owned.has(item.id)
           ? 'Das hast du schon.'
-          : levelInfo(statsRef.current.xp).level < e.minLevel
-            ? `Ab Level ${e.minLevel}.`
-            : (await spend('shop', e.id, e.preis, `${e.name} gekauft`)) ||
-              (setOwned((t) => new Set(t).add(e.id)), null),
+          : levelInfo(statsRef.current.xp).level < item.minLevel
+            ? `Ab Level ${item.minLevel}.`
+            : (await spend('shop', item.id, item.preis, `${item.name} gekauft`)) ||
+              (setOwned((current) => new Set(current).add(item.id)), null),
       [owned, spend],
     ),
     equip = useCallback(
-      async (e) => {
+      async (equipped) => {
         await updateCharacter({
-          equipped: e,
+          equipped,
         })
       },
       [updateCharacter],
