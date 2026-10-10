@@ -37,7 +37,7 @@ export function Charakter() {
     { available, loaded, character, level, stats, updateCharacter } = useGame(),
     navigate = useNavigate(),
     [searchParams, setSearchParams] = useSearchParams(),
-    tab = CHARAKTER_TABS.find((e) => e.key === searchParams.get('tab'))?.key ?? 'challenges',
+    tab = CHARAKTER_TABS.find((tabItem) => tabItem.key === searchParams.get('tab'))?.key ?? 'challenges',
     [editing, setEditing] = useState(false),
     [helpOpen, setHelpOpen] = useState(false),
     [draftConfig, setDraftConfig] = useState(null),
@@ -50,23 +50,23 @@ export function Charakter() {
     (loaded && available && !character && (wantsOnboarding.current = true),
     useEffect(() => {
       if (!user || !character) return
-      let t = new Date()
-      t.setHours(0, 0, 0, 0)
-      let n = false
+      let startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      let cancelled = false
       return (
         supabase
           .from('xp_events')
           .select('id,titel,xp,punkte')
           .eq('user_id', user.id)
-          .gte('created_at', t.toISOString())
+          .gte('created_at', startOfDay.toISOString())
           .order('created_at', {
             ascending: false,
           })
-          .then(({ data: e }) => {
-            n || setTodayEvents((e ?? []).filter((e) => e.xp > 0 || e.punkte > 0))
+          .then(({ data: eventRows }) => {
+            cancelled || setTodayEvents((eventRows ?? []).filter((event) => event.xp > 0 || event.punkte > 0))
           }),
         () => {
-          n = true
+          cancelled = true
         }
       )
     }, [user, character, stats.xp, stats.punkte]),
@@ -89,19 +89,19 @@ export function Charakter() {
     ;(setDraftConfig(character.config), setDraftName(character.name), setEditing(true))
   }
   async function saveCharacter() {
-    let e = normalizeCharacterName(draftName)
-    !e ||
+    let cleanName = normalizeCharacterName(draftName)
+    !cleanName ||
       !draftConfig ||
       (setSaving(true),
       await updateCharacter({
-        name: e,
+        name: cleanName,
         config: draftConfig,
       }),
       setSaving(false),
       setEditing(false))
   }
-  let todayXp = todayEvents.reduce((e, t) => e + t.xp, 0),
-    todayPunkte = todayEvents.reduce((e, t) => e + t.punkte, 0)
+  let todayXp = todayEvents.reduce((sum, event) => sum + event.xp, 0),
+    todayPunkte = todayEvents.reduce((sum, event) => sum + event.punkte, 0)
   return (
     <div className="max-w-2xl space-y-5">
       <div className="card relative overflow-hidden !p-5">
@@ -221,15 +221,15 @@ export function Charakter() {
           </p>
         ) : (
           <ul className="space-y-1.5">
-            {todayEvents.slice(0, 8).map((e) => (
-              <li className="flex items-center gap-2.5 text-sm" key={e.id}>
+            {todayEvents.slice(0, 8).map((event) => (
+              <li className="flex items-center gap-2.5 text-sm" key={event.id}>
                 <span className="w-5 h-5 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
                   <Check size={12} strokeWidth={3.5} aria-hidden="true" />
                 </span>
-                <span className="flex-1 min-w-0 text-text-primary break-words">{e.titel ?? 'Erfolg'}</span>
+                <span className="flex-1 min-w-0 text-text-primary break-words">{event.titel ?? 'Erfolg'}</span>
                 <span className="text-xs font-semibold tabular-nums text-text-secondary">
-                  {e.xp > 0 && `+${e.xp} XP`}
-                  {e.punkte > 0 && <span className="text-warning"> +{e.punkte}</span>}
+                  {event.xp > 0 && `+${event.xp} XP`}
+                  {event.punkte > 0 && <span className="text-warning"> +{event.punkte}</span>}
                 </span>
               </li>
             ))}
@@ -239,12 +239,12 @@ export function Charakter() {
       <SegmentedTabs
         tabs={CHARAKTER_TABS}
         value={tab}
-        onChange={(e) =>
+        onChange={(nextTab) =>
           setSearchParams(
-            e === 'challenges'
+            nextTab === 'challenges'
               ? {}
               : {
-                  tab: e,
+                  tab: nextTab,
                 },
             {
               replace: true,
@@ -309,11 +309,11 @@ export function Charakter() {
                 ['Training geschafft', 30, 10],
                 ['Wasserziel erreicht', 20, 10],
                 ['Grüner Tag', 30, 20],
-              ].map(([e, t, n]) => (
-                <tr key={e}>
-                  <td className="py-1.5 text-text-primary">{e}</td>
-                  <td className="py-1.5 text-right tabular-nums">+{t}</td>
-                  <td className="py-1.5 text-right tabular-nums">{n ? `+${n}` : '–'}</td>
+              ].map(([rewardLabel, xpAmount, punkteAmount]) => (
+                <tr key={rewardLabel}>
+                  <td className="py-1.5 text-text-primary">{rewardLabel}</td>
+                  <td className="py-1.5 text-right tabular-nums">+{xpAmount}</td>
+                  <td className="py-1.5 text-right tabular-nums">{punkteAmount ? `+${punkteAmount}` : '–'}</td>
                 </tr>
               ))}
             </tbody>

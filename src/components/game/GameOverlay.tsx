@@ -23,36 +23,36 @@ export function Confetti({ count = 44 }) {
             {
               length: count,
             },
-            (t, n) => {
-              let r = (n / count) * Math.PI * 2 + (n % 3) * 0.18,
-                i = 130 + ((n * 53) % 140)
+            (_item, index) => {
+              let angle = (index / count) * Math.PI * 2 + (index % 3) * 0.18,
+                distance = 130 + ((index * 53) % 140)
               return {
-                dx: Math.cos(r) * i,
-                dy: Math.sin(r) * i - 60,
-                rot: ((n * 97) % 720) - 360,
-                color: CONFETTI_COLORS[n % CONFETTI_COLORS.length],
-                w: (n % 6) * 0.04,
-                t: 1.3 + ((n * 7) % 8) / 10,
-                shape: n % 3 == 0 ? 'rounded-full' : 'rounded-[2px]',
-                size: 6 + (n % 4) * 2,
+                dx: Math.cos(angle) * distance,
+                dy: Math.sin(angle) * distance - 60,
+                rot: ((index * 97) % 720) - 360,
+                color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
+                w: (index % 6) * 0.04,
+                t: 1.3 + ((index * 7) % 8) / 10,
+                shape: index % 3 == 0 ? 'rounded-full' : 'rounded-[2px]',
+                size: 6 + (index % 4) * 2,
               }
             },
           ),
         [count],
-      ).map((e, t) => (
+      ).map((piece, index) => (
         <span
-          className={`confetti absolute block ${e.shape}`}
+          className={`confetti absolute block ${piece.shape}`}
           style={{
-            width: e.size,
-            height: e.size * (e.shape === 'rounded-full' ? 1 : 1.7),
-            backgroundColor: e.color,
-            '--dx': `${e.dx}px`,
-            '--dy': `${e.dy}px`,
-            '--rot': `${e.rot}deg`,
-            '--w': `${e.w}s`,
-            '--t': `${e.t}s`,
+            width: piece.size,
+            height: piece.size * (piece.shape === 'rounded-full' ? 1 : 1.7),
+            backgroundColor: piece.color,
+            '--dx': `${piece.dx}px`,
+            '--dy': `${piece.dy}px`,
+            '--rot': `${piece.rot}deg`,
+            '--w': `${piece.w}s`,
+            '--t': `${piece.t}s`,
           }}
-          key={t}
+          key={index}
         />
       ))}
     </div>
@@ -69,27 +69,27 @@ export function GameOverlay() {
       try {
         navigator.vibrate?.([40, 60, 40, 60, 90])
       } catch {}
-      let e = window.setTimeout(() => {
+      let firstCheer = window.setTimeout(() => {
           avatarRef.current?.cheer()
         }, 450),
-        r = window.setTimeout(() => {
+        secondCheer = window.setTimeout(() => {
           avatarRef.current?.cheer()
         }, 2300)
       continueRef.current?.focus()
-      let i = (e) => {
-        e.key === 'Escape' && dismissLevelUp()
+      let onKeyDown = (event) => {
+        event.key === 'Escape' && dismissLevelUp()
       }
       return (
-        document.addEventListener('keydown', i),
+        document.addEventListener('keydown', onKeyDown),
         () => {
-          ;(window.clearTimeout(e), window.clearTimeout(r), document.removeEventListener('keydown', i))
+          ;(window.clearTimeout(firstCheer), window.clearTimeout(secondCheer), document.removeEventListener('keydown', onKeyDown))
         }
       )
     }, [levelUp, dismissLevelUp]),
     !available || !character)
   )
     return null
-  let unlocked = levelUp ? SHOP_ITEMS.filter((e) => e.minLevel === levelUp) : []
+  let unlocked = levelUp ? SHOP_ITEMS.filter((item) => item.minLevel === levelUp) : []
   return (
     <>
       <div
@@ -97,20 +97,20 @@ export function GameOverlay() {
         role="status"
         aria-live="polite"
       >
-        {toasts.map((e) => (
+        {toasts.map((toast) => (
           <div
             className="toast-pop flex items-center gap-3 rounded-full bg-bg-card border border-brand/40 shadow-glow pl-2 pr-4 py-2 max-w-full"
-            key={e.id}
+            key={toast.id}
           >
             <span className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center shrink-0">
               <Star size={18} aria-hidden="true" />
             </span>
             <span className="min-w-0">
               <span className="block text-sm font-bold text-text-primary tabular-nums">
-                +{e.xp} XP{e.punkte > 0 && <span className="text-warning"> · +{e.punkte} Punkte</span>}
+                +{toast.xp} XP{toast.punkte > 0 && <span className="text-warning"> · +{toast.punkte} Punkte</span>}
               </span>
               <span className="block text-xs text-text-secondary truncate">
-                {e.titel.length > 2 ? `${e.titel.slice(0, 2).join(', ')} und mehr` : e.titel.join(', ')}
+                {toast.titel.length > 2 ? `${toast.titel.slice(0, 2).join(', ')} und mehr` : toast.titel.join(', ')}
               </span>
             </span>
           </div>
@@ -121,14 +121,14 @@ export function GameOverlay() {
           <div className="absolute inset-0 bg-black/85 backdrop-blur-sm fade-in" onClick={dismissLevelUp} />
           <div
             className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain"
-            onClick={(e) => {
-              e.target === e.currentTarget && dismissLevelUp()
+            onClick={(event) => {
+              event.target === event.currentTarget && dismissLevelUp()
             }}
           >
             <div
               className="min-h-full flex items-center justify-center p-5 py-[max(1.25rem,env(safe-area-inset-top))]"
-              onClick={(e) => {
-                e.target === e.currentTarget && dismissLevelUp()
+              onClick={(event) => {
+                event.target === event.currentTarget && dismissLevelUp()
               }}
             >
               <div className="relative w-full max-w-sm modal-in text-center">
@@ -191,11 +191,11 @@ export function GameOverlay() {
                         <Sparkles size={13} className="text-warning" aria-hidden="true" /> Neu im Shop
                       </div>
                       <ul className="space-y-1">
-                        {unlocked.map((e) => (
-                          <li className="flex items-center justify-between gap-2 text-sm" key={e.id}>
-                            <span className="font-semibold text-text-primary">{e.name}</span>
+                        {unlocked.map((item) => (
+                          <li className="flex items-center justify-between gap-2 text-sm" key={item.id}>
+                            <span className="font-semibold text-text-primary">{item.name}</span>
                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning tabular-nums">
-                              <Coins size={12} aria-hidden="true" /> {e.preis}
+                              <Coins size={12} aria-hidden="true" /> {item.preis}
                             </span>
                           </li>
                         ))}
