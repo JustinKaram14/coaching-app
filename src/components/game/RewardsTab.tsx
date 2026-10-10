@@ -225,7 +225,7 @@ export function RewardsTab() {
                       />
                     </div>
                     <div className="text-xs text-text-secondary mt-1 tabular-nums">
-                      Noch {reward.preis - stats.punkte} Punkte ({reward.preis})
+                      Noch {reward.preis - stats.punkte} Punkte
                     </div>
                   </div>
                 )}
