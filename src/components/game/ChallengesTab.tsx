@@ -17,18 +17,18 @@ import { Camera, Check, ChevronDown, Coins, Flag, ListChecks, Play, Sparkles, Tr
 import { Spinner } from '../ui/Spinner'
 import { BottomSheet } from '../ui/BottomSheet'
 
-export const categoryEmoji = (e) => CHALLENGE_CATEGORIES.find((t) => t.key === e)?.emoji ?? '⭐'
+export const categoryEmoji = (categoryKey) => CHALLENGE_CATEGORIES.find((entry) => entry.key === categoryKey)?.emoji ?? '⭐'
 export function ProofThumb({ path }) {
   let [url, setUrl] = useState(null)
   return (
     useEffect(() => {
-      let t = false
+      let cancelled = false
       return (
-        proofUrl(path).then((e) => {
-          t || setUrl(e)
+        proofUrl(path).then((signedUrl) => {
+          cancelled || setUrl(signedUrl)
         }),
         () => {
-          t = true
+          cancelled = true
         }
       )
     }, [path]),
@@ -56,72 +56,72 @@ export function ChallengesTab() {
     today = todayISO(),
     reload = useCallback(async () => {
       if (!user) return
-      let t = await fetchChallenges(user.id)
-      t === null ? setUnavailable(true) : (setChallenges(t), setUnavailable(false))
+      let fetched = await fetchChallenges(user.id)
+      fetched === null ? setUnavailable(true) : (setChallenges(fetched), setUnavailable(false))
     }, [user])
   useEffect(() => {
     reload()
   }, [reload])
   let all = challenges ?? [],
     weekDone = useMemo(() => weekCompletedTemplates(all, today), [all, today]),
-    active = all.filter((e) => e.status === 'aktiv'),
-    activeTemplateIds = new Set(active.map((e) => e.vorlage_id).filter(Boolean)),
-    fromCoach = active.filter((e) => e.coach_id),
-    own = active.filter((e) => !e.coach_id),
-    done = all.filter((e) => e.status === 'erledigt'),
+    active = all.filter((challenge) => challenge.status === 'aktiv'),
+    activeTemplateIds = new Set(active.map((challenge) => challenge.vorlage_id).filter(Boolean)),
+    fromCoach = active.filter((challenge) => challenge.coach_id),
+    own = active.filter((challenge) => !challenge.coach_id),
+    done = all.filter((challenge) => challenge.status === 'erledigt'),
     createdToday = createdTodayCount(all, today),
     startsLeft = Math.max(0, 3 - createdToday),
     suggestions = useMemo(
       () => dailyChallengeSuggestions(today, new Set([...weekDone, ...activeTemplateIds])),
       [today, weekDone, active.length],
     )
-  async function start(t) {
+  async function start(template) {
     if (!user || busyId) return
     if (startsLeft <= 0) {
       setNotice('Heute sind 3 Challenges genug. Morgen gibt es neue.')
       return
     }
-    ;(setBusyId(t.id), setNotice(null))
-    let { error: n } = await supabase.from('challenges').insert({
+    ;(setBusyId(template.id), setNotice(null))
+    let { error: insertError } = await supabase.from('challenges').insert({
       user_id: user.id,
-      vorlage_id: t.id,
-      titel: t.titel,
-      beschreibung: t.text,
-      kategorie: t.kategorie,
-      punkte: t.punkte,
+      vorlage_id: template.id,
+      titel: template.titel,
+      beschreibung: template.text,
+      kategorie: template.kategorie,
+      punkte: template.punkte,
     })
-    if ((setBusyId(null), n)) {
+    if ((setBusyId(null), insertError)) {
       setNotice('Das hat nicht geklappt. Versuche es noch einmal.')
       return
     }
     await reload()
   }
-  async function drop(e) {
-    ;(setBusyId(e.id), await supabase.from('challenges').delete().eq('id', e.id), setBusyId(null), await reload())
+  async function drop(challenge) {
+    ;(setBusyId(challenge.id), await supabase.from('challenges').delete().eq('id', challenge.id), setBusyId(null), await reload())
   }
-  async function finish(n, r, i) {
+  async function finish(challengeRow, noteText, photoFile) {
     if (!user) return 'Nicht angemeldet'
-    let a = null
-    if (i && ((a = await uploadProof(user.id, n.id, i)), !a))
+    let proofPath = null
+    if (photoFile && ((proofPath = await uploadProof(user.id, challengeRow.id, photoFile)), !proofPath))
       return 'Das Foto konnte nicht hochgeladen werden. Versuche es noch einmal oder schreib eine Notiz.'
-    let o = await supabase.from('challenges').select('id').eq('id', n.id).eq('status', 'aktiv')
-    if (o.error) return 'Das hat nicht geklappt. Versuche es noch einmal.'
-    if (!(o.data ?? []).length) return (await reload(), 'Diese Challenge läuft nicht mehr.')
-    if ((await award([challengeEvent(n.id, n.titel, n.punkte)])) === null)
+    let stillActive = await supabase.from('challenges').select('id').eq('id', challengeRow.id).eq('status', 'aktiv')
+    if (stillActive.error) return 'Das hat nicht geklappt. Versuche es noch einmal.'
+    if (!(stillActive.data ?? []).length) return (await reload(), 'Diese Challenge läuft nicht mehr.')
+    if ((await award([challengeEvent(challengeRow.id, challengeRow.titel, challengeRow.punkte)])) === null)
       return 'Die Punkte konnten nicht gutgeschrieben werden. Versuche es noch einmal.'
-    let { error: s } = await supabase
+    let { error: updateError } = await supabase
       .from('challenges')
       .update({
         status: 'erledigt',
-        nachweis_text: r.trim() || null,
-        nachweis_pfad: a,
+        nachweis_text: noteText.trim() || null,
+        nachweis_pfad: proofPath,
         erledigt_am: new Date().toISOString(),
       })
-      .eq('id', n.id)
+      .eq('id', challengeRow.id)
       .eq('status', 'aktiv')
-    return s
+    return updateError
       ? 'Das hat nicht geklappt. Versuche es noch einmal.'
-      : (setJustDoneId(n.id), window.setTimeout(() => setJustDoneId(null), 1400), await reload(), null)
+      : (setJustDoneId(challengeRow.id), window.setTimeout(() => setJustDoneId(null), 1400), await reload(), null)
   }
   return unavailable ? (
     <p className="card text-sm text-text-secondary">
@@ -142,15 +142,15 @@ export function ChallengesTab() {
           <h3 className="text-xs font-bold tracking-wider text-text-secondary uppercase flex items-center gap-1.5">
             <UserCheck size={13} aria-hidden="true" /> Von deinem Coach
           </h3>
-          {fromCoach.map((e, t) => (
+          {fromCoach.map((challenge, position) => (
             <ChallengeCard
-              row={e}
-              index={t}
+              row={challenge}
+              index={position}
               coach
-              done={justDoneId === e.id}
-              busy={busyId === e.id}
-              onFinish={() => setFinishing(e)}
-              key={e.id}
+              done={justDoneId === challenge.id}
+              busy={busyId === challenge.id}
+              onFinish={() => setFinishing(challenge)}
+              key={challenge.id}
             />
           ))}
         </section>
@@ -160,15 +160,15 @@ export function ChallengesTab() {
           <h3 className="text-xs font-bold tracking-wider text-text-secondary uppercase flex items-center gap-1.5">
             <Flag size={13} aria-hidden="true" /> Läuft gerade
           </h3>
-          {own.map((e, t) => (
+          {own.map((challenge, position) => (
             <ChallengeCard
-              row={e}
-              index={t}
-              done={justDoneId === e.id}
-              busy={busyId === e.id}
-              onFinish={() => setFinishing(e)}
-              onDrop={() => drop(e)}
-              key={e.id}
+              row={challenge}
+              index={position}
+              done={justDoneId === challenge.id}
+              busy={busyId === challenge.id}
+              onFinish={() => setFinishing(challenge)}
+              onDrop={() => drop(challenge)}
+              key={challenge.id}
             />
           ))}
         </section>
@@ -185,32 +185,32 @@ export function ChallengesTab() {
         {suggestions.length === 0 && (
           <p className="card text-sm text-text-secondary">Für heute gibt es keine neuen Vorschläge mehr. Stark!</p>
         )}
-        {suggestions.map((e, t) => (
+        {suggestions.map((suggestion, position) => (
           <div
             className="enter card !p-4 flex items-center gap-3"
             style={{
-              '--d': 40 + t * 60,
+              '--d': 40 + position * 60,
             }}
-            key={e.id}
+            key={suggestion.id}
           >
             <span
               className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center text-xl shrink-0"
               aria-hidden="true"
             >
-              {categoryEmoji(e.kategorie)}
+              {categoryEmoji(suggestion.kategorie)}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="font-bold text-text-primary text-sm">{e.titel}</div>
-              <div className="text-xs text-text-secondary leading-snug">{e.text}</div>
+              <div className="font-bold text-text-primary text-sm">{suggestion.titel}</div>
+              <div className="text-xs text-text-secondary leading-snug">{suggestion.text}</div>
               <div className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-warning tabular-nums">
-                <Coins size={12} aria-hidden="true" /> {e.punkte} Punkte
+                <Coins size={12} aria-hidden="true" /> {suggestion.punkte} Punkte
               </div>
             </div>
             <button
-              onClick={() => start(e)}
-              disabled={busyId === e.id || startsLeft <= 0}
+              onClick={() => start(suggestion)}
+              disabled={busyId === suggestion.id || startsLeft <= 0}
               className="btn-primary !px-4 !py-2 text-sm shrink-0 disabled:opacity-50 flex items-center gap-1.5"
-              aria-label={`${e.titel} starten`}
+              aria-label={`${suggestion.titel} starten`}
             >
               <Play size={14} aria-hidden="true" /> Start
             </button>
@@ -226,7 +226,7 @@ export function ChallengesTab() {
       {done.length > 0 && (
         <section aria-label="Erledigte Challenges">
           <button
-            onClick={() => setDoneOpen((e) => !e)}
+            onClick={() => setDoneOpen((wasOpen) => !wasOpen)}
             aria-expanded={doneOpen}
             className="w-full flex items-center justify-between text-xs font-bold tracking-wider text-text-secondary uppercase py-3"
           >
@@ -241,29 +241,29 @@ export function ChallengesTab() {
           </button>
           {doneOpen && (
             <ul className="space-y-2 mt-2">
-              {done.slice(0, 20).map((e, t) => (
+              {done.slice(0, 20).map((challenge, position) => (
                 <li
                   className="enter card !p-3 flex items-center gap-3"
                   style={{
-                    '--d': t * 30,
+                    '--d': position * 30,
                   }}
-                  key={e.id}
+                  key={challenge.id}
                 >
-                  {e.nachweis_pfad ? (
-                    <ProofThumb path={e.nachweis_pfad} />
+                  {challenge.nachweis_pfad ? (
+                    <ProofThumb path={challenge.nachweis_pfad} />
                   ) : (
                     <span className="w-11 h-11 rounded-2xl bg-success/15 text-success flex items-center justify-center shrink-0">
                       <Check size={20} strokeWidth={3} aria-hidden="true" />
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-text-primary text-sm truncate">{e.titel}</div>
+                    <div className="font-semibold text-text-primary text-sm truncate">{challenge.titel}</div>
                     <div className="text-xs text-text-secondary truncate">
-                      {e.erledigt_am ? formatDate(e.erledigt_am, 'dd.MM.yyyy') : ''}
-                      {e.nachweis_text ? ` · ${e.nachweis_text}` : ''}
+                      {challenge.erledigt_am ? formatDate(challenge.erledigt_am, 'dd.MM.yyyy') : ''}
+                      {challenge.nachweis_text ? ` · ${challenge.nachweis_text}` : ''}
                     </div>
                   </div>
-                  <span className="text-xs font-semibold text-warning tabular-nums shrink-0">+{e.punkte}</span>
+                  <span className="text-xs font-semibold text-warning tabular-nums shrink-0">+{challenge.punkte}</span>
                 </li>
               ))}
             </ul>
@@ -277,8 +277,8 @@ export function ChallengesTab() {
         activeIds={activeTemplateIds}
         left={startsLeft}
         busy={busyId}
-        onStart={async (e) => {
-          await start(e)
+        onStart={async (template) => {
+          await start(template)
         }}
       />
       <FinishChallengeSheet
@@ -368,16 +368,16 @@ export function FinishChallengeSheet({ row, onClose, onFinish, points }) {
         setPreview(null)
         return
       }
-      let e = URL.createObjectURL(photo)
-      return (setPreview(e), () => URL.revokeObjectURL(e))
+      let previewUrl = URL.createObjectURL(photo)
+      return (setPreview(previewUrl), () => URL.revokeObjectURL(previewUrl))
     }, [photo]))
   let canSubmit = !!photo || note.trim().length >= 3
   async function submit() {
     if (!row || !canSubmit || busy) return
     ;(setBusy(true), setError(null))
-    let r = await onFinish(row, note, photo)
-    if ((setBusy(false), r)) {
-      setError(r)
+    let finishError = await onFinish(row, note, photo)
+    if ((setBusy(false), finishError)) {
+      setError(finishError)
       return
     }
     onClose()
@@ -406,7 +406,7 @@ export function FinishChallengeSheet({ row, onClose, onFinish, points }) {
               className="input min-h-[84px]"
               maxLength={200}
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(event) => setNote(event.target.value)}
               placeholder="Was hast du gemacht? Wie hat es sich angefühlt?"
             />
           </div>
@@ -435,7 +435,7 @@ export function FinishChallengeSheet({ row, onClose, onFinish, points }) {
                   accept="image/*"
                   className="sr-only"
                   aria-label="Nachweis-Foto"
-                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                  onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
                 />
               </label>
             )}
@@ -470,24 +470,24 @@ export function FinishChallengeSheet({ row, onClose, onFinish, points }) {
 }
 export function AllChallengesSheet({ open, onClose, weekDone, activeIds, left, busy, onStart }) {
   let [category, setCategory] = useState('draussen'),
-    list = CHALLENGE_TEMPLATES.filter((e) => e.kategorie === category)
+    list = CHALLENGE_TEMPLATES.filter((template) => template.kategorie === category)
   return (
     <BottomSheet open={open} onClose={onClose} title="Alle Challenges" tall>
       <div className="space-y-3 pb-3">
         <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1" role="group" aria-label="Bereich">
-          {CHALLENGE_CATEGORIES.map((e) => (
+          {CHALLENGE_CATEGORIES.map((categoryItem) => (
             <button
-              onClick={() => setCategory(e.key)}
-              aria-pressed={category === e.key}
+              onClick={() => setCategory(categoryItem.key)}
+              aria-pressed={category === categoryItem.key}
               className={cn(
                 'shrink-0 px-3.5 py-2 rounded-full text-sm font-semibold border transition-all active:scale-95',
-                category === e.key
+                category === categoryItem.key
                   ? 'bg-primary text-white border-brand'
                   : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary',
               )}
-              key={e.key}
+              key={categoryItem.key}
             >
-              <span aria-hidden="true">{e.emoji}</span> {e.label}
+              <span aria-hidden="true">{categoryItem.emoji}</span> {categoryItem.label}
             </button>
           ))}
         </div>
@@ -496,35 +496,35 @@ export function AllChallengesSheet({ open, onClose, weekDone, activeIds, left, b
           Challenge zählt einmal pro Woche.
         </p>
         <ul className="space-y-2" key={category}>
-          {list.map((e, t) => {
-            let s = activeIds.has(e.id),
-              c = weekDone.has(e.id),
-              l = s || c || left <= 0 || busy === e.id
+          {list.map((template, position) => {
+            let isActive = activeIds.has(template.id),
+              doneThisWeek = weekDone.has(template.id),
+              isDisabled = isActive || doneThisWeek || left <= 0 || busy === template.id
             return (
               <li
                 className="enter card !p-3 flex items-center gap-3"
                 style={{
-                  '--d': t * 28,
+                  '--d': position * 28,
                 }}
-                key={e.id}
+                key={template.id}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-text-primary text-sm">{e.titel}</div>
-                  <div className="text-xs text-text-secondary leading-snug">{findChallengeTemplate(e.id)?.text}</div>
+                  <div className="font-semibold text-text-primary text-sm">{template.titel}</div>
+                  <div className="text-xs text-text-secondary leading-snug">{findChallengeTemplate(template.id)?.text}</div>
                   <div className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-warning tabular-nums">
-                    <Coins size={11} aria-hidden="true" /> {e.punkte}
+                    <Coins size={11} aria-hidden="true" /> {template.punkte}
                   </div>
                 </div>
                 <button
-                  onClick={() => void onStart(e)}
-                  disabled={l}
+                  onClick={() => void onStart(template)}
+                  disabled={isDisabled}
                   className={cn(
                     'shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold border transition-all active:scale-95',
-                    l ? 'bg-bg-elevated text-text-muted border-border' : 'bg-primary text-white border-brand',
+                    isDisabled ? 'bg-bg-elevated text-text-muted border-border' : 'bg-primary text-white border-brand',
                   )}
-                  aria-label={`${e.titel} starten`}
+                  aria-label={`${template.titel} starten`}
                 >
-                  {s ? 'Läuft' : c ? 'Diese Woche geschafft' : 'Start'}
+                  {isActive ? 'Läuft' : doneThisWeek ? 'Diese Woche geschafft' : 'Start'}
                 </button>
               </li>
             )
