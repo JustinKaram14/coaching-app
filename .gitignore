@@ -33,3 +33,5 @@ keystore-base64.txt
 android/app/build/
 android/.gradle/
 android/build/
+# Supabase CLI, lokale Dateien
+supabase/.temp/
