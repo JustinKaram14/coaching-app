@@ -8,20 +8,20 @@ import { cn } from '../lib/utils'
 
 export const BOTTLE_SIZES = [330, 500, 750, 1e3]
 export const QUICK_ADD_ML = [250, 500, 750]
-export const formatLiters = (e) =>
-  (e / 1e3).toLocaleString('de-DE', {
+export const formatLiters = (amountMl) =>
+  (amountMl / 1e3).toLocaleString('de-DE', {
     maximumFractionDigits: 2,
   })
-export function waterMessage(e, t) {
-  return e >= 100
+export function waterMessage(percent, remaining) {
+  return percent >= 100
     ? 'Tagesziel geschafft, stark!'
-    : e === 0
+    : percent === 0
       ? 'Los geht’s: Die erste Flasche wartet.'
-      : e < 50
-        ? `Guter Start! Noch ${formatLiters(t)} l.`
-        : e === 50
-          ? `Halbzeit! Noch ${formatLiters(t)} l.`
-          : `Über die Hälfte, weiter so! Noch ${formatLiters(t)} l.`
+      : percent < 50
+        ? `Guter Start! Noch ${formatLiters(remaining)} l.`
+        : percent === 50
+          ? `Halbzeit! Noch ${formatLiters(remaining)} l.`
+          : `Über die Hälfte, weiter so! Noch ${formatLiters(remaining)} l.`
 }
 export function WaterTracker({
   totalMl,
@@ -41,23 +41,23 @@ export function WaterTracker({
     totalRef = useRef(totalMl)
   ;((totalRef.current = totalMl),
     useEffect(() => {
-      let e = requestAnimationFrame(() => setShownMl(totalRef.current))
-      return () => cancelAnimationFrame(e)
+      let frameId = requestAnimationFrame(() => setShownMl(totalRef.current))
+      return () => cancelAnimationFrame(frameId)
     }, []),
     useEffect(() => {
       drinking === 0 && setShownMl(totalMl)
     }, [totalMl, drinking]))
   let drink = useCallback(
-      async (e) => {
-        ;(onAdd(e), setDrinking((e) => e + 1))
-        let n = totalRef.current >= goalMl
+      async (amountMl) => {
+        ;(onAdd(amountMl), setDrinking((drinks) => drinks + 1))
+        let alreadyReached = totalRef.current >= goalMl
         try {
-          ;(await avatarRef.current?.drink(e, bottleMl, {
-            onSip: () => setShownMl((t) => t + e),
+          ;(await avatarRef.current?.drink(amountMl, bottleMl, {
+            onSip: () => setShownMl((shown) => shown + amountMl),
           }),
-            !n && totalRef.current + e >= goalMl && (await avatarRef.current?.cheer()))
+            !alreadyReached && totalRef.current + amountMl >= goalMl && (await avatarRef.current?.cheer()))
         } finally {
-          ;(setDrinking((e) => e - 1), setShownMl(totalRef.current))
+          ;(setDrinking((drinks) => drinks - 1), setShownMl(totalRef.current))
         }
       },
       [bottleMl, goalMl, onAdd],
@@ -108,27 +108,27 @@ export function WaterTracker({
                 </div>
                 <div className="absolute inset-0 bg-info/80" />
                 {drinking > 0 &&
-                  [0, 1, 2].map((e) => (
+                  [0, 1, 2].map((bubbleIndex) => (
                     <span
                       className="water-bubble absolute bottom-2 w-1.5 h-1.5 rounded-full bg-white/70"
                       style={{
-                        left: `${22 + e * 26}%`,
-                        animationDelay: `${e * 380}ms`,
+                        left: `${22 + bubbleIndex * 26}%`,
+                        animationDelay: `${bubbleIndex * 380}ms`,
                       }}
-                      key={e}
+                      key={bubbleIndex}
                     />
                   ))}
               </div>
               <div className="absolute left-0 inset-y-0 w-2.5 pointer-events-none" aria-hidden="true">
                 {Array.from({
                   length: Math.max(0, Math.floor(goalMl / 500) - 1),
-                }).map((e, t, n) => (
+                }).map((_tick, index, ticks) => (
                   <span
                     className="absolute left-0 h-0.5 w-2.5 rounded-r bg-text-muted/70"
                     style={{
-                      top: `${((t + 1) / (n.length + 1)) * 100}%`,
+                      top: `${((index + 1) / (ticks.length + 1)) * 100}%`,
                     }}
-                    key={t}
+                    key={index}
                   />
                 ))}
               </div>
@@ -146,13 +146,13 @@ export function WaterTracker({
           <Droplets size={18} aria-hidden="true" /> Flasche getrunken · {bottleMl} ml
         </button>
         <div className="flex items-center gap-2 flex-wrap">
-          {QUICK_ADD_ML.map((e) => (
+          {QUICK_ADD_ML.map((amount) => (
             <button
-              onClick={() => drink(e)}
+              onClick={() => drink(amount)}
               className="btn-secondary !px-4 !py-1.5 text-sm flex items-center gap-1"
-              key={e}
+              key={amount}
             >
-              <Plus size={13} aria-hidden="true" /> {e} ml
+              <Plus size={13} aria-hidden="true" /> {amount} ml
             </button>
           ))}
           {entries > 0 && (
@@ -168,21 +168,21 @@ export function WaterTracker({
         <div className="border-t border-border pt-3">
           <div className="text-xs font-semibold text-text-secondary mb-2">Meine Flasche</div>
           <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Flaschengröße">
-            {BOTTLE_SIZES.map((e) => (
+            {BOTTLE_SIZES.map((bottleSize) => (
               <button
-                aria-pressed={bottleMl === e && !customOpen}
+                aria-pressed={bottleMl === bottleSize && !customOpen}
                 onClick={() => {
-                  ;(setCustomOpen(false), onBottleChange(e))
+                  ;(setCustomOpen(false), onBottleChange(bottleSize))
                 }}
                 className={cn(
                   'px-3.5 py-2.5 rounded-full text-xs font-semibold border transition-all active:scale-95',
-                  bottleMl === e && !customOpen
+                  bottleMl === bottleSize && !customOpen
                     ? 'bg-primary border-brand text-white'
                     : 'border-border text-text-secondary hover:border-brand/40',
                 )}
-                key={e}
+                key={bottleSize}
               >
-                {e >= 1e3 ? `${e / 1e3} l` : `${e} ml`}
+                {bottleSize >= 1e3 ? `${bottleSize / 1e3} l` : `${bottleSize} ml`}
               </button>
             ))}
             <button
@@ -219,9 +219,9 @@ export function WaterTracker({
                 step={50}
                 className="input !w-28 !py-2 text-center"
                 value={bottleMl}
-                onChange={(e) => {
-                  let t = parseInt(e.target.value)
-                  t >= 100 && t <= 2e3 && onBottleChange(t)
+                onChange={(event) => {
+                  let parsedMl = parseInt(event.target.value)
+                  parsedMl >= 100 && parsedMl <= 2e3 && onBottleChange(parsedMl)
                 }}
               />
               <span className="text-sm text-text-secondary">ml</span>

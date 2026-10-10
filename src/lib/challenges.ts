@@ -6,46 +6,46 @@ import { toLocalISO } from './utils'
 import { compressImage } from './images'
 
 export const CHALLENGE_PROOFS_BUCKET = 'challenge-proofs'
-export async function fetchChallenges(e) {
-  let { data: t, error: n } = await supabase
+export async function fetchChallenges(userId) {
+  let { data: rows, error: queryError } = await supabase
     .from('challenges')
     .select('*')
-    .eq('user_id', e)
+    .eq('user_id', userId)
     .order('created_at', {
       ascending: false,
     })
     .limit(300)
-  return n ? null : (t ?? [])
+  return queryError ? null : (rows ?? [])
 }
-export function weekCompletedTemplates(e, t) {
-  let n = isoWeek(t),
-    r = new Set()
-  for (let t of e)
-    t.status !== 'erledigt' ||
-      !t.vorlage_id ||
-      !t.erledigt_am ||
-      (isoWeek(toLocalISO(new Date(t.erledigt_am))) === n && r.add(t.vorlage_id))
-  return r
+export function weekCompletedTemplates(challenges, dateISO) {
+  let week = isoWeek(dateISO),
+    templates = new Set()
+  for (let challenge of challenges)
+    challenge.status !== 'erledigt' ||
+      !challenge.vorlage_id ||
+      !challenge.erledigt_am ||
+      (isoWeek(toLocalISO(new Date(challenge.erledigt_am))) === week && templates.add(challenge.vorlage_id))
+  return templates
 }
-export function createdTodayCount(e, t) {
-  return e.filter((e) => !e.coach_id && toLocalISO(new Date(e.created_at)) === t).length
+export function createdTodayCount(challenges, today) {
+  return challenges.filter((challenge) => !challenge.coach_id && toLocalISO(new Date(challenge.created_at)) === today).length
 }
-export async function uploadProof(e, t, n) {
-  let r = await compressImage(n, 1400, 0.82),
-    i = `${e}/${t}-${Date.now()}.jpg`
+export async function uploadProof(userId, challengeId, file) {
+  let compressed = await compressImage(file, 1400, 0.82),
+    path = `${userId}/${challengeId}-${Date.now()}.jpg`
   return (
-    await supabase.storage.from('challenge-proofs').upload(i, r, {
+    await supabase.storage.from('challenge-proofs').upload(path, compressed, {
       contentType: 'image/jpeg',
       upsert: false,
     })
   ).error
     ? null
-    : i
+    : path
 }
-export async function proofUrl(e) {
+export async function proofUrl(proofPath) {
   try {
-    let { data: t } = await supabase.storage.from(CHALLENGE_PROOFS_BUCKET).createSignedUrl(e, 3600)
-    return t?.signedUrl ?? null
+    let { data: signed } = await supabase.storage.from(CHALLENGE_PROOFS_BUCKET).createSignedUrl(proofPath, 3600)
+    return signed?.signedUrl ?? null
   } catch {
     return null
   }
