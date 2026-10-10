@@ -1,8 +1,8 @@
 name: Send Push Reminders
 
+# Der automatische Zeitplan läuft seit 10.10.2026 in Supabase (pg_cron, Job "send-reminders", alle 15 Minuten).
+# Dieser Workflow bleibt für einen manuellen Start über "Run workflow".
 on:
-  schedule:
-    - cron: '*/15 * * * *'  # alle 15 Minuten (UTC); Termin-Erinnerungen brauchen einen engen Takt
   workflow_dispatch:
 
 jobs:
