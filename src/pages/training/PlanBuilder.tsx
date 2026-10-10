@@ -34,91 +34,91 @@ import {
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 
-export const g2 = ['Alle', 'Langhantel', 'Kurzhantel', 'Kabel', 'Maschine', 'Körpergewicht']
-export const _2 = 60
-export function V2_({ ex: e }) {
-  let [t, n] = useState(false)
+export const EQUIPMENT_FILTERS = ['Alle', 'Langhantel', 'Kurzhantel', 'Kabel', 'Maschine', 'Körpergewicht']
+export const PAGE_SIZE = 60
+export function ExerciseThumb({ ex: exercise }) {
+  let [imageFailed, setImageFailed] = useState(false)
   return (
     <div className="w-12 h-12 rounded-xl bg-bg-elevated overflow-hidden shrink-0 flex items-center justify-center">
-      {t ? (
+      {imageFailed ? (
         <Dumbbell size={20} className="text-text-muted" />
       ) : (
         <img
-          src={exerciseImageUrl(e)}
+          src={exerciseImageUrl(exercise)}
           alt=""
           loading="lazy"
           className="w-full h-full object-cover"
-          onError={() => n(true)}
+          onError={() => setImageFailed(true)}
         />
       )}
     </div>
   )
 }
-export function Y2_({ open: e, onClose: t, group: n, role: r, onPick: i }) {
-  let [a, o] = useState(null),
-    [s, c] = useState(false),
-    [l, u] = useState(''),
-    [d, f] = useState(n),
-    [p, m] = useState('Alle'),
-    [h, g] = useState(true),
-    [_, y] = useState(_2),
+export function ExercisePicker({ open: isOpen, onClose: handleClose, group: initialGroup, role: slotRole, onPick: onChoose }) {
+  let [pool, setPool] = useState(null),
+    [loadFailed, setLoadFailed] = useState(false),
+    [query, setQuery] = useState(''),
+    [groupFilter, setGroupFilter] = useState(initialGroup),
+    [equipmentFilter, setEquipmentFilter] = useState('Alle'),
+    [hideStretch, setHideStretch] = useState(true),
+    [visibleCount, setVisibleCount] = useState(PAGE_SIZE),
     { user: authUser } = useAuth(),
     [ownNames, setOwnNames] = useState([])
   ;(useEffect(() => {
-    if (!e || !authUser || !a) return
+    if (!isOpen || !authUser || !pool) return
     let alive = true
-    loadMyExerciseNames(authUser.id, a).then((names) => alive && setOwnNames(names))
+    loadMyExerciseNames(authUser.id, pool).then((names) => alive && setOwnNames(names))
     return () => {
       alive = false
     }
-  }, [e, authUser, a]),
+  }, [isOpen, authUser, pool]),
     useEffect(() => {
-    e && (f(n), u(''), m('Alle'), y(_2))
-  }, [e, n]),
+    isOpen && (setGroupFilter(initialGroup), setQuery(''), setEquipmentFilter('Alle'), setVisibleCount(PAGE_SIZE))
+  }, [isOpen, initialGroup]),
     useEffect(() => {
-      !e ||
-        a ||
+      !isOpen ||
+        pool ||
         loadExerciseData()
-          .then(o)
-          .catch(() => c(true))
-    }, [e, a]),
+          .then(setPool)
+          .catch(() => setLoadFailed(true))
+    }, [isOpen, pool]),
     useEffect(() => {
-      y(_2)
-    }, [l, d, p, h]))
-  let b = useMemo(() => (a ? new Map(a.map((e) => [e.id, searchHaystack(e)])) : new Map()), [a]),
-    x = useMemo(() => {
-      if (!a) return []
-      let e = normalizeText(l),
-        t = e ? e.split(' ') : []
-      return a
-        .filter((e) => {
-          if ((d !== 'alle' && e.group !== d) || (h && e.stretch) || (p !== 'Alle' && e.equipment_group !== p))
+      setVisibleCount(PAGE_SIZE)
+    }, [query, groupFilter, equipmentFilter, hideStretch]))
+  let haystacks = useMemo(() => (pool ? new Map(pool.map((poolItem) => [poolItem.id, searchHaystack(poolItem)])) : new Map()), [pool]),
+    results = useMemo(() => {
+      if (!pool) return []
+      let normalized = normalizeText(query),
+        queryWords = normalized ? normalized.split(' ') : []
+      return pool
+        .filter((poolEntry) => {
+          if ((groupFilter !== 'alle' && poolEntry.group !== groupFilter) || (hideStretch && poolEntry.stretch) || (equipmentFilter !== 'Alle' && poolEntry.equipment_group !== equipmentFilter))
             return false
-          if (t.length) {
-            let n = b.get(e.id) ?? ''
-            return t.every((e) => n.includes(e))
+          if (queryWords.length) {
+            let haystack = haystacks.get(poolEntry.id) ?? ''
+            return queryWords.every((queryWord) => haystack.includes(queryWord))
           }
           return true
         })
-        .sort((e, t) => {
-          let n = +(r === 'grund')
-          return (e.compound === n ? 0 : 1) - (t.compound === n ? 0 : 1) || e.name.localeCompare(t.name, 'de')
+        .sort((exerciseA, exerciseB) => {
+          let preferCompound = +(slotRole === 'grund')
+          return (exerciseA.compound === preferCompound ? 0 : 1) - (exerciseB.compound === preferCompound ? 0 : 1) || exerciseA.name.localeCompare(exerciseB.name, 'de')
         })
-    }, [a, b, l, d, p, h, r])
+    }, [pool, haystacks, query, groupFilter, equipmentFilter, hideStretch, slotRole])
   // Eigene Übungen: Namen aus früheren Plänen und Trainings, die nicht im Übungspool stehen (ohne GIF und Anleitung)
-  const typed = l.trim()
+  const typed = query.trim()
   const typedKey = normalizeText(typed)
   const ownMatches = ownNames.filter((name) => {
     const words = typedKey.split(' ').filter(Boolean)
-    return words.every((w) => normalizeText(name).includes(w))
+    return words.every((queryWord) => normalizeText(name).includes(queryWord))
   })
   const canUseTyped =
     typed.length >= 2 &&
     !ownNames.some((name) => normalizeText(name) === typedKey) &&
-    !(a ?? []).some((x) => normalizeText(x.name) === typedKey || normalizeText(x.name_en ?? '') === typedKey)
-  const pickOwn = (name) => i({ id: `own:${name}`, name, image: '', own: true })
+    !(pool ?? []).some((poolExercise) => normalizeText(poolExercise.name) === typedKey || normalizeText(poolExercise.name_en ?? '') === typedKey)
+  const pickOwn = (name) => onChoose({ id: `own:${name}`, name, image: '', own: true })
   return (
-    <BottomSheet open={e} onClose={t} title="Übung wählen" tall>
+    <BottomSheet open={isOpen} onClose={handleClose} title="Übung wählen" tall>
       <div className="space-y-3">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
@@ -126,13 +126,13 @@ export function Y2_({ open: e, onClose: t, group: n, role: r, onPick: i }) {
             type="search"
             className="input pl-9 pr-9"
             placeholder="Übung suchen, z. B. Bankdrücken"
-            value={l}
-            onChange={(e) => u(e.target.value)}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
             aria-label="Übung suchen"
           />
-          {l && (
+          {query && (
             <button
-              onClick={() => u('')}
+              onClick={() => setQuery('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
               aria-label="Suche leeren"
             >
@@ -146,40 +146,40 @@ export function Y2_({ open: e, onClose: t, group: n, role: r, onPick: i }) {
               key: 'alle',
               label: 'Alle',
             },
-            ...MUSCLE_GROUPS.filter((e) => e.key !== 'sonstige'),
-          ].map((e) => (
+            ...MUSCLE_GROUPS.filter((muscle) => muscle.key !== 'sonstige'),
+          ].map((muscle) => (
             <button
-              onClick={() => f(e.key)}
+              onClick={() => setGroupFilter(muscle.key)}
               className={cn(
                 'px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border shrink-0 transition-all active:scale-95',
-                d === e.key
+                groupFilter === muscle.key
                   ? 'bg-primary border-brand text-white'
                   : 'border-border text-text-secondary hover:border-brand/40',
               )}
-              key={e.key}
+              key={muscle.key}
             >
-              {e.label}
+              {muscle.label}
             </button>
           ))}
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 scrollbar-none">
-          {g2.map((e) => (
+          {EQUIPMENT_FILTERS.map((equipment) => (
             <button
-              onClick={() => m(e)}
+              onClick={() => setEquipmentFilter(equipment)}
               className={cn(
                 'px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border shrink-0 transition-all active:scale-95',
-                p === e
+                equipmentFilter === equipment
                   ? 'bg-brand/15 border-brand/50 text-brand'
                   : 'border-border text-text-muted hover:border-brand/40',
               )}
-              key={e}
+              key={equipment}
             >
-              {e}
+              {equipment}
             </button>
           ))}
         </div>
         <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
-          <input type="checkbox" checked={h} onChange={(e) => g(e.target.checked)} />
+          <input type="checkbox" checked={hideStretch} onChange={(event) => setHideStretch(event.target.checked)} />
           Dehnübungen und Mobilisation ausblenden
         </label>
         {(ownMatches.length > 0 || canUseTyped) && (
@@ -216,36 +216,36 @@ export function Y2_({ open: e, onClose: t, group: n, role: r, onPick: i }) {
             )}
           </div>
         )}
-        {s ? (
+        {loadFailed ? (
           <div className="card text-sm text-text-secondary">Der Übungspool konnte nicht geladen werden.</div>
-        ) : a ? (
-          x.length === 0 ? (
+        ) : pool ? (
+          results.length === 0 ? (
             <div className="card text-sm text-text-secondary text-center">
               Keine passende Übung gefunden. Lockere die Filter.
             </div>
           ) : (
             <ul className="space-y-0.5 pb-4">
-              {x.slice(0, _).map((e) => (
-                <li key={e.id}>
+              {results.slice(0, visibleCount).map((exercise) => (
+                <li key={exercise.id}>
                   <button
-                    onClick={() => i(e)}
+                    onClick={() => onChoose(exercise)}
                     className="flex items-center gap-3 w-full py-2 px-2 rounded-2xl hover:bg-bg-elevated active:scale-[0.985] transition-all text-left"
                   >
-                    <V2_ ex={e} />
+                    <ExerciseThumb ex={exercise} />
                     <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold text-text-primary truncate">{e.name}</span>
+                      <span className="block text-sm font-semibold text-text-primary truncate">{exercise.name}</span>
                       <span className="block text-xs text-text-muted truncate">
-                        {e.equipment_de} · {e.target_de}
+                        {exercise.equipment_de} · {exercise.target_de}
                       </span>
                     </span>
-                    {e.compound === 1 && <span className="badge bg-brand/10 text-brand shrink-0">Grundübung</span>}
+                    {exercise.compound === 1 && <span className="badge bg-brand/10 text-brand shrink-0">Grundübung</span>}
                   </button>
                 </li>
               ))}
-              {x.length > _ && (
+              {results.length > visibleCount && (
                 <li>
-                  <button onClick={() => y((e) => e + _2)} className="btn-secondary w-full mt-2 text-sm">
-                    Mehr anzeigen ({x.length - _} weitere)
+                  <button onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} className="btn-secondary w-full mt-2 text-sm">
+                    Mehr anzeigen ({results.length - visibleCount} weitere)
                   </button>
                 </li>
               )}
@@ -260,21 +260,21 @@ export function Y2_({ open: e, onClose: t, group: n, role: r, onPick: i }) {
     </BottomSheet>
   )
 }
-export const b2 = (e) => ({
-  group: e,
+export const compoundSlot = (groupKey) => ({
+  group: groupKey,
   role: 'grund',
 })
-export const Q = (e) => ({
-  group: e,
+export const isolationSlot = (groupKey) => ({
+  group: groupKey,
   role: 'iso',
 })
-export function x2(e, t) {
-  return t === 'bauch' || t === 'waden' || t === 'unterarme'
+export function defaultVolume(roleKey, groupKey) {
+  return groupKey === 'bauch' || groupKey === 'waden' || groupKey === 'unterarme'
     ? {
         sets: 3,
         reps: '12-15',
       }
-    : e === 'grund'
+    : roleKey === 'grund'
       ? {
           sets: 4,
           reps: '6-8',
@@ -284,44 +284,44 @@ export function x2(e, t) {
           reps: '10-15',
         }
 }
-export const S2 = {
+export const ROLE_LABELS = {
   grund: 'Grundübung',
   iso: 'Isolation',
 }
-export const C2 = (e, t, n) => ({
-  name: e,
-  slots: [b2('quadrizeps'), b2(t), b2(n), b2('schultern'), Q('beinbeuger'), Q('bizeps'), Q('trizeps'), Q('bauch')],
+export const fullBodyDay = (dayName, pushGroup, pullGroup) => ({
+  name: dayName,
+  slots: [compoundSlot('quadrizeps'), compoundSlot(pushGroup), compoundSlot(pullGroup), compoundSlot('schultern'), isolationSlot('beinbeuger'), isolationSlot('bizeps'), isolationSlot('trizeps'), isolationSlot('bauch')],
 })
-export const w2 = {
+export const PUSH_DAY = {
   name: 'Push',
-  slots: [b2('brust'), b2('brust'), b2('schultern'), Q('brust'), Q('schultern'), Q('trizeps'), Q('trizeps')],
+  slots: [compoundSlot('brust'), compoundSlot('brust'), compoundSlot('schultern'), isolationSlot('brust'), isolationSlot('schultern'), isolationSlot('trizeps'), isolationSlot('trizeps')],
 }
-export const T2 = {
+export const PULL_DAY = {
   name: 'Pull',
-  slots: [b2('ruecken'), b2('ruecken'), Q('ruecken'), Q('schultern'), Q('trapez'), Q('bizeps'), Q('bizeps')],
+  slots: [compoundSlot('ruecken'), compoundSlot('ruecken'), isolationSlot('ruecken'), isolationSlot('schultern'), isolationSlot('trapez'), isolationSlot('bizeps'), isolationSlot('bizeps')],
 }
-export const E2 = {
+export const LEGS_DAY = {
   name: 'Legs',
-  slots: [b2('quadrizeps'), b2('quadrizeps'), b2('beinbeuger'), b2('gesaess'), Q('beinbeuger'), Q('waden'), Q('bauch')],
+  slots: [compoundSlot('quadrizeps'), compoundSlot('quadrizeps'), compoundSlot('beinbeuger'), compoundSlot('gesaess'), isolationSlot('beinbeuger'), isolationSlot('waden'), isolationSlot('bauch')],
 }
-export const D2 = (e) => ({
-  name: e,
-  slots: [b2('brust'), b2('ruecken'), b2('schultern'), Q('ruecken'), Q('brust'), Q('bizeps'), Q('trizeps')],
+export const upperDay = (dayName) => ({
+  name: dayName,
+  slots: [compoundSlot('brust'), compoundSlot('ruecken'), compoundSlot('schultern'), isolationSlot('ruecken'), isolationSlot('brust'), isolationSlot('bizeps'), isolationSlot('trizeps')],
 })
-export const O2 = (e) => ({
-  name: e,
-  slots: [b2('quadrizeps'), b2('beinbeuger'), b2('gesaess'), Q('quadrizeps'), Q('waden'), Q('bauch')],
+export const lowerDay = (dayName) => ({
+  name: dayName,
+  slots: [compoundSlot('quadrizeps'), compoundSlot('beinbeuger'), compoundSlot('gesaess'), isolationSlot('quadrizeps'), isolationSlot('waden'), isolationSlot('bauch')],
 })
-export const k2 = [
+export const SPLITS = [
   {
     id: 'ganzkoerper',
     name: 'Ganzkörper',
     tagline: '3 Tage · jeder Muskel mehrmals pro Woche',
     description: 'Ideal für den Einstieg und wenig Zeit: Pro Tag der ganze Körper, dazwischen Pausentage.',
     days: [
-      C2('Ganzkörper A', 'brust', 'ruecken'),
-      C2('Ganzkörper B', 'brust', 'ruecken'),
-      C2('Ganzkörper C', 'brust', 'ruecken'),
+      fullBodyDay('Ganzkörper A', 'brust', 'ruecken'),
+      fullBodyDay('Ganzkörper B', 'brust', 'ruecken'),
+      fullBodyDay('Ganzkörper C', 'brust', 'ruecken'),
     ],
   },
   {
@@ -329,14 +329,14 @@ export const k2 = [
     name: 'Ober- / Unterkörper',
     tagline: '4 Tage · Oberkörper und Beine im Wechsel',
     description: 'Jede Muskelgruppe zweimal pro Woche mit genug Erholung. Klassiker für Muskelaufbau.',
-    days: [D2('Oberkörper A'), O2('Unterkörper A'), D2('Oberkörper B'), O2('Unterkörper B')],
+    days: [upperDay('Oberkörper A'), lowerDay('Unterkörper A'), upperDay('Oberkörper B'), lowerDay('Unterkörper B')],
   },
   {
     id: 'ppl',
     name: 'Push / Pull / Legs',
     tagline: '3 Tage · Drücken, Ziehen, Beine',
     description: 'Der 3er-Split: Push (Brust, Schultern, Trizeps), Pull (Rücken, Bizeps), Legs (Beine, Bauch).',
-    days: [w2, T2, E2],
+    days: [PUSH_DAY, PULL_DAY, LEGS_DAY],
   },
   {
     id: 'ppl6',
@@ -345,27 +345,27 @@ export const k2 = [
     description: 'Der 3er-Split doppelt: Push, Pull, Legs, dann noch einmal mit anderen Übungen.',
     days: [
       {
-        ...w2,
+        ...PUSH_DAY,
         name: 'Push A',
       },
       {
-        ...T2,
+        ...PULL_DAY,
         name: 'Pull A',
       },
       {
-        ...E2,
+        ...LEGS_DAY,
         name: 'Legs A',
       },
       {
-        ...w2,
+        ...PUSH_DAY,
         name: 'Push B',
       },
       {
-        ...T2,
+        ...PULL_DAY,
         name: 'Pull B',
       },
       {
-        ...E2,
+        ...LEGS_DAY,
         name: 'Legs B',
       },
     ],
@@ -376,14 +376,14 @@ export const k2 = [
     tagline: '4 Tage · Oberkörper-Rumpf und Beine',
     description: 'Torso (Brust, Rücken, Schultern, Arme) und Legs im Wechsel, mit Bauch am Beintag.',
     days: [
-      D2('Torso A'),
+      upperDay('Torso A'),
       {
-        ...E2,
+        ...LEGS_DAY,
         name: 'Legs A',
       },
-      D2('Torso B'),
+      upperDay('Torso B'),
       {
-        ...E2,
+        ...LEGS_DAY,
         name: 'Legs B',
       },
     ],
@@ -396,30 +396,30 @@ export const k2 = [
     days: [
       {
         name: 'Brust',
-        slots: [b2('brust'), b2('brust'), b2('brust'), Q('brust'), Q('brust'), Q('bauch')],
+        slots: [compoundSlot('brust'), compoundSlot('brust'), compoundSlot('brust'), isolationSlot('brust'), isolationSlot('brust'), isolationSlot('bauch')],
       },
       {
         name: 'Rücken',
-        slots: [b2('ruecken'), b2('ruecken'), b2('ruecken'), Q('ruecken'), Q('trapez'), Q('unterer_ruecken')],
+        slots: [compoundSlot('ruecken'), compoundSlot('ruecken'), compoundSlot('ruecken'), isolationSlot('ruecken'), isolationSlot('trapez'), isolationSlot('unterer_ruecken')],
       },
       {
         name: 'Schultern',
-        slots: [b2('schultern'), b2('schultern'), Q('schultern'), Q('schultern'), Q('trapez'), Q('bauch')],
+        slots: [compoundSlot('schultern'), compoundSlot('schultern'), isolationSlot('schultern'), isolationSlot('schultern'), isolationSlot('trapez'), isolationSlot('bauch')],
       },
       {
         name: 'Arme',
-        slots: [b2('trizeps'), b2('bizeps'), Q('trizeps'), Q('bizeps'), Q('trizeps'), Q('bizeps'), Q('unterarme')],
+        slots: [compoundSlot('trizeps'), compoundSlot('bizeps'), isolationSlot('trizeps'), isolationSlot('bizeps'), isolationSlot('trizeps'), isolationSlot('bizeps'), isolationSlot('unterarme')],
       },
       {
         name: 'Beine',
         slots: [
-          b2('quadrizeps'),
-          b2('quadrizeps'),
-          b2('beinbeuger'),
-          b2('gesaess'),
-          Q('beinbeuger'),
-          Q('waden'),
-          Q('waden'),
+          compoundSlot('quadrizeps'),
+          compoundSlot('quadrizeps'),
+          compoundSlot('beinbeuger'),
+          compoundSlot('gesaess'),
+          isolationSlot('beinbeuger'),
+          isolationSlot('waden'),
+          isolationSlot('waden'),
         ],
       },
     ],
@@ -432,22 +432,22 @@ export const k2 = [
     days: [
       {
         name: 'Brust & Rücken',
-        slots: [b2('brust'), b2('ruecken'), b2('brust'), b2('ruecken'), Q('brust'), Q('ruecken'), Q('bauch')],
+        slots: [compoundSlot('brust'), compoundSlot('ruecken'), compoundSlot('brust'), compoundSlot('ruecken'), isolationSlot('brust'), isolationSlot('ruecken'), isolationSlot('bauch')],
       },
       {
         name: 'Schultern & Arme',
-        slots: [b2('schultern'), b2('schultern'), Q('schultern'), Q('bizeps'), Q('trizeps'), Q('bizeps'), Q('trizeps')],
+        slots: [compoundSlot('schultern'), compoundSlot('schultern'), isolationSlot('schultern'), isolationSlot('bizeps'), isolationSlot('trizeps'), isolationSlot('bizeps'), isolationSlot('trizeps')],
       },
       {
         name: 'Beine',
         slots: [
-          b2('quadrizeps'),
-          b2('quadrizeps'),
-          b2('beinbeuger'),
-          b2('gesaess'),
-          Q('waden'),
-          Q('waden'),
-          Q('bauch'),
+          compoundSlot('quadrizeps'),
+          compoundSlot('quadrizeps'),
+          compoundSlot('beinbeuger'),
+          compoundSlot('gesaess'),
+          isolationSlot('waden'),
+          isolationSlot('waden'),
+          isolationSlot('bauch'),
         ],
       },
     ],
@@ -465,7 +465,7 @@ export const k2 = [
     ],
   },
 ]
-export function A2(e) {
+export function trainingWeekdays(dayCount) {
   return {
     1: [1],
     2: [1, 4],
@@ -474,47 +474,47 @@ export function A2(e) {
     5: [1, 2, 3, 5, 6],
     6: [1, 2, 3, 4, 5, 6],
     7: [1, 2, 3, 4, 5, 6, 7],
-  }[Math.min(Math.max(e, 1), 7)]
+  }[Math.min(Math.max(dayCount, 1), 7)]
 }
-export const j2 = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-export let M2 = 0
-export const N2 = () => `p${Date.now().toString(36)}${(M2++).toString(36)}`
-export function P2(e, t) {
-  let n = x2(t, e)
+export const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+export let slotCounter = 0
+export const newId = () => `p${Date.now().toString(36)}${(slotCounter++).toString(36)}`
+export function newSlot(groupKey, roleKey) {
+  let volume = defaultVolume(roleKey, groupKey)
   return {
-    id: N2(),
-    group: e,
-    role: t,
-    sets: String(n.sets),
-    reps: n.reps,
+    id: newId(),
+    group: groupKey,
+    role: roleKey,
+    sets: String(volume.sets),
+    reps: volume.reps,
   }
 }
-export function F2(e) {
-  let t = A2(e.days.length)
-  return e.days.map((e, n) => ({
-    id: N2(),
-    name: e.name,
-    weekdays: [t[n]],
-    slots: e.slots.map((e) => P2(e.group, e.role)),
+export function daysFromSplit(splitData) {
+  let weekdayPlan = trainingWeekdays(splitData.days.length)
+  return splitData.days.map((splitDay, dayIndex) => ({
+    id: newId(),
+    name: splitDay.name,
+    weekdays: [weekdayPlan[dayIndex]],
+    slots: splitDay.slots.map((slotItem) => newSlot(slotItem.group, slotItem.role)),
   }))
 }
-export function I2({ id: e, children: t }) {
+export function SortableItem({ id: itemId, children: renderChild }) {
   let {
-      attributes: n,
-      listeners: r,
-      setNodeRef: i,
-      setActivatorNodeRef: a,
-      transform: o,
-      transition: s,
-      isDragging: c,
+      attributes: dragAttributes,
+      listeners: dragListeners,
+      setNodeRef: setRef,
+      setActivatorNodeRef: setHandleRef,
+      transform: dragTransform,
+      transition: dragTransition,
+      isDragging: beingDragged,
     } = useSortable({
-      id: e,
+      id: itemId,
     }),
-    l = (
+    handleButton = (
       <button
-        ref={a}
-        {...n}
-        {...r}
+        ref={setHandleRef}
+        {...dragAttributes}
+        {...dragListeners}
         className="p-1.5 -ml-1 rounded-lg text-text-muted hover:text-text-primary cursor-grab active:cursor-grabbing touch-none shrink-0"
         aria-label="Zum Verschieben ziehen"
       >
@@ -523,23 +523,23 @@ export function I2({ id: e, children: t }) {
     )
   return (
     <div
-      ref={i}
+      ref={setRef}
       style={{
-        transform: CSS.Transform.toString(o),
-        transition: s,
-        zIndex: c ? 20 : undefined,
+        transform: CSS.Transform.toString(dragTransform),
+        transition: dragTransition,
+        zIndex: beingDragged ? 20 : undefined,
         position: 'relative',
       }}
-      className={cn(c && 'opacity-90 shadow-glow rounded-3xl')}
+      className={cn(beingDragged && 'opacity-90 shadow-glow rounded-3xl')}
     >
-      {t({
-        handle: l,
-        dragging: c,
+      {renderChild({
+        handle: handleButton,
+        dragging: beingDragged,
       })}
     </div>
   )
 }
-export function L2() {
+export function useDragSensors() {
   return useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -557,27 +557,27 @@ export function L2() {
     }),
   )
 }
-export function R2({ slot: e, handle: t, onPick: n, onChange: r, onRemove: i }) {
+export function SlotRow({ slot: slotItem, handle: dragHandleNode, onPick: onPickExercise, onChange: onChangeSlot, onRemove: onRemoveSlot }) {
   return (
     <div className="rounded-2xl bg-bg-elevated border border-border p-3 space-y-2.5">
       <div className="flex items-center gap-1.5">
-        {t}
-        <span className="badge bg-brand/10 text-brand">{muscleGroupLabel(e.group)}</span>
+        {dragHandleNode}
+        <span className="badge bg-brand/10 text-brand">{muscleGroupLabel(slotItem.group)}</span>
         <button
           onClick={() =>
-            r({
-              role: e.role === 'grund' ? 'iso' : 'grund',
-              ...x2(e.role === 'grund' ? 'iso' : 'grund', e.group),
-              sets: String(x2(e.role === 'grund' ? 'iso' : 'grund', e.group).sets),
+            onChangeSlot({
+              role: slotItem.role === 'grund' ? 'iso' : 'grund',
+              ...defaultVolume(slotItem.role === 'grund' ? 'iso' : 'grund', slotItem.group),
+              sets: String(defaultVolume(slotItem.role === 'grund' ? 'iso' : 'grund', slotItem.group).sets),
             })
           }
           className="text-xs text-text-muted hover:text-text-primary transition-colors"
           title="Rolle wechseln"
         >
-          {S2[e.role]}
+          {ROLE_LABELS[slotItem.role]}
         </button>
         <button
-          onClick={i}
+          onClick={onRemoveSlot}
           className="ml-auto p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
           aria-label="Platz entfernen"
         >
@@ -585,42 +585,42 @@ export function R2({ slot: e, handle: t, onPick: n, onChange: r, onRemove: i }) 
         </button>
       </div>
       <button
-        onClick={n}
+        onClick={onPickExercise}
         className={cn(
           'w-full flex items-center gap-3 rounded-xl text-left transition-all active:scale-[0.985]',
-          e.ex
+          slotItem.ex
             ? 'bg-bg-card border border-border p-2'
             : 'border-2 border-dashed border-brand/40 text-brand p-3 justify-center hover:bg-brand/5',
         )}
       >
-        {e.ex ? (
+        {slotItem.ex ? (
           <>
             <span className="w-11 h-11 rounded-lg bg-bg-elevated overflow-hidden shrink-0 flex items-center justify-center">
-              {e.ex.own ? (
+              {slotItem.ex.own ? (
                 <UserRound size={20} className="text-brand" aria-hidden="true" />
               ) : (
               <img
                 src={exerciseImageUrl({
-                  image: e.ex.image,
+                  image: slotItem.ex.image,
                 })}
                 alt=""
                 loading="lazy"
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.visibility = 'hidden'
+                onError={(event) => {
+                  event.target.style.visibility = 'hidden'
                 }}
               />
               )}
             </span>
             <span className="flex-1 min-w-0">
-              <span className="block text-sm font-semibold text-text-primary truncate">{e.ex.name}</span>
-              <span className="block text-xs text-text-muted">{e.ex.own ? 'Eigene Übung · antippen zum Tauschen' : 'Antippen zum Tauschen'}</span>
+              <span className="block text-sm font-semibold text-text-primary truncate">{slotItem.ex.name}</span>
+              <span className="block text-xs text-text-muted">{slotItem.ex.own ? 'Eigene Übung · antippen zum Tauschen' : 'Antippen zum Tauschen'}</span>
             </span>
             <ChevronRight size={16} className="text-text-muted shrink-0" />
           </>
         ) : (
           <span className="flex items-center gap-2 text-sm font-semibold">
-            <Plus size={16} /> Übung für {muscleGroupLabel(e.group)} wählen
+            <Plus size={16} /> Übung für {muscleGroupLabel(slotItem.group)} wählen
           </span>
         )}
       </button>
@@ -629,10 +629,10 @@ export function R2({ slot: e, handle: t, onPick: n, onChange: r, onRemove: i }) 
           inputMode="numeric"
           aria-label="Sätze"
           className="input !w-14 !px-2 !py-1.5 text-center text-sm font-semibold"
-          value={e.sets}
-          onChange={(e) =>
-            r({
-              sets: e.target.value.replace(/\D/g, '').slice(0, 2),
+          value={slotItem.sets}
+          onChange={(event) =>
+            onChangeSlot({
+              sets: event.target.value.replace(/\D/g, '').slice(0, 2),
             })
           }
         />
@@ -640,10 +640,10 @@ export function R2({ slot: e, handle: t, onPick: n, onChange: r, onRemove: i }) 
         <input
           aria-label="Wiederholungen"
           className="input !w-20 !px-2 !py-1.5 text-center text-sm font-semibold"
-          value={e.reps}
-          onChange={(e) =>
-            r({
-              reps: e.target.value.replace(/[^0-9-–]/g, '').slice(0, 7),
+          value={slotItem.reps}
+          onChange={(event) =>
+            onChangeSlot({
+              reps: event.target.value.replace(/[^0-9-–]/g, '').slice(0, 7),
             })
           }
         />
@@ -652,53 +652,53 @@ export function R2({ slot: e, handle: t, onPick: n, onChange: r, onRemove: i }) 
     </div>
   )
 }
-export function Z2_({ day: e, index: t, handle: n, onChange: r, onRemove: i, onPickSlot: a }) {
-  let o = L2(),
-    [s, c] = useState(false),
-    l = e.slots.filter((e) => e.ex).length
-  function u(t) {
-    if (!t.over || t.active.id === t.over.id) return
-    let n = e.slots.findIndex((e) => e.id === t.active.id),
-      i = e.slots.findIndex((e) => e.id === t.over.id)
-    r({
-      slots: arrayMove(e.slots, n, i),
+export function DayCard({ day: dayItem, index: dayPos, handle: dragHandle, onChange: onChangeDay, onRemove: onRemoveDay, onPickSlot: onPickSlotId }) {
+  let dragSensors = useDragSensors(),
+    [groupSheetOpen, setGroupSheetOpen] = useState(false),
+    filledCount = dayItem.slots.filter((slotItem) => slotItem.ex).length
+  function handleDragEnd(dragEvent) {
+    if (!dragEvent.over || dragEvent.active.id === dragEvent.over.id) return
+    let fromIndex = dayItem.slots.findIndex((slotItem) => slotItem.id === dragEvent.active.id),
+      toIndex = dayItem.slots.findIndex((slotItem) => slotItem.id === dragEvent.over.id)
+    onChangeDay({
+      slots: arrayMove(dayItem.slots, fromIndex, toIndex),
     })
   }
-  let d = (t, n) =>
-    r({
-      slots: e.slots.map((e) =>
-        e.id === t
+  let updateSlot = (slotKey, changes) =>
+    onChangeDay({
+      slots: dayItem.slots.map((slotItem) =>
+        slotItem.id === slotKey
           ? {
-              ...e,
-              ...n,
+              ...slotItem,
+              ...changes,
             }
-          : e,
+          : slotItem,
       ),
     })
   return (
     <div
       className="card enter space-y-3"
       style={{
-        '--d': 80 + t * 70,
+        '--d': 80 + dayPos * 70,
       }}
     >
       <div className="flex items-center gap-2">
-        {n}
+        {dragHandle}
         <input
           className="flex-1 min-w-0 bg-transparent text-lg font-bold text-text-primary tracking-tight outline-none focus:ring-1 focus:ring-brand rounded-lg px-1"
-          value={e.name}
-          onChange={(e) =>
-            r({
-              name: e.target.value,
+          value={dayItem.name}
+          onChange={(event) =>
+            onChangeDay({
+              name: event.target.value,
             })
           }
           aria-label="Name des Trainingstags"
         />
         <span className="text-xs text-text-muted whitespace-nowrap">
-          {l}/{e.slots.length}
+          {filledCount}/{dayItem.slots.length}
         </span>
         <button
-          onClick={i}
+          onClick={onRemoveDay}
           className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
           aria-label="Tag entfernen"
         >
@@ -706,67 +706,67 @@ export function Z2_({ day: e, index: t, handle: n, onChange: r, onRemove: i, onP
         </button>
       </div>
       <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Wochentage">
-        {j2.map((t, n) => {
-          let i = e.weekdays.includes(n + 1)
+        {WEEKDAY_LABELS.map((weekdayLabel, weekdayIndex) => {
+          let isSelected = dayItem.weekdays.includes(weekdayIndex + 1)
           return (
             <button
-              aria-pressed={i}
+              aria-pressed={isSelected}
               onClick={() =>
-                r({
-                  weekdays: i ? e.weekdays.filter((e) => e !== n + 1) : [...e.weekdays, n + 1].sort(),
+                onChangeDay({
+                  weekdays: isSelected ? dayItem.weekdays.filter((dayNumber) => dayNumber !== weekdayIndex + 1) : [...dayItem.weekdays, weekdayIndex + 1].sort(),
                 })
               }
               className={cn(
                 'w-9 h-8 rounded-full text-xs font-bold border transition-all active:scale-90',
-                i ? 'bg-primary border-brand text-white' : 'border-border text-text-muted hover:border-brand/40',
+                isSelected ? 'bg-primary border-brand text-white' : 'border-border text-text-muted hover:border-brand/40',
               )}
-              key={t}
+              key={weekdayLabel}
             >
-              {t}
+              {weekdayLabel}
             </button>
           )
         })}
       </div>
-      <DndContext sensors={o} collisionDetection={closestCenter} onDragEnd={u}>
-        <SortableContext items={e.slots.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+      <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={dayItem.slots.map((slotItem) => slotItem.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2.5">
-            {e.slots.map((t) => (
-              <I2 id={t.id} key={t.id}>
-                {({ handle: n }) => (
-                  <R2
-                    slot={t}
-                    handle={n}
-                    onPick={() => a(t.id)}
-                    onChange={(e) => d(t.id, e)}
+            {dayItem.slots.map((slotItem) => (
+              <SortableItem id={slotItem.id} key={slotItem.id}>
+                {({ handle: slotHandle }) => (
+                  <SlotRow
+                    slot={slotItem}
+                    handle={slotHandle}
+                    onPick={() => onPickSlotId(slotItem.id)}
+                    onChange={(slotChanges) => updateSlot(slotItem.id, slotChanges)}
                     onRemove={() =>
-                      r({
-                        slots: e.slots.filter((e) => e.id !== t.id),
+                      onChangeDay({
+                        slots: dayItem.slots.filter((other) => other.id !== slotItem.id),
                       })
                     }
                   />
                 )}
-              </I2>
+              </SortableItem>
             ))}
           </div>
         </SortableContext>
       </DndContext>
-      <button onClick={() => c(true)} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+      <button onClick={() => setGroupSheetOpen(true)} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
         <Plus size={15} /> Muskelgruppe hinzufügen
       </button>
-      <BottomSheet open={s} onClose={() => c(false)} title="Muskelgruppe hinzufügen">
+      <BottomSheet open={groupSheetOpen} onClose={() => setGroupSheetOpen(false)} title="Muskelgruppe hinzufügen">
         <div className="grid grid-cols-2 gap-2 pb-3">
-          {MUSCLE_GROUPS.filter((e) => e.key !== 'sonstige').map((t) => (
+          {MUSCLE_GROUPS.filter((muscle) => muscle.key !== 'sonstige').map((muscle) => (
             <button
               onClick={() => {
-                ;(r({
-                  slots: [...e.slots, P2(t.key, 'iso')],
+                ;(onChangeDay({
+                  slots: [...dayItem.slots, newSlot(muscle.key, 'iso')],
                 }),
-                  c(false))
+                  setGroupSheetOpen(false))
               }}
               className="rounded-2xl bg-bg-elevated border border-border px-3 py-3 text-sm font-semibold text-text-primary hover:border-brand/50 active:scale-95 transition-all text-left"
-              key={t.key}
+              key={muscle.key}
             >
-              {t.label}
+              {muscle.label}
             </button>
           ))}
         </div>
@@ -774,175 +774,175 @@ export function Z2_({ day: e, index: t, handle: n, onChange: r, onRemove: i, onP
     </div>
   )
 }
-export function PlanBuilder({ onSaved: e }) {
-  let { user: t } = useAuth(),
-    n = L2(),
-    [r, i] = useState(null),
-    [a, o] = useState(''),
-    [s, c] = useState([]),
-    [l, u] = useState(null),
-    [d, f] = useState(false),
-    [p, m] = useState(false),
-    [h, g] = useState(''),
-    _ = useMemo(
-      () => (l ? (s.find((e) => e.id === l.dayId)?.slots.find((e) => e.id === l.slotId) ?? null) : null),
-      [l, s],
+export function PlanBuilder({ onSaved: handleSaved }) {
+  let { user: currentUser } = useAuth(),
+    dragSensors = useDragSensors(),
+    [splitData, setSplit] = useState(null),
+    [planName, setPlanName] = useState(''),
+    [planDays, setDays] = useState([]),
+    [pickTarget, setPickTarget] = useState(null),
+    [saving, setSaving] = useState(false),
+    [suggesting, setSuggesting] = useState(false),
+    [errorText, setErrorText] = useState(''),
+    pickedSlot = useMemo(
+      () => (pickTarget ? (planDays.find((dayItem) => dayItem.id === pickTarget.dayId)?.slots.find((slotItem) => slotItem.id === pickTarget.slotId) ?? null) : null),
+      [pickTarget, planDays],
     ),
-    y = s.reduce((e, t) => e + t.slots.length, 0),
-    b = s.reduce((e, t) => e + t.slots.filter((e) => e.ex).length, 0)
-  function x(e) {
-    ;(i(e), o(e.id === 'frei' ? 'Mein Plan' : e.name), c(F2(e)), g(''))
+    slotTotal = planDays.reduce((sum, dayItem) => sum + dayItem.slots.length, 0),
+    chosenTotal = planDays.reduce((sum, dayItem) => sum + dayItem.slots.filter((slotItem) => slotItem.ex).length, 0)
+  function chooseSplit(chosenSplit) {
+    ;(setSplit(chosenSplit), setPlanName(chosenSplit.id === 'frei' ? 'Mein Plan' : chosenSplit.name), setDays(daysFromSplit(chosenSplit)), setErrorText(''))
   }
-  let S = (e, t) =>
-    c((n) =>
-      n.map((n) =>
-        n.id === e
+  let updateDay = (dayKey, changes) =>
+    setDays((prevDays) =>
+      prevDays.map((dayItem) =>
+        dayItem.id === dayKey
           ? {
-              ...n,
-              ...t,
+              ...dayItem,
+              ...changes,
             }
-          : n,
+          : dayItem,
       ),
     )
-  function C(e) {
-    !e.over ||
-      e.active.id === e.over.id ||
-      c((t) =>
+  function handleDayDragEnd(dragEvent) {
+    !dragEvent.over ||
+      dragEvent.active.id === dragEvent.over.id ||
+      setDays((prevDays) =>
         arrayMove(
-          t,
-          t.findIndex((t) => t.id === e.active.id),
-          t.findIndex((t) => t.id === e.over.id),
+          prevDays,
+          prevDays.findIndex((dayItem) => dayItem.id === dragEvent.active.id),
+          prevDays.findIndex((dayItem) => dayItem.id === dragEvent.over.id),
         ),
       )
   }
-  function w(e) {
-    l &&
-      (S(l.dayId, {
-        slots: s
-          .find((e) => e.id === l.dayId)
-          .slots.map((t) =>
-            t.id === l.slotId
+  function pickExercise(exercise) {
+    pickTarget &&
+      (updateDay(pickTarget.dayId, {
+        slots: planDays
+          .find((dayItem) => dayItem.id === pickTarget.dayId)
+          .slots.map((slotItem) =>
+            slotItem.id === pickTarget.slotId
               ? {
-                  ...t,
+                  ...slotItem,
                   ex: {
-                    id: e.id,
-                    name: e.name,
-                    image: e.image,
-                    own: !!e.own,
+                    id: exercise.id,
+                    name: exercise.name,
+                    image: exercise.image,
+                    own: !!exercise.own,
                   },
                 }
-              : t,
+              : slotItem,
           ),
       }),
-      u(null))
+      setPickTarget(null))
   }
-  async function T() {
-    m(true)
+  async function suggestFill() {
+    setSuggesting(true)
     try {
-      let e = await loadExerciseData(),
-        t = new Set(s.flatMap((e) => e.slots.map((e) => e.ex?.id)).filter(Boolean)),
-        n = (e) =>
+      let allExercises = await loadExerciseData(),
+        usedIds = new Set(planDays.flatMap((dayItem) => dayItem.slots.map((slotItem) => slotItem.ex?.id)).filter(Boolean)),
+        equipmentRank = (exercise) =>
           ({
             Langhantel: 0,
             Kurzhantel: 1,
             Maschine: 2,
             Kabel: 3,
             Körpergewicht: 4,
-          })[e.equipment_group] ?? 5
-      c((r) =>
-        r.map((r) => ({
-          ...r,
-          slots: r.slots.map((r) => {
-            if (r.ex) return r
-            let i = e
+          })[exercise.equipment_group] ?? 5
+      setDays((prevDays) =>
+        prevDays.map((dayItem) => ({
+          ...dayItem,
+          slots: dayItem.slots.map((slotItem) => {
+            if (slotItem.ex) return slotItem
+            let suggestion = allExercises
               .filter(
-                (e) =>
-                  e.group === r.group && !e.stretch && !t.has(e.id) && !/\(.*(pov|male|female).*\)/i.test(e.name_en),
+                (candidate) =>
+                  candidate.group === slotItem.group && !candidate.stretch && !usedIds.has(candidate.id) && !/\(.*(pov|male|female).*\)/i.test(candidate.name_en),
               )
-              .sort((e, t) => {
-                let i = +(r.role === 'grund')
+              .sort((candidateA, candidateB) => {
+                let wantCompound = +(slotItem.role === 'grund')
                 return (
-                  (e.compound === i ? 0 : 1) - (t.compound === i ? 0 : 1) ||
-                  n(e) - n(t) ||
-                  e.name.length - t.name.length
+                  (candidateA.compound === wantCompound ? 0 : 1) - (candidateB.compound === wantCompound ? 0 : 1) ||
+                  equipmentRank(candidateA) - equipmentRank(candidateB) ||
+                  candidateA.name.length - candidateB.name.length
                 )
               })[0]
-            return i
-              ? (t.add(i.id),
+            return suggestion
+              ? (usedIds.add(suggestion.id),
                 {
-                  ...r,
+                  ...slotItem,
                   ex: {
-                    id: i.id,
-                    name: i.name,
-                    image: i.image,
+                    id: suggestion.id,
+                    name: suggestion.name,
+                    image: suggestion.image,
                   },
                 })
-              : r
+              : slotItem
           }),
         })),
       )
     } finally {
-      m(false)
+      setSuggesting(false)
     }
   }
-  async function E() {
-    if (!t) return
-    let n = s
-      .map((e) => ({
-        ...e,
-        slots: e.slots.filter((e) => e.ex),
+  async function savePlan() {
+    if (!currentUser) return
+    let filledDays = planDays
+      .map((dayItem) => ({
+        ...dayItem,
+        slots: dayItem.slots.filter((slotItem) => slotItem.ex),
       }))
-      .filter((e) => e.slots.length)
-    if (!n.length) {
-      g('Wähle mindestens eine Übung aus.')
+      .filter((dayItem) => dayItem.slots.length)
+    if (!filledDays.length) {
+      setErrorText('Wähle mindestens eine Übung aus.')
       return
     }
-    ;(f(true), g(''))
+    ;(setSaving(true), setErrorText(''))
     try {
-      for (let e = 0; e < n.length; e++) {
-        let i = n[e],
-          { data: o, error: s } = await V2(
+      for (let dayIndex = 0; dayIndex < filledDays.length; dayIndex++) {
+        let dayItem = filledDays[dayIndex],
+          { data: created, error: insertError } = await insertWithFallback(
             'training_vorlagen',
             {
-              user_id: t.id,
-              name: `${a.trim() || 'Mein Plan'} · ${i.name}`,
+              user_id: currentUser.id,
+              name: `${planName.trim() || 'Mein Plan'} · ${dayItem.name}`,
               trainingstyp: 'Kraft',
-              wochentage: i.weekdays.join(',') || null,
-              plan_name: a.trim() || 'Mein Plan',
-              plan_split: r?.id ?? null,
-              plan_reihenfolge: e,
+              wochentage: dayItem.weekdays.join(',') || null,
+              plan_name: planName.trim() || 'Mein Plan',
+              plan_split: splitData?.id ?? null,
+              plan_reihenfolge: dayIndex,
             },
             ['plan_name', 'plan_split', 'plan_reihenfolge'],
           )
-        if (s || !o) throw Error(s?.message ?? 'Speichern fehlgeschlagen')
-        let { error: c } = await V2(
+        if (insertError || !created) throw Error(insertError?.message ?? 'Speichern fehlgeschlagen')
+        let { error: slotsError } = await insertWithFallback(
           'vorlagen_uebungen',
-          i.slots.map((e, t) => ({
-            vorlage_id: o.id,
-            uebungsname: e.ex.name,
-            saetze: parseInt(e.sets) || null,
-            wdh: parseInt(e.reps) || null,
-            wdh_text: e.reps || null,
-            gruppe: e.group,
-            rolle: e.role,
-            reihenfolge: t,
+          dayItem.slots.map((slotItem, slotIndex) => ({
+            vorlage_id: created.id,
+            uebungsname: slotItem.ex.name,
+            saetze: parseInt(slotItem.sets) || null,
+            wdh: parseInt(slotItem.reps) || null,
+            wdh_text: slotItem.reps || null,
+            gruppe: slotItem.group,
+            rolle: slotItem.role,
+            reihenfolge: slotIndex,
           })),
           ['wdh_text', 'gruppe', 'rolle'],
         )
-        if (c) throw Error(c.message)
+        if (slotsError) throw Error(slotsError.message)
       }
-      e()
-    } catch (e) {
-      g(e instanceof Error ? e.message : 'Speichern fehlgeschlagen')
+      handleSaved()
+    } catch (saveError) {
+      setErrorText(saveError instanceof Error ? saveError.message : 'Speichern fehlgeschlagen')
     } finally {
-      f(false)
+      setSaving(false)
     }
   }
-  return r ? (
+  return splitData ? (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3 enter">
         <button
-          onClick={() => i(null)}
+          onClick={() => setSplit(null)}
           className="p-2 rounded-full bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
           aria-label="Zurück zur Split-Auswahl"
         >
@@ -955,8 +955,8 @@ export function PlanBuilder({ onSaved: e }) {
           <input
             id="plan-name"
             className="input mt-1"
-            value={a}
-            onChange={(e) => o(e.target.value)}
+            value={planName}
+            onChange={(event) => setPlanName(event.target.value)}
             placeholder="z. B. Mein 3er-Split"
           />
         </div>
@@ -968,44 +968,44 @@ export function PlanBuilder({ onSaved: e }) {
         }}
       >
         <span className="text-sm text-text-secondary">
-          {r.name} · {b} von {y} Übungen gewählt
+          {splitData.name} · {chosenTotal} von {slotTotal} Übungen gewählt
         </span>
-        <button onClick={T} disabled={p} className="btn-secondary text-sm !px-4 !py-2 ml-auto flex items-center gap-2">
-          {p ? <Spinner size={14} /> : <Sparkles size={14} />} Leere Plätze vorschlagen
+        <button onClick={suggestFill} disabled={suggesting} className="btn-secondary text-sm !px-4 !py-2 ml-auto flex items-center gap-2">
+          {suggesting ? <Spinner size={14} /> : <Sparkles size={14} />} Leere Plätze vorschlagen
         </button>
       </div>
-      <DndContext sensors={n} collisionDetection={closestCenter} onDragEnd={C}>
-        <SortableContext items={s.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+      <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={handleDayDragEnd}>
+        <SortableContext items={planDays.map((dayItem) => dayItem.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-4">
-            {s.map((e, t) => (
-              <I2 id={e.id} key={e.id}>
-                {({ handle: n }) => (
-                  <Z2_
-                    day={e}
-                    index={t}
-                    handle={n}
-                    onChange={(t) => S(e.id, t)}
-                    onRemove={() => c((t) => t.filter((t) => t.id !== e.id))}
-                    onPickSlot={(t) =>
-                      u({
-                        dayId: e.id,
-                        slotId: t,
+            {planDays.map((dayItem, dayIndex) => (
+              <SortableItem id={dayItem.id} key={dayItem.id}>
+                {({ handle: dragHandle }) => (
+                  <DayCard
+                    day={dayItem}
+                    index={dayIndex}
+                    handle={dragHandle}
+                    onChange={(dayChanges) => updateDay(dayItem.id, dayChanges)}
+                    onRemove={() => setDays((prevDays) => prevDays.filter((other) => other.id !== dayItem.id))}
+                    onPickSlot={(slotKey) =>
+                      setPickTarget({
+                        dayId: dayItem.id,
+                        slotId: slotKey,
                       })
                     }
                   />
                 )}
-              </I2>
+              </SortableItem>
             ))}
           </div>
         </SortableContext>
       </DndContext>
       <button
         onClick={() =>
-          c((e) => [
-            ...e,
+          setDays((prevDays) => [
+            ...prevDays,
             {
-              id: N2(),
-              name: `Tag ${e.length + 1}`,
+              id: newId(),
+              name: `Tag ${prevDays.length + 1}`,
               weekdays: [],
               slots: [],
             },
@@ -1015,23 +1015,23 @@ export function PlanBuilder({ onSaved: e }) {
       >
         <Plus size={16} /> Trainingstag hinzufügen
       </button>
-      {h && (
+      {errorText && (
         <div className="text-sm text-danger" role="alert">
-          {h}
+          {errorText}
         </div>
       )}
       <div className="sticky bottom-[calc(env(safe-area-inset-bottom,0px)_-_2.5rem)] lg:bottom-4 z-10">
         <button
-          onClick={E}
-          disabled={d || b === 0}
+          onClick={savePlan}
+          disabled={saving || chosenTotal === 0}
           className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 shadow-glow disabled:opacity-50"
         >
-          {d ? <Spinner size={16} /> : <Check size={18} />}Plan speichern (
-          {s.filter((e) => e.slots.some((e) => e.ex)).length} Vorlagen)
+          {saving ? <Spinner size={16} /> : <Check size={18} />}Plan speichern (
+          {planDays.filter((dayItem) => dayItem.slots.some((slotItem) => slotItem.ex)).length} Vorlagen)
         </button>
       </div>
-      <Y2_ open={!!l} onClose={() => u(null)} group={_?.group ?? 'brust'} role={_?.role ?? 'grund'} onPick={w} />
-      {y === 0 && (
+      <ExercisePicker open={!!pickTarget} onClose={() => setPickTarget(null)} group={pickedSlot?.group ?? 'brust'} role={pickedSlot?.role ?? 'grund'} onPick={pickExercise} />
+      {slotTotal === 0 && (
         <div className="card text-center text-sm text-text-secondary">
           <Dumbbell size={28} className="mx-auto mb-2 text-text-muted" />
           Noch keine Muskelgruppen. Tippe auf „Muskelgruppe hinzufügen“.
@@ -1048,27 +1048,27 @@ export function PlanBuilder({ onSaved: e }) {
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {k2.map((e, t) => (
+        {SPLITS.map((splitItem, splitIndex) => (
           <button
-            onClick={() => x(e)}
+            onClick={() => chooseSplit(splitItem)}
             className="card enter text-left space-y-2 hover:border-brand/50 active:scale-[0.985] transition-all"
             style={{
-              '--d': 60 + t * 55,
+              '--d': 60 + splitIndex * 55,
             }}
-            key={e.id}
+            key={splitItem.id}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-bold text-text-primary">{e.name}</div>
-                <div className="text-xs text-brand font-semibold mt-0.5">{e.tagline}</div>
+                <div className="font-bold text-text-primary">{splitItem.name}</div>
+                <div className="text-xs text-brand font-semibold mt-0.5">{splitItem.tagline}</div>
               </div>
               <ChevronRight size={18} className="text-text-muted shrink-0 mt-1" />
             </div>
-            <p className="text-sm text-text-secondary leading-relaxed">{e.description}</p>
+            <p className="text-sm text-text-secondary leading-relaxed">{splitItem.description}</p>
             <div className="flex gap-1.5 flex-wrap pt-1">
-              {e.days.map((e, t) => (
-                <span className="badge bg-bg-elevated text-text-secondary border border-border" key={t}>
-                  {e.name}
+              {splitItem.days.map((splitDay, splitDayIndex) => (
+                <span className="badge bg-bg-elevated text-text-secondary border border-border" key={splitDayIndex}>
+                  {splitDay.name}
                 </span>
               ))}
             </div>
@@ -1078,23 +1078,23 @@ export function PlanBuilder({ onSaved: e }) {
     </div>
   )
 }
-export async function V2(e, t, n) {
-  let r = async (t) => {
-      if (Array.isArray(t)) {
-        let { error: n } = await supabase.from(e).insert(t)
+export async function insertWithFallback(table, payload, optionalColumns) {
+  let attempt = async (body) => {
+      if (Array.isArray(body)) {
+        let { error: batchError } = await supabase.from(table).insert(body)
         return {
           data: null,
-          error: n,
+          error: batchError,
         }
       }
-      let { data: n, error: r } = await supabase.from(e).insert(t).select('id').single()
+      let { data: insertedRow, error: singleError } = await supabase.from(table).insert(body).select('id').single()
       return {
-        data: n,
-        error: r,
+        data: insertedRow,
+        error: singleError,
       }
     },
-    i = await r(t)
-  if (!i.error || !/column|schema cache|PGRST204|42703/i.test(`${i.error.message} ${i.error.code ?? ''}`)) return i
-  let a = (e) => Object.fromEntries(Object.entries(e).filter(([e]) => !n.includes(e)))
-  return r(Array.isArray(t) ? t.map(a) : a(t))
+    firstResult = await attempt(payload)
+  if (!firstResult.error || !/column|schema cache|PGRST204|42703/i.test(`${firstResult.error.message} ${firstResult.error.code ?? ''}`)) return firstResult
+  let stripOptional = (record) => Object.fromEntries(Object.entries(record).filter(([column]) => !optionalColumns.includes(column)))
+  return attempt(Array.isArray(payload) ? payload.map(stripOptional) : stripOptional(payload))
 }
