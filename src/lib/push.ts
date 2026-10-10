@@ -11,25 +11,25 @@ export const isStandalone = () =>
 export const pushCapable = () =>
   typeof window < 'u' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 export function deviceLabel() {
-  let e = navigator.userAgent
-  if (/iPhone/.test(e)) return 'iPhone'
-  if (/iPad/.test(e) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iPad'
-  if (/Android/.test(e)) return /Mobile/.test(e) ? 'Android-Handy' : 'Android-Tablet'
-  let t = /Edg\//.test(e)
+  let agent = navigator.userAgent
+  if (/iPhone/.test(agent)) return 'iPhone'
+  if (/iPad/.test(agent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iPad'
+  if (/Android/.test(agent)) return /Mobile/.test(agent) ? 'Android-Handy' : 'Android-Tablet'
+  let browser = /Edg\//.test(agent)
     ? 'Edge'
-    : /Firefox\//.test(e)
+    : /Firefox\//.test(agent)
       ? 'Firefox'
-      : /Chrome\//.test(e)
+      : /Chrome\//.test(agent)
         ? 'Chrome'
-        : /Safari\//.test(e)
+        : /Safari\//.test(agent)
           ? 'Safari'
           : 'Browser'
-  return `${/Mac OS X/.test(e) ? 'Mac' : /Windows/.test(e) ? 'Windows' : /Linux/.test(e) ? 'Linux' : 'Computer'} (${t})`
+  return `${/Mac OS X/.test(agent) ? 'Mac' : /Windows/.test(agent) ? 'Windows' : /Linux/.test(agent) ? 'Linux' : 'Computer'} (${browser})`
 }
-export async function serviceWorkerReady(e = 6e3) {
+export async function serviceWorkerReady(timeoutMs = 6e3) {
   try {
     return 'serviceWorker' in navigator
-      ? await Promise.race([navigator.serviceWorker.ready, new Promise((t) => setTimeout(() => t(null), e))])
+      ? await Promise.race([navigator.serviceWorker.ready, new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))])
       : null
   } catch {
     return null
@@ -42,50 +42,50 @@ export const getPushUser = () => {
     return null
   }
 }
-export const setPushUser = (e) => {
+export const setPushUser = (userId) => {
   try {
-    e ? localStorage.setItem(PUSH_USER_KEY, e) : localStorage.removeItem(PUSH_USER_KEY)
+    userId ? localStorage.setItem(PUSH_USER_KEY, userId) : localStorage.removeItem(PUSH_USER_KEY)
   } catch {}
 }
 export async function getPushState() {
   if (!pushCapable()) return isIOS() ? (isStandalone() ? 'ios-old' : 'ios-install') : 'unsupported'
   if (Notification.permission === 'denied') return 'denied'
   if (Notification.permission === 'default') return 'off'
-  let e = await serviceWorkerReady(3e3)
-  return e ? ((await e.pushManager.getSubscription()) ? 'on' : 'off') : 'unsupported'
+  let stateWorker = await serviceWorkerReady(3e3)
+  return stateWorker ? ((await stateWorker.pushManager.getSubscription()) ? 'on' : 'off') : 'unsupported'
 }
-export async function saveTimezone(e) {
+export async function saveTimezone(userId) {
   try {
-    let t = Intl.DateTimeFormat().resolvedOptions().timeZone
-    t &&
+    let zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    zone &&
       (await supabase
         .from('client_settings')
         .update({
-          timezone: t,
+          timezone: zone,
         })
-        .eq('user_id', e))
+        .eq('user_id', userId))
   } catch {}
 }
-export async function saveSubscription(e, t) {
-  let n = t.toJSON()
-  if (!n.endpoint || !n.keys?.p256dh || !n.keys?.auth) return
-  let r = {
-      user_id: e,
-      endpoint: n.endpoint,
-      p256dh: n.keys.p256dh,
-      auth: n.keys.auth,
+export async function saveSubscription(userId, subscription) {
+  let json = subscription.toJSON()
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return
+  let basicRow = {
+      user_id: userId,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
     },
-    i = {
-      ...r,
+    fullRow = {
+      ...basicRow,
       user_agent: navigator.userAgent.slice(0, 250),
       device_label: deviceLabel(),
       last_seen_at: new Date().toISOString(),
     },
-    { error: a } = await supabase.from('push_subscriptions').upsert(i, {
+    { error: upsertError } = await supabase.from('push_subscriptions').upsert(fullRow, {
       onConflict: 'endpoint',
     })
-  a &&
-    (await supabase.from('push_subscriptions').upsert(r, {
+  upsertError &&
+    (await supabase.from('push_subscriptions').upsert(basicRow, {
       onConflict: 'user_id',
     }))
 }
@@ -93,7 +93,7 @@ function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
   const raw = window.atob(base64)
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+  return Uint8Array.from([...raw].map(character => character.charCodeAt(0)))
 }
 
 // Liefert das Push-Abo dieses Geräts; legt es an, falls es fehlt oder mit einem anderen VAPID-Schlüssel erstellt wurde
@@ -107,73 +107,73 @@ export async function getOrCreateSubscription(registration: ServiceWorkerRegistr
   const existing = await registration.pushManager.getSubscription()
   if (existing) {
     const current = existing.options.applicationServerKey
-    const same = current && new Uint8Array(current).length === key.length && new Uint8Array(current).every((b, i) => b === key[i])
+    const same = current && new Uint8Array(current).length === key.length && new Uint8Array(current).every((byte, index) => byte === key[index])
     if (same) return existing
     await existing.unsubscribe() // anderer Schlüssel: neu anlegen, sonst bricht subscribe() mit AbortError ab
   }
   return registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
 }
-export async function enablePush(e) {
+export async function enablePush(userId) {
   if (!pushCapable()) return 'unsupported'
   try {
     if ((await Notification.requestPermission()) !== 'granted') return 'denied'
-    let t = await serviceWorkerReady()
-    if (!t) return 'error'
-    let n = await getOrCreateSubscription(t)
-    return n ? (await saveSubscription(e, n), await saveTimezone(e), setPushUser(e), 'ok') : 'error'
-  } catch (e) {
-    return (console.error('Push-Aktivierung fehlgeschlagen:', e), 'error')
+    let worker = await serviceWorkerReady()
+    if (!worker) return 'error'
+    let subscription = await getOrCreateSubscription(worker)
+    return subscription ? (await saveSubscription(userId, subscription), await saveTimezone(userId), setPushUser(userId), 'ok') : 'error'
+  } catch (pushError) {
+    return (console.error('Push-Aktivierung fehlgeschlagen:', pushError), 'error')
   }
 }
-export async function refreshPushSubscription(e) {
+export async function refreshPushSubscription(userId) {
   try {
-    if (!pushCapable() || Notification.permission !== 'granted' || getPushUser() !== e) return
-    let t = await serviceWorkerReady(4e3)
-    if (!t) return
-    let n = await getOrCreateSubscription(t)
-    ;(n && (await saveSubscription(e, n)), await saveTimezone(e))
-  } catch (e) {
-    console.error('Push-Abo erneuern fehlgeschlagen:', e)
+    if (!pushCapable() || Notification.permission !== 'granted' || getPushUser() !== userId) return
+    let worker = await serviceWorkerReady(4e3)
+    if (!worker) return
+    let subscription = await getOrCreateSubscription(worker)
+    ;(subscription && (await saveSubscription(userId, subscription)), await saveTimezone(userId))
+  } catch (pushError) {
+    console.error('Push-Abo erneuern fehlgeschlagen:', pushError)
   }
 }
-export async function disablePush(e) {
+export async function disablePush(userId) {
   try {
-    let t = await (await serviceWorkerReady(3e3))?.pushManager.getSubscription()
-    t &&
-      (await supabase.from('push_subscriptions').delete().eq('user_id', e).eq('endpoint', t.endpoint),
-      await t.unsubscribe())
+    let subscription = await (await serviceWorkerReady(3e3))?.pushManager.getSubscription()
+    subscription &&
+      (await supabase.from('push_subscriptions').delete().eq('user_id', userId).eq('endpoint', subscription.endpoint),
+      await subscription.unsubscribe())
   } finally {
     setPushUser(null)
   }
 }
-export async function forgetThisDevice(e) {
-  getPushUser() === e && (await disablePush(e).catch(() => {}))
+export async function forgetThisDevice(userId) {
+  getPushUser() === userId && (await disablePush(userId).catch(() => {}))
 }
-export async function listDevices(e) {
-  let { data: t } = await supabase.from('push_subscriptions').select('*').eq('user_id', e),
-    n = (await (await serviceWorkerReady(2e3))?.pushManager.getSubscription())?.endpoint
-  return (t ?? []).map((e) => ({
-    id: e.id,
-    endpoint: e.endpoint,
-    device_label: e.device_label ?? null,
-    last_seen_at: e.last_seen_at ?? null,
-    thisDevice: !!n && e.endpoint === n,
+export async function listDevices(userId) {
+  let { data: rows } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId),
+    thisEndpoint = (await (await serviceWorkerReady(2e3))?.pushManager.getSubscription())?.endpoint
+  return (rows ?? []).map((row) => ({
+    id: row.id,
+    endpoint: row.endpoint,
+    device_label: row.device_label ?? null,
+    last_seen_at: row.last_seen_at ?? null,
+    thisDevice: !!thisEndpoint && row.endpoint === thisEndpoint,
   }))
 }
-export async function removeDevice(e) {
-  await supabase.from('push_subscriptions').delete().eq('id', e)
+export async function removeDevice(deviceId) {
+  await supabase.from('push_subscriptions').delete().eq('id', deviceId)
 }
-export async function sendPushToUser(e, t, n, r) {
-  let { data: i, error: a } = await supabase.functions.invoke('send-notification', {
+export async function sendPushToUser(recipientId, heading, message, link) {
+  let { data: result, error: invokeError } = await supabase.functions.invoke('send-notification', {
     body: {
-      targetUserId: e,
-      title: t,
-      body: n,
-      url: r,
+      targetUserId: recipientId,
+      title: heading,
+      body: message,
+      url: link,
     },
   })
   return {
-    data: i,
-    error: a,
+    data: result,
+    error: invokeError,
   }
 }
