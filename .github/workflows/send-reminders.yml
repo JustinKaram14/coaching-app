@@ -11,7 +11,9 @@ jobs:
     steps:
       - name: Plan and send reminders
         run: |
-          curl -s -X POST "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/send-reminders" \
+          # --fail-with-body: bei einem Fehler (z. B. 401) schlägt der Lauf rot fehl und zeigt die Antwort an
+          curl -sS --fail-with-body -X POST "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/send-reminders" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"type":"all"}'
+          echo
