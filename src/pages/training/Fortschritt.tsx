@@ -11,110 +11,110 @@ import { useCountUpText as useCountUp } from '../../hooks/useCountUp'
 import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
 
-export function H2(e, t) {
-  return t <= 1 ? e : e * (1 + t / 30)
+export function estimateOneRepMax(weightKg, repCount) {
+  return repCount <= 1 ? weightKg : weightKg * (1 + repCount / 30)
 }
-export function U2(e) {
-  return e
-    .filter((e) => e.wdh && e.wdh > 0 && e.kg && e.kg > 0)
-    .map((e) => ({
-      kg: e.kg,
-      wdh: e.wdh,
+export function validSets(setList) {
+  return setList
+    .filter((setEntry) => setEntry.wdh && setEntry.wdh > 0 && setEntry.kg && setEntry.kg > 0)
+    .map((setEntry) => ({
+      kg: setEntry.kg,
+      wdh: setEntry.wdh,
     }))
 }
-export function W2(e) {
-  let t = U2(e)
-  return t.length ? Math.max(...t.map((e) => H2(e.kg, e.wdh))) : null
+export function bestEstimate(setList) {
+  let valid = validSets(setList)
+  return valid.length ? Math.max(...valid.map((setEntry) => estimateOneRepMax(setEntry.kg, setEntry.wdh))) : null
 }
-export function G2(e) {
-  let t = U2(e)
-  return t.length ? t.reduce((e, t) => e + t.kg * t.wdh, 0) : null
+export function volumeOf(setList) {
+  let valid = validSets(setList)
+  return valid.length ? valid.reduce((sum, setEntry) => sum + setEntry.kg * setEntry.wdh, 0) : null
 }
-export function K2(e) {
-  let t = e.map((e) => e.wdh ?? 0).filter((e) => e > 0)
-  return t.length ? Math.max(...t) : null
+export function maxReps(setList) {
+  let repsList = setList.map((setEntry) => setEntry.wdh ?? 0).filter((reps) => reps > 0)
+  return repsList.length ? Math.max(...repsList) : null
 }
-export function q2(e, t) {
-  if (!t.length) return null
-  let n = [...t].sort((e, t) => e.datum.localeCompare(t.datum)),
-    r = null
-  for (let t of n)
-    if (t.datum <= e) r = t.gewicht
+export function bodyWeightOn(day, weights) {
+  if (!weights.length) return null
+  let sorted = [...weights].sort((entryA, entryB) => entryA.datum.localeCompare(entryB.datum)),
+    found = null
+  for (let entry of sorted)
+    if (entry.datum <= day) found = entry.gewicht
     else break
-  return r ?? n[0].gewicht
+  return found ?? sorted[0].gewicht
 }
-export function J2(e, t, n, r) {
-  let i = new Map()
-  for (let t of e) {
-    let e = normalizeText(t.name)
-    e && (i.get(e) ?? i.set(e, []).get(e)).push(t)
+export function buildSeries(entries, bodyWeights, mode, exerciseList) {
+  let byName = new Map()
+  for (let entry of entries) {
+    let normName = normalizeText(entry.name)
+    normName && (byName.get(normName) ?? byName.set(normName, []).get(normName)).push(entry)
   }
-  let a = []
-  for (let [e, o] of i) {
-    let i = o[o.length - 1].name,
-      s = o.some((e) => U2(e.sets).length > 0),
-      c = new Map()
-    for (let e of o) (c.get(e.datum) ?? c.set(e.datum, []).get(e.datum)).push(e)
-    let l = []
-    for (let [e, r] of [...c].sort(([e], [t]) => e.localeCompare(t))) {
-      let i = r.flatMap((e) => e.sets),
-        a
-      ;((a = s ? (n === 'volumen' ? G2(i) : W2(i)) : K2(i)),
-        a !== null &&
-          l.push({
-            datum: e,
-            value: a,
-            bw: q2(e, t),
+  let result = []
+  for (let [nameKey, sessions] of byName) {
+    let displayName = sessions[sessions.length - 1].name,
+      hasWeights = sessions.some((session) => validSets(session.sets).length > 0),
+      byDate = new Map()
+    for (let session of sessions) (byDate.get(session.datum) ?? byDate.set(session.datum, []).get(session.datum)).push(session)
+    let seriesPoints = []
+    for (let [date, daySessions] of [...byDate].sort(([dateA], [dateB]) => dateA.localeCompare(dateB))) {
+      let daySets = daySessions.flatMap((session) => session.sets),
+        dayValue
+      ;((dayValue = hasWeights ? (mode === 'volumen' ? volumeOf(daySets) : bestEstimate(daySets)) : maxReps(daySets)),
+        dayValue !== null &&
+          seriesPoints.push({
+            datum: date,
+            value: dayValue,
+            bw: bodyWeightOn(date, bodyWeights),
           }))
     }
-    l.length &&
-      a.push({
-        key: e,
-        name: i,
-        group: guessMuscleGroup(i, r),
-        unit: s ? 'kg' : 'wdh',
-        points: l,
+    seriesPoints.length &&
+      result.push({
+        key: nameKey,
+        name: displayName,
+        group: guessMuscleGroup(displayName, exerciseList),
+        unit: hasWeights ? 'kg' : 'wdh',
+        points: seriesPoints,
       })
   }
-  return a.sort((e, t) => t.points.length - e.points.length)
+  return result.sort((first, second) => second.points.length - first.points.length)
 }
-export function Y2(e, t, n) {
-  let r = e.points.filter((e) => !t || e.datum >= t)
-  if (r.length < 2) return null
-  let i = (t) => (!n || e.unit !== 'kg' ? t.value : t.bw ? t.value / t.bw : NaN),
-    a = r[0],
-    o = r[r.length - 1],
-    s = i(a),
-    c = i(o)
-  return !isFinite(s) || !isFinite(c) || s <= 0
+export function compareSeries(oneSeries, since, relative) {
+  let inRange = oneSeries.points.filter((point) => !since || point.datum >= since)
+  if (inRange.length < 2) return null
+  let i = (point) => (!relative || oneSeries.unit !== 'kg' ? point.value : point.bw ? point.value / point.bw : NaN),
+    firstPoint = inRange[0],
+    lastPoint = inRange[inRange.length - 1],
+    startValue = i(firstPoint),
+    endValue = i(lastPoint)
+  return !isFinite(startValue) || !isFinite(endValue) || startValue <= 0
     ? null
     : {
-        series: e,
-        start: s,
-        end: c,
-        delta: c - s,
-        pct: ((c - s) / s) * 100,
-        from: a.datum,
-        to: o.datum,
+        series: oneSeries,
+        start: startValue,
+        end: endValue,
+        delta: endValue - startValue,
+        pct: ((endValue - startValue) / startValue) * 100,
+        from: firstPoint.datum,
+        to: lastPoint.datum,
       }
 }
-export function X2(e) {
-  let t = new Map()
-  for (let n of e) (t.get(n.series.group) ?? t.set(n.series.group, []).get(n.series.group)).push(n)
-  return [...t]
-    .map(([e, t]) => ({
-      group: e,
-      items: t.sort((e, t) => t.pct - e.pct),
-      pct: t.reduce((e, t) => e + t.pct, 0) / t.length,
+export function groupByMuscle(comparisons) {
+  let byGroup = new Map()
+  for (let item of comparisons) (byGroup.get(item.series.group) ?? byGroup.set(item.series.group, []).get(item.series.group)).push(item)
+  return [...byGroup]
+    .map(([groupKey, groupItems]) => ({
+      group: groupKey,
+      items: groupItems.sort((first, second) => second.pct - first.pct),
+      pct: groupItems.reduce((sum, item) => sum + item.pct, 0) / groupItems.length,
     }))
-    .sort((e, t) => t.pct - e.pct)
+    .sort((first, second) => second.pct - first.pct)
 }
-export function Z2(e) {
-  return e.length ? e.reduce((e, t) => e + t.pct, 0) / e.length : null
+export function averagePct(itemList) {
+  return itemList.length ? itemList.reduce((sum, item) => sum + item.pct, 0) / itemList.length : null
 }
-export const Q2 = (e) => `${e > 0 ? '+' : ''}${e.toFixed(1).replace('.', ',')} %`
-export const $2 = (e, t = 1) => `${(Math.round(e * 10 ** t) / 10 ** t).toString().replace('.', ',')} kg`
-export const e4 = [
+export const formatPct = (percent) => `${percent > 0 ? '+' : ''}${percent.toFixed(1).replace('.', ',')} %`
+export const formatKg = (kgValue, digits = 1) => `${(Math.round(kgValue * 10 ** digits) / 10 ** digits).toString().replace('.', ',')} kg`
+export const RANGES = [
   {
     key: '4w',
     label: '4 Wochen',
@@ -134,16 +134,16 @@ export const e4 = [
     text: 'seit Beginn',
   },
 ]
-export function T4_({ values: e }) {
-  if (e.length < 2) return null
-  let t = Math.min(...e),
-    n = Math.max(...e) - t || 1,
-    r = e.map((r, i) => `${(i / (e.length - 1)) * 100},${34 - ((r - t) / n) * 30}`).join(' '),
-    i = r.split(' ').at(-1).split(',')
+export function Sparkline({ values: numbers }) {
+  if (numbers.length < 2) return null
+  let minValue = Math.min(...numbers),
+    range = Math.max(...numbers) - minValue || 1,
+    polylinePoints = numbers.map((number, position) => `${(position / (numbers.length - 1)) * 100},${34 - ((number - minValue) / range) * 30}`).join(' '),
+    endPoint = polylinePoints.split(' ').at(-1).split(',')
   return (
     <svg viewBox="0 0 100 38" preserveAspectRatio="none" className="w-full h-9" aria-hidden="true">
       <polyline
-        points={r}
+        points={polylinePoints}
         fill="none"
         stroke="rgb(var(--c-brand))"
         strokeWidth="2"
@@ -151,126 +151,126 @@ export function T4_({ values: e }) {
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
       />
-      <circle cx={i[0]} cy={i[1]} r="2.5" fill="rgb(var(--c-brand))" vectorEffect="non-scaling-stroke" />
+      <circle cx={endPoint[0]} cy={endPoint[1]} r="2.5" fill="rgb(var(--c-brand))" vectorEffect="non-scaling-stroke" />
     </svg>
   )
 }
-export function N4_({ pct: e }) {
-  let t = e >= 0,
-    N_ = t ? TrendingUp : TrendingDown
+export function TrendBadge({ pct: percent }) {
+  let positive = percent >= 0,
+    TrendIcon = positive ? TrendingUp : TrendingDown
   return (
     <span
       className={cn(
         'inline-flex items-center gap-1 text-sm font-extrabold tabular-nums',
-        t ? 'text-success' : 'text-warning',
+        positive ? 'text-success' : 'text-warning',
       )}
     >
-      <N_ size={14} aria-hidden="true" /> {Q2(e)}
+      <TrendIcon size={14} aria-hidden="true" /> {formatPct(percent)}
     </span>
   )
 }
 export function Fortschritt() {
-  let { user: e } = useAuth(),
-    [t, n] = useState(true),
-    [r, i] = useState([]),
-    [a, o] = useState([]),
-    [s, c] = useState([]),
-    [l, u] = useState('12w'),
-    [d, f] = useState('max'),
-    [p, m] = useState(false),
-    [h, g] = useState(null),
-    [_, y] = useState(false)
+  let { user: authUser } = useAuth(),
+    [loading, setLoading] = useState(true),
+    [workouts, setWorkouts] = useState([]),
+    [bodyWeights, setBodyWeights] = useState([]),
+    [exerciseList, setExerciseList] = useState([]),
+    [rangeKey, setRangeKey] = useState('12w'),
+    [mode, setMode] = useState('max'),
+    [relative, setRelative] = useState(false),
+    [openGroup, setOpenGroup] = useState(null),
+    [showInfo, setShowInfo] = useState(false)
   useEffect(() => {
-    if (!e) return
-    let t = true
-    async function r() {
-      let [r, a, s, l] = await Promise.all([
-        supabase.from('training').select('id,datum').eq('user_id', e.id),
+    if (!authUser) return
+    let active = true
+    async function load() {
+      let [trainingResult, exercisesResult, weightResult, exerciseData] = await Promise.all([
+        supabase.from('training').select('id,datum').eq('user_id', authUser.id),
         supabase
           .from('uebungen')
           .select('uebungsname,saetze_log,saetze,wdh,gewicht_kg,training_id')
-          .eq('user_id', e.id),
-        supabase.from('gewicht').select('datum,gewicht').eq('user_id', e.id).order('datum', {
+          .eq('user_id', authUser.id),
+        supabase.from('gewicht').select('datum,gewicht').eq('user_id', authUser.id).order('datum', {
           ascending: true,
         }),
         loadExerciseData().catch(() => []),
       ])
-      if (!t) return
-      let u = new Map((r.data ?? []).map((e) => [e.id, e.datum])),
-        d = []
-      for (let e of a.data ?? []) {
-        let t = u.get(e.training_id)
-        if (!t) continue
-        let n =
-          Array.isArray(e.saetze_log) && e.saetze_log.length
-            ? e.saetze_log
-            : e.saetze
+      if (!active) return
+      let dateByTraining = new Map((trainingResult.data ?? []).map((row) => [row.id, row.datum])),
+        entries = []
+      for (let exerciseRow of exercisesResult.data ?? []) {
+        let trainingDate = dateByTraining.get(exerciseRow.training_id)
+        if (!trainingDate) continue
+        let setList =
+          Array.isArray(exerciseRow.saetze_log) && exerciseRow.saetze_log.length
+            ? exerciseRow.saetze_log
+            : exerciseRow.saetze
               ? Array.from(
                   {
-                    length: e.saetze,
+                    length: exerciseRow.saetze,
                   },
                   () => ({
-                    wdh: e.wdh,
-                    kg: e.gewicht_kg,
+                    wdh: exerciseRow.wdh,
+                    kg: exerciseRow.gewicht_kg,
                   }),
                 )
               : []
-        n.length &&
-          d.push({
-            name: e.uebungsname,
-            datum: t,
-            sets: n,
+        setList.length &&
+          entries.push({
+            name: exerciseRow.uebungsname,
+            datum: trainingDate,
+            sets: setList,
           })
       }
-      ;(i(d), o(s.data ?? []), c(l), n(false))
+      ;(setWorkouts(entries), setBodyWeights(weightResult.data ?? []), setExerciseList(exerciseData), setLoading(false))
     }
     return (
-      r(),
+      load(),
       () => {
-        t = false
+        active = false
       }
     )
-  }, [e])
-  let b = e4.find((e) => e.key === l),
-    x = b.days ? toLocalISO(subDays(new Date(), b.days)) : null,
-    S = p && d === 'max',
+  }, [authUser])
+  let range = RANGES.find((option) => option.key === rangeKey),
+    sinceDate = range.days ? toLocalISO(subDays(new Date(), range.days)) : null,
+    useRelative = relative && mode === 'max',
     {
-      groups: C,
-      total: w,
-      trackedExercises: T,
+      groups: muscleGroups,
+      total: totalPct,
+      trackedExercises: trackedCount,
     } = useMemo(() => {
-      let e = J2(r, a, d, s),
-        t = X2(e.map((e) => Y2(e, x, S)).filter((e) => !!e))
+      let seriesList = buildSeries(workouts, bodyWeights, mode, exerciseList),
+        groupList = groupByMuscle(seriesList.map((oneSeries) => compareSeries(oneSeries, sinceDate, useRelative)).filter((comparison) => !!comparison))
       return {
-        groups: t,
-        total: Z2(t),
-        trackedExercises: e.length,
+        groups: groupList,
+        total: averagePct(groupList),
+        trackedExercises: seriesList.length,
       }
-    }, [r, a, s, d, x, S]),
-    E = useCountUp(w ?? 0, Q2, {
+    }, [workouts, bodyWeights, exerciseList, mode, sinceDate, useRelative]),
+    totalRef = useCountUp(totalPct ?? 0, formatPct, {
       duration: 1100,
       delay: 200,
     }),
-    D = Math.max(5, ...C.map((e) => Math.abs(e.pct))),
-    O = (e, t) =>
-      e.series.unit === 'wdh'
-        ? `${Math.round(t)} Wdh.`
-        : S
-          ? `${t.toFixed(2).replace('.', ',')} × KG`
-          : d === 'volumen'
-            ? `${Math.round(t).toLocaleString('de-DE')} kg`
-            : $2(t),
-    k = (e) => {
-      let t = e.delta > 0 ? '+' : ''
-      return e.series.unit === 'wdh'
-        ? `${t}${Math.round(e.delta)} Wdh.`
-        : S
-          ? `${t}${e.delta.toFixed(2).replace('.', ',')} × KG`
-          : d === 'volumen'
-            ? `${t}${Math.round(e.delta).toLocaleString('de-DE')} kg`
-            : `${t}${$2(e.delta)}`
+    maxAbsPct = Math.max(5, ...muscleGroups.map((groupData) => Math.abs(groupData.pct))),
+    formatValue = (comparison, amount) =>
+      comparison.series.unit === 'wdh'
+        ? `${Math.round(amount)} Wdh.`
+        : useRelative
+          ? `${amount.toFixed(2).replace('.', ',')} × KG`
+          : mode === 'volumen'
+            ? `${Math.round(amount).toLocaleString('de-DE')} kg`
+            : formatKg(amount),
+    formatDelta = (comparison) => {
+      let sign = comparison.delta > 0 ? '+' : ''
+      return comparison.series.unit === 'wdh'
+        ? `${sign}${Math.round(comparison.delta)} Wdh.`
+        : useRelative
+          ? `${sign}${comparison.delta.toFixed(2).replace('.', ',')} × KG`
+          : mode === 'volumen'
+            ? `${sign}${Math.round(comparison.delta).toLocaleString('de-DE')} kg`
+            : `${sign}${formatKg(comparison.delta)}`
     }
-  return t ? (
+  return loading ? (
     <div className="flex justify-center py-16">
       <Spinner size={28} />
     </div>
@@ -278,19 +278,19 @@ export function Fortschritt() {
     <div className="space-y-5">
       <div className="space-y-3 enter">
         <div className="flex gap-2 flex-wrap" role="group" aria-label="Zeitraum">
-          {e4.map((e) => (
+          {RANGES.map((option) => (
             <button
-              aria-pressed={l === e.key}
-              onClick={() => u(e.key)}
+              aria-pressed={rangeKey === option.key}
+              onClick={() => setRangeKey(option.key)}
               className={cn(
                 'px-4 py-2 rounded-full text-sm font-semibold border transition-all active:scale-95',
-                l === e.key
+                rangeKey === option.key
                   ? 'bg-primary border-brand text-white'
                   : 'border-border text-text-secondary hover:border-brand/40',
               )}
-              key={e.key}
+              key={option.key}
             >
-              {e.label}
+              {option.label}
             </button>
           ))}
         </div>
@@ -298,44 +298,44 @@ export function Fortschritt() {
           {[
             ['max', 'Maximalgewicht'],
             ['volumen', 'Volumen'],
-          ].map(([e, t]) => (
+          ].map(([modeKey, modeLabel]) => (
             <button
-              aria-pressed={d === e}
-              onClick={() => f(e)}
+              aria-pressed={mode === modeKey}
+              onClick={() => setMode(modeKey)}
               className={cn(
                 'px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95',
-                d === e
+                mode === modeKey
                   ? 'bg-brand/15 border-brand/50 text-brand'
                   : 'border-border text-text-muted hover:border-brand/40',
               )}
-              key={e}
+              key={modeKey}
             >
-              {t}
+              {modeLabel}
             </button>
           ))}
           <label
             className={cn(
               'flex items-center gap-2 text-xs ml-1 select-none',
-              d === 'max' ? 'text-text-secondary cursor-pointer' : 'text-text-muted opacity-60',
+              mode === 'max' ? 'text-text-secondary cursor-pointer' : 'text-text-muted opacity-60',
             )}
           >
             <input
               type="checkbox"
-              checked={p && d === 'max'}
-              disabled={d !== 'max'}
-              onChange={(e) => m(e.target.checked)}
+              checked={relative && mode === 'max'}
+              disabled={mode !== 'max'}
+              onChange={(event) => setRelative(event.target.checked)}
             />
             Im Verhältnis zum Körpergewicht
           </label>
           <button
-            onClick={() => y((e) => !e)}
-            aria-expanded={_}
+            onClick={() => setShowInfo((prev) => !prev)}
+            aria-expanded={showInfo}
             className="ml-auto text-xs text-brand flex items-center gap-1"
           >
             <Info size={13} aria-hidden="true" /> So wird verglichen
           </button>
         </div>
-        {_ && (
+        {showInfo && (
           <div className="card !p-4 text-sm text-text-secondary leading-relaxed enter">
             <p>
               <strong className="text-text-primary">Maximalgewicht:</strong> Jeder Satz wird in ein geschätztes Gewicht
@@ -353,7 +353,7 @@ export function Fortschritt() {
           </div>
         )}
       </div>
-      {C.length === 0 ? (
+      {muscleGroups.length === 0 ? (
         <div
           className="card enter"
           style={{
@@ -364,9 +364,9 @@ export function Fortschritt() {
             icon={TrendingUp}
             title="Noch nicht genug Daten"
             description={
-              T === 0
+              trackedCount === 0
                 ? 'Trage Trainings mit Gewicht und Wiederholungen ein. Sobald du dieselbe Übung an zwei Tagen gemacht hast, siehst du hier, wie viel stärker du geworden bist.'
-                : `Für ${b.text} gibt es noch keine Übung mit zwei Einträgen. Wähle einen längeren Zeitraum oder trainiere dieselbe Übung noch einmal.`
+                : `Für ${range.text} gibt es noch keine Übung mit zwei Einträgen. Wähle einen längeren Zeitraum oder trainiere dieselbe Übung noch einmal.`
             }
           />
         </div>
@@ -384,83 +384,83 @@ export function Fortschritt() {
             <div
               className={cn(
                 'text-5xl font-extrabold tracking-tight mt-1 tabular-nums',
-                (w ?? 0) >= 0 ? 'text-brand' : 'text-warning',
+                (totalPct ?? 0) >= 0 ? 'text-brand' : 'text-warning',
               )}
             >
-              <span ref={E} />
+              <span ref={totalRef} />
             </div>
             <div className="text-sm text-text-secondary mt-1">
-              {(w ?? 0) >= 0 ? 'stärker' : 'weniger'} {b.text} · {C.reduce((e, t) => e + t.items.length, 0)} Übungen
+              {(totalPct ?? 0) >= 0 ? 'stärker' : 'weniger'} {range.text} · {muscleGroups.reduce((sum, groupData) => sum + groupData.items.length, 0)} Übungen
               verglichen
             </div>
           </div>
           <div className="space-y-3">
-            {C.map((e, t) => {
-              let n = h === e.group
+            {muscleGroups.map((groupData, groupIndex) => {
+              let isOpen = openGroup === groupData.group
               return (
                 <div
                   className="card !p-0 enter overflow-hidden"
                   style={{
-                    '--d': 130 + t * 55,
+                    '--d': 130 + groupIndex * 55,
                   }}
-                  key={e.group}
+                  key={groupData.group}
                 >
                   <button
-                    onClick={() => g(n ? null : e.group)}
-                    aria-expanded={n}
+                    onClick={() => setOpenGroup(isOpen ? null : groupData.group)}
+                    aria-expanded={isOpen}
                     className="w-full p-4 sm:p-5 flex items-center gap-4 text-left active:bg-bg-elevated/60 transition-colors"
                   >
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="font-bold text-text-primary">{muscleGroupLabel(e.group)}</span>
-                        <N4_ pct={e.pct} />
+                        <span className="font-bold text-text-primary">{muscleGroupLabel(groupData.group)}</span>
+                        <TrendBadge pct={groupData.pct} />
                       </div>
                       <div className="h-2 rounded-full bg-bg-elevated overflow-hidden" aria-hidden="true">
                         <div
-                          className={cn('h-full rounded-full grow-x', e.pct >= 0 ? 'bg-brand' : 'bg-warning')}
+                          className={cn('h-full rounded-full grow-x', groupData.pct >= 0 ? 'bg-brand' : 'bg-warning')}
                           style={{
-                            width: `${Math.max(4, Math.min(100, (Math.abs(e.pct) / D) * 100))}%`,
-                            '--d': 220 + t * 55,
+                            width: `${Math.max(4, Math.min(100, (Math.abs(groupData.pct) / maxAbsPct) * 100))}%`,
+                            '--d': 220 + groupIndex * 55,
                           }}
                         />
                       </div>
                       <div className="text-xs text-text-muted">
-                        {e.items.length} {e.items.length === 1 ? 'Übung' : 'Übungen'}
+                        {groupData.items.length} {groupData.items.length === 1 ? 'Übung' : 'Übungen'}
                       </div>
                     </div>
                     <ChevronDown
                       size={18}
-                      className={cn('text-text-muted transition-transform duration-300 shrink-0', n && 'rotate-180')}
+                      className={cn('text-text-muted transition-transform duration-300 shrink-0', isOpen && 'rotate-180')}
                       aria-hidden="true"
                     />
                   </button>
-                  {n && (
+                  {isOpen && (
                     <ul className="border-t border-border divide-y divide-border">
-                      {e.items.map((e, t) => {
-                        let n = e.series.points.filter((e) => !x || e.datum >= x)
+                      {groupData.items.map((comparison, comparisonIndex) => {
+                        let pointsInRange = comparison.series.points.filter((point) => !sinceDate || point.datum >= sinceDate)
                         return (
                           <li
                             className="p-4 sm:px-5 enter"
                             style={{
-                              '--d': t * 45,
+                              '--d': comparisonIndex * 45,
                             }}
-                            key={e.series.key}
+                            key={comparison.series.key}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="text-sm font-semibold text-text-primary truncate">{e.series.name}</div>
+                                <div className="text-sm font-semibold text-text-primary truncate">{comparison.series.name}</div>
                                 <div className="text-xs text-text-muted mt-0.5">
-                                  {O(e, e.start)} →{' '}
-                                  <span className="text-text-secondary font-semibold">{O(e, e.end)}</span>
+                                  {formatValue(comparison, comparison.start)} →{' '}
+                                  <span className="text-text-secondary font-semibold">{formatValue(comparison, comparison.end)}</span>
                                 </div>
                               </div>
                               <div className="text-right shrink-0">
-                                <N4_ pct={e.pct} />
-                                <div className="text-xs text-text-muted mt-0.5">{k(e)}</div>
+                                <TrendBadge pct={comparison.pct} />
+                                <div className="text-xs text-text-muted mt-0.5">{formatDelta(comparison)}</div>
                               </div>
                             </div>
                             <div className="mt-2">
-                              <T4_ values={n.map((e) => (S && e.bw ? e.value / e.bw : e.value))} />
+                              <Sparkline values={pointsInRange.map((point) => (useRelative && point.bw ? point.value / point.bw : point.value))} />
                             </div>
                           </li>
                         )
