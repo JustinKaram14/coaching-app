@@ -21,8 +21,11 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok')
 
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  // Nur der Zeitplan darf das auslösen
-  if (req.headers.get('Authorization') !== `Bearer ${serviceKey}`) {
+  // Nur der Zeitplan darf das auslösen: GitHub-Action mit dem Service-Schlüssel oder der Supabase-Zeitplan mit dem Zugangswort CRON_SECRET
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  const allowedByKey = req.headers.get('Authorization') === `Bearer ${serviceKey}`
+  const allowedByCron = !!cronSecret && req.headers.get('x-cron-secret') === cronSecret
+  if (!allowedByKey && !allowedByCron) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 
