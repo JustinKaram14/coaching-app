@@ -27,16 +27,16 @@ export const TRAINING_TABS = [
   },
 ]
 export function Training() {
-  let [e, t] = useSearchParams(),
-    n = e.get('tab'),
-    r = TRAINING_TABS.some((e) => e.key === n) ? n : 'einheiten',
-    i = e.get('mode') === 'plan' ? 'plan' : 'pool',
-    a = e.get('start') ?? undefined,
-    o = (e, n) => {
-      let r = new URLSearchParams()
-      ;(e !== 'einheiten' && r.set('tab', e),
-        e === 'uebungen' && n === 'plan' && r.set('mode', 'plan'),
-        t(r, {
+  let [searchParams, setSearchParams] = useSearchParams(),
+    tabParam = searchParams.get('tab'),
+    activeTab = TRAINING_TABS.some((tabItem) => tabItem.key === tabParam) ? tabParam : 'einheiten',
+    practiceMode = searchParams.get('mode') === 'plan' ? 'plan' : 'pool',
+    startParam = searchParams.get('start') ?? undefined,
+    selectTab = (tabKey, nextMode) => {
+      let params = new URLSearchParams()
+      ;(tabKey !== 'einheiten' && params.set('tab', tabKey),
+        tabKey === 'uebungen' && nextMode === 'plan' && params.set('mode', 'plan'),
+        setSearchParams(params, {
           replace: true,
         }))
     }
@@ -46,28 +46,28 @@ export function Training() {
         <h1 className="section-title text-2xl">Training</h1>
         <p className="text-text-secondary text-sm mt-0.5">Einheiten, Vorlagen, Übungen und dein Fortschritt</p>
       </div>
-      <SegmentedTabs tabs={TRAINING_TABS} value={r} onChange={(e) => o(e)} label="Trainingsbereich" />
+      <SegmentedTabs tabs={TRAINING_TABS} value={activeTab} onChange={(nextTab) => selectTab(nextTab)} label="Trainingsbereich" />
       <div
         className="enter"
         style={{
           '--d': 0,
         }}
-        key={r}
+        key={activeTab}
       >
-        {r === 'einheiten' && (
+        {activeTab === 'einheiten' && (
           <TrainingEinheiten
             embedded
-            onOpenVorlagen={() => o('vorlagen')}
-            startVorlageId={a}
+            onOpenVorlagen={() => selectTab('vorlagen')}
+            startVorlageId={startParam}
             onStartHandled={() =>
-              t(new URLSearchParams(), {
+              setSearchParams(new URLSearchParams(), {
                 replace: true,
               })
             }
           />
         )}
-        {r === 'vorlagen' && <TrainingVorlagen embedded onBuildPlan={() => o('uebungen', 'plan')} />}
-        {r === 'uebungen' && (
+        {activeTab === 'vorlagen' && <TrainingVorlagen embedded onBuildPlan={() => selectTab('uebungen', 'plan')} />}
+        {activeTab === 'uebungen' && (
           <div className="space-y-4">
             <SegmentedTabs
               tabs={[
@@ -80,15 +80,15 @@ export function Training() {
                   label: 'Plan bauen',
                 },
               ]}
-              value={i}
-              onChange={(e) => o('uebungen', e)}
+              value={practiceMode}
+              onChange={(nextMode) => selectTab('uebungen', nextMode)}
               label="Übungen oder Plan"
               className="max-w-sm"
             />
-            {i === 'pool' ? <Uebungspool embedded /> : <PlanBuilder onSaved={() => o('vorlagen')} />}
+            {practiceMode === 'pool' ? <Uebungspool embedded /> : <PlanBuilder onSaved={() => selectTab('vorlagen')} />}
           </div>
         )}
-        {r === 'fortschritt' && <Fortschritt />}
+        {activeTab === 'fortschritt' && <Fortschritt />}
       </div>
     </div>
   )

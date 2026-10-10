@@ -84,8 +84,8 @@ export function RadioRow({ label, on, onClick }) {
     </button>
   )
 }
-export function toggleInList(e, t) {
-  return e.includes(t) ? e.filter((e) => e !== t) : [...e, t]
+export function toggleInList(list, toggled) {
+  return list.includes(toggled) ? list.filter((entry) => entry !== toggled) : [...list, toggled]
 }
 export function StepBar({ step, total }) {
   return (
@@ -101,13 +101,13 @@ export function StepBar({ step, total }) {
         {
           length: total,
         },
-        (t, n) => (
+        (_item, index) => (
           <span
             className={cn(
               'h-1.5 flex-1 rounded-full transition-colors duration-500',
-              n < step ? 'bg-primary' : 'bg-bg-elevated',
+              index < step ? 'bg-primary' : 'bg-bg-elevated',
             )}
-            key={n}
+            key={index}
           />
         ),
       )}
@@ -122,7 +122,7 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
     firstName = profile?.name?.split(' ')[0] ?? '',
     storageKey = `hlx-kennenlernen-${user?.id ?? ''}`,
     [answers, setAnswers] = useState(() => {
-      let e = {
+      let defaults = {
         anrede: firstName,
         ziele: [],
         warum: '',
@@ -132,11 +132,11 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
       }
       try {
         return {
-          ...e,
+          ...defaults,
           ...(JSON.parse(localStorage.getItem(storageKey) ?? 'null') ?? {}),
         }
       } catch {
-        return e
+        return defaults
       }
     }),
     saveAnswers = () => {
@@ -160,11 +160,11 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
             ? !!answers.erfahrung && !!answers.zeit
             : answers.schwierigkeiten.length > 0
   async function finish() {
-    let e = normalizeCharacterName(figureName)
-    if (!e || saving) return
+    let characterName = normalizeCharacterName(figureName)
+    if (!characterName || saving) return
     ;(setSaving(true), setSaveError(null))
-    let t = await createCharacter({
-      name: e,
+    let created = await createCharacter({
+      name: characterName,
       config: figure,
       equipped: {},
       kennenlernen: {
@@ -173,7 +173,7 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
         warum: answers.warum.trim(),
       },
     })
-    if ((setSaving(false), !t)) {
+    if ((setSaving(false), !created)) {
       setSaveError('Das hat nicht geklappt. Prüfe deine Verbindung und versuche es noch einmal.')
       return
     }
@@ -273,10 +273,10 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
                     value={answers.anrede}
                     autoFocus
                     autoComplete="given-name"
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setAnswers({
                         ...answers,
-                        anrede: e.target.value,
+                        anrede: event.target.value,
                       })
                     }
                     placeholder="z. B. Lena"
@@ -291,17 +291,17 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
                   <p className="text-sm text-text-secondary mt-1">Du kannst mehrere wählen.</p>
                 </div>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Ziele">
-                  {GOALS.map((e) => (
+                  {GOALS.map((goal) => (
                     <ChoiceChip
-                      label={e}
-                      on={answers.ziele.includes(e)}
+                      label={goal}
+                      on={answers.ziele.includes(goal)}
                       onClick={() =>
                         setAnswers({
                           ...answers,
-                          ziele: toggleInList(answers.ziele, e),
+                          ziele: toggleInList(answers.ziele, goal),
                         })
                       }
-                      key={e}
+                      key={goal}
                     />
                   ))}
                 </div>
@@ -314,10 +314,10 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
                     className="input min-h-[88px]"
                     maxLength={240}
                     value={answers.warum}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setAnswers({
                         ...answers,
-                        warum: e.target.value,
+                        warum: event.target.value,
                       })
                     }
                     placeholder="Zum Beispiel: Ich will mich wieder wohler fühlen."
@@ -329,34 +329,34 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
               <>
                 <h2 className="text-2xl font-extrabold text-text-primary">Wie sieht es mit Training aus?</h2>
                 <div className="space-y-2" role="radiogroup" aria-label="Erfahrung">
-                  {EXPERIENCE_LEVELS.map((e) => (
+                  {EXPERIENCE_LEVELS.map((experience) => (
                     <RadioRow
-                      label={e}
-                      on={answers.erfahrung === e}
+                      label={experience}
+                      on={answers.erfahrung === experience}
                       onClick={() =>
                         setAnswers({
                           ...answers,
-                          erfahrung: e,
+                          erfahrung: experience,
                         })
                       }
-                      key={e}
+                      key={experience}
                     />
                   ))}
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-text-secondary mb-2">Wie viel Zeit hast du pro Woche?</div>
                   <div className="space-y-2" role="radiogroup" aria-label="Zeit pro Woche">
-                    {WEEKLY_TIME.map((e) => (
+                    {WEEKLY_TIME.map((option) => (
                       <RadioRow
-                        label={e}
-                        on={answers.zeit === e}
+                        label={option}
+                        on={answers.zeit === option}
                         onClick={() =>
                           setAnswers({
                             ...answers,
-                            zeit: e,
+                            zeit: option,
                           })
                         }
-                        key={e}
+                        key={option}
                       />
                     ))}
                   </div>
@@ -372,17 +372,17 @@ export function Onboarding({ withAnamnese, onDone, onSkip }) {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Was fällt schwer">
-                  {DIFFICULTIES.map((e) => (
+                  {DIFFICULTIES.map((difficulty) => (
                     <ChoiceChip
-                      label={e}
-                      on={answers.schwierigkeiten.includes(e)}
+                      label={difficulty}
+                      on={answers.schwierigkeiten.includes(difficulty)}
                       onClick={() =>
                         setAnswers({
                           ...answers,
-                          schwierigkeiten: toggleInList(answers.schwierigkeiten, e),
+                          schwierigkeiten: toggleInList(answers.schwierigkeiten, difficulty),
                         })
                       }
-                      key={e}
+                      key={difficulty}
                     />
                   ))}
                 </div>
