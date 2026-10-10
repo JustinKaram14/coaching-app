@@ -6,211 +6,211 @@
 export const COUNTED_KINDS = ['missing', 'praise', 'streak', 'water']
 export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 300, 365, 500, 730, 1e3]
 export const DEFAULT_TIMEZONE = 'Europe/Berlin'
-export function safeTimezone(e) {
-  if (!e) return DEFAULT_TIMEZONE
+export function safeTimezone(zone) {
+  if (!zone) return DEFAULT_TIMEZONE
   try {
     return (
       new Intl.DateTimeFormat('de-DE', {
-        timeZone: e,
+        timeZone: zone,
       }),
-      e
+      zone
     )
   } catch {
     return DEFAULT_TIMEZONE
   }
 }
-export function localParts(e, t) {
-  let n = new Intl.DateTimeFormat('en-CA', {
-      timeZone: t,
+export function localParts(dateValue, zone) {
+  let parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: zone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
-    }).formatToParts(e),
-    r = (e) => Number(n.find((t) => t.type === e)?.value ?? 0),
-    i = (e) => String(e).padStart(2, '0')
+    }).formatToParts(dateValue),
+    part = (partType) => Number(parts.find((item) => item.type === partType)?.value ?? 0),
+    pad = (num) => String(num).padStart(2, '0')
   return {
-    date: `${r('year')}-${i(r('month'))}-${i(r('day'))}`,
-    minutes: r('hour') * 60 + r('minute'),
+    date: `${part('year')}-${pad(part('month'))}-${pad(part('day'))}`,
+    minutes: part('hour') * 60 + part('minute'),
   }
 }
-export function timezoneOffsetMs(e, t) {
-  let n = localParts(e, t),
-    [r, i, a] = n.date.split('-').map(Number)
-  return Date.UTC(r, i - 1, a, Math.floor(n.minutes / 60), n.minutes % 60) - Math.floor(e.getTime() / 6e4) * 6e4
+export function timezoneOffsetMs(dateValue, zone) {
+  let local = localParts(dateValue, zone),
+    [yearNum, monthNum, dayNum] = local.date.split('-').map(Number)
+  return Date.UTC(yearNum, monthNum - 1, dayNum, Math.floor(local.minutes / 60), local.minutes % 60) - Math.floor(dateValue.getTime() / 6e4) * 6e4
 }
-export function localDateTime(e, t, n) {
-  let [r, i, a] = e.split('-').map(Number),
-    [o, s] = t.split(':').map(Number),
-    c = Date.UTC(r, i - 1, a, o, s || 0),
-    l = c - timezoneOffsetMs(new Date(c), n)
-  return ((l = c - timezoneOffsetMs(new Date(l), n)), new Date(l))
+export function localDateTime(dateISO, time, zone) {
+  let [yearNum, monthNum, dayNum] = dateISO.split('-').map(Number),
+    [hourNum, minuteNum] = time.split(':').map(Number),
+    utcMs = Date.UTC(yearNum, monthNum - 1, dayNum, hourNum, minuteNum || 0),
+    guess = utcMs - timezoneOffsetMs(new Date(utcMs), zone)
+  return ((guess = utcMs - timezoneOffsetMs(new Date(guess), zone)), new Date(guess))
 }
-export function parseMinutes(e, t) {
-  let n = /^(\d{1,2}):(\d{2})/.exec(e ?? '')
-  if (!n) return t
-  let r = Number(n[1]),
-    i = Number(n[2])
-  return r > 23 || i > 59 ? t : r * 60 + i
+export function parseMinutes(text, fallback) {
+  let match = /^(\d{1,2}):(\d{2})/.exec(text ?? '')
+  if (!match) return fallback
+  let hours = Number(match[1]),
+    mins = Number(match[2])
+  return hours > 23 || mins > 59 ? fallback : hours * 60 + mins
 }
-export function addDaysISO(e, t) {
-  let [n, r, i] = e.split('-').map(Number),
-    a = new Date(Date.UTC(n, r - 1, i + t))
-  return `${a.getUTCFullYear()}-${String(a.getUTCMonth() + 1).padStart(2, '0')}-${String(a.getUTCDate()).padStart(2, '0')}`
+export function addDaysISO(dateISO, dayOffset) {
+  let [yearNum, monthNum, dayNum] = dateISO.split('-').map(Number),
+    result = new Date(Date.UTC(yearNum, monthNum - 1, dayNum + dayOffset))
+  return `${result.getUTCFullYear()}-${String(result.getUTCMonth() + 1).padStart(2, '0')}-${String(result.getUTCDate()).padStart(2, '0')}`
 }
-export function missingParts(e) {
-  let t = []
+export function missingParts(dayFacts) {
+  let parts = []
   return (
-    e.mealsMain < 3 && t.push('Ernährung'),
-    e.sleep || t.push('Schlaf'),
-    e.supplementsTotal > 0 && e.supplementsTaken < e.supplementsTotal && t.push('Supplements'),
-    t
+    dayFacts.mealsMain < 3 && parts.push('Ernährung'),
+    dayFacts.sleep || parts.push('Schlaf'),
+    dayFacts.supplementsTotal > 0 && dayFacts.supplementsTaken < dayFacts.supplementsTotal && parts.push('Supplements'),
+    parts
   )
 }
-export function hasAnyEntry(e) {
-  return e.weight || e.sleep || e.training || e.mealsMain > 0 || e.supplementsTaken > 0 || e.waterMl > 0
+export function hasAnyEntry(dayFacts) {
+  return dayFacts.weight || dayFacts.sleep || dayFacts.training || dayFacts.mealsMain > 0 || dayFacts.supplementsTaken > 0 || dayFacts.waterMl > 0
 }
-export function joinGerman(e) {
-  return e.length <= 1 ? e.join('') : `${e.slice(0, -1).join(', ')} und ${e[e.length - 1]}`
+export function joinGerman(items) {
+  return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} und ${items[items.length - 1]}`
 }
-export const formatLiters1 = (e) =>
-  (e / 1e3).toLocaleString('de-DE', {
+export const formatLiters1 = (ml) =>
+  (ml / 1e3).toLocaleString('de-DE', {
     maximumFractionDigits: 1,
   })
 export function planNotifications(input) {
-  let { now: t, settings: n, facts: r, streak: i, sent: a, appUrl: o } = input,
-    { date: s, minutes: c } = localParts(t, safeTimezone(n.timezone))
-  if (c < 480 || c >= 1320) return []
-  let l = Math.min(3, Math.max(1, n.notif_max_per_day ?? 3)),
-    u = (e, t) => a.some((n) => n.kind === e && (t === undefined || n.ref === t)),
-    d = a.filter((e) => COUNTED_KINDS.includes(e.kind)).length,
-    f = [],
-    p = (e) => (e === 'missing' || e === 'streak' ? d < l : d < l - 1),
-    m = (e) => {
-      ;(f.push(e), d++)
+  let { now: nowDate, settings: cfg, facts: factsData, streak: streakData, sent: sentList, appUrl: baseUrl } = input,
+    { date: today, minutes: minuteOfDay } = localParts(nowDate, safeTimezone(cfg.timezone))
+  if (minuteOfDay < 480 || minuteOfDay >= 1320) return []
+  let maxPerDay = Math.min(3, Math.max(1, cfg.notif_max_per_day ?? 3)),
+    wasSent = (messageKind, messageRef) => sentList.some((entry) => entry.kind === messageKind && (messageRef === undefined || entry.ref === messageRef)),
+    countedToday = sentList.filter((entry) => COUNTED_KINDS.includes(entry.kind)).length,
+    plannedMessages = [],
+    hasRoom = (messageKind) => (messageKind === 'missing' || messageKind === 'streak' ? countedToday < maxPerDay : countedToday < maxPerDay - 1),
+    add = (message) => {
+      ;(plannedMessages.push(message), countedToday++)
     },
-    h = parseMinutes(n.notif_reminder_time, 1200),
-    g = missingParts(r)
-  if (n.notif_daily_reminder !== false && c >= h && !u('missing') && p('missing')) {
-    let e = i.days >= 3 ? ` Deine ${i.days}-Tage-Serie wartet auf dich.` : ''
-    hasAnyEntry(r)
-      ? g.length > 0 &&
-        m({
+    reminderMinute = parseMinutes(cfg.notif_reminder_time, 1200),
+    missing = missingParts(factsData)
+  if (cfg.notif_daily_reminder !== false && minuteOfDay >= reminderMinute && !wasSent('missing') && hasRoom('missing')) {
+    let streakText = streakData.days >= 3 ? ` Deine ${streakData.days}-Tage-Serie wartet auf dich.` : ''
+    hasAnyEntry(factsData)
+      ? missing.length > 0 &&
+        add({
           kind: 'missing',
-          ref: s,
+          ref: today,
           title: 'Fast geschafft',
-          body: `Heute fehlt dir noch: ${joinGerman(g)}.${e}`,
-          url: `${o}#/dashboard`,
+          body: `Heute fehlt dir noch: ${joinGerman(missing)}.${streakText}`,
+          url: `${baseUrl}#/dashboard`,
         })
-      : m({
+      : add({
           kind: 'missing',
-          ref: s,
+          ref: today,
           title: 'Heute noch nichts eingetragen',
-          body: `Ein kurzer Eintrag reicht: Essen, Schlaf oder Gewicht.${e}`,
-          url: `${o}#/dashboard`,
+          body: `Ein kurzer Eintrag reicht: Essen, Schlaf oder Gewicht.${streakText}`,
+          url: `${baseUrl}#/dashboard`,
         })
   }
   if (
-    n.notif_streak !== false &&
-    i.includesToday &&
-    STREAK_MILESTONES.includes(i.days) &&
-    !u('streak', `${i.days}@${addDaysISO(s, -(i.days - 1))}`) &&
-    p('streak')
+    cfg.notif_streak !== false &&
+    streakData.includesToday &&
+    STREAK_MILESTONES.includes(streakData.days) &&
+    !wasSent('streak', `${streakData.days}@${addDaysISO(today, -(streakData.days - 1))}`) &&
+    hasRoom('streak')
   ) {
-    let e = i.days,
-      t =
-        e >= 100
+    let streakDays = streakData.days,
+      bodyText =
+        streakDays >= 100
           ? 'Das ist Disziplin auf Profi-Niveau.'
-          : e >= 30
+          : streakDays >= 30
             ? 'Ein ganzer Monat Routine, richtig stark.'
-            : e >= 7
+            : streakDays >= 7
               ? 'Genau so entstehen Gewohnheiten.'
               : 'Der Anfang ist gemacht, bleib dran.'
-    m({
+    add({
       kind: 'streak',
-      ref: `${e}@${addDaysISO(s, -(e - 1))}`,
-      title: `${e} Tage am Stück`,
-      body: t,
-      url: `${o}#/dashboard`,
+      ref: `${streakDays}@${addDaysISO(today, -(streakDays - 1))}`,
+      title: `${streakDays} Tage am Stück`,
+      body: bodyText,
+      url: `${baseUrl}#/dashboard`,
     })
   }
-  if (n.notif_praise !== false && !u('praise') && p('praise'))
-    if (r.training && (!r.trainingAt || t.getTime() - new Date(r.trainingAt).getTime() >= 10 * 6e4)) {
-      let e = r.trainingMin ? `${r.trainingMin} Minuten ` : '',
-        t = r.trainingType ? `${r.trainingType}` : 'Training'
-      m({
+  if (cfg.notif_praise !== false && !wasSent('praise') && hasRoom('praise'))
+    if (factsData.training && (!factsData.trainingAt || nowDate.getTime() - new Date(factsData.trainingAt).getTime() >= 10 * 6e4)) {
+      let minutesText = factsData.trainingMin ? `${factsData.trainingMin} Minuten ` : '',
+        typeText = factsData.trainingType ? `${factsData.trainingType}` : 'Training'
+      add({
         kind: 'praise',
-        ref: `train:${s}`,
+        ref: `train:${today}`,
         title: 'Heute schon fleißig trainiert',
-        body: `${e}${t}, stark gemacht. Gönn dir jetzt Erholung und genug Eiweiß.`,
-        url: `${o}#/training`,
+        body: `${minutesText}${typeText}, stark gemacht. Gönn dir jetzt Erholung und genug Eiweiß.`,
+        url: `${baseUrl}#/training`,
       })
     } else
-      c >= 1020 &&
-        hasAnyEntry(r) &&
-        g.length === 0 &&
-        (r.weight || r.sleep || r.mealsMain >= 3) &&
-        m({
+      minuteOfDay >= 1020 &&
+        hasAnyEntry(factsData) &&
+        missing.length === 0 &&
+        (factsData.weight || factsData.sleep || factsData.mealsMain >= 3) &&
+        add({
           kind: 'praise',
-          ref: `all:${s}`,
+          ref: `all:${today}`,
           title: 'Alles eingetragen',
           body: 'Starker Tag, du bist komplett dabei.',
-          url: `${o}#/dashboard`,
+          url: `${baseUrl}#/dashboard`,
         })
-  let waterGoal = n.wasser_ziel_ml ?? 0
+  let waterGoal = cfg.wasser_ziel_ml ?? 0
   return (
-    n.notif_water !== false &&
+    cfg.notif_water !== false &&
       waterGoal > 0 &&
-      c >= 900 &&
-      c < 1140 &&
-      r.waterMl < waterGoal * 0.5 &&
-      !u('water') &&
-      p('water') &&
-      m({
+      minuteOfDay >= 900 &&
+      minuteOfDay < 1140 &&
+      factsData.waterMl < waterGoal * 0.5 &&
+      !wasSent('water') &&
+      hasRoom('water') &&
+      add({
         kind: 'water',
-        ref: s,
+        ref: today,
         title: 'Zeit für ein Glas Wasser',
-        body: `Bisher ${formatLiters1(r.waterMl)} l von ${formatLiters1(waterGoal)} l. Ein Glas jetzt tut dir gut.`,
-        url: `${o}#/nutrition`,
+        body: `Bisher ${formatLiters1(factsData.waterMl)} l von ${formatLiters1(waterGoal)} l. Ein Glas jetzt tut dir gut.`,
+        url: `${baseUrl}#/nutrition`,
       }),
-    f
+    plannedMessages
   )
 }
-export function leadTimeText(e) {
-  return e >= 1440 && e % 1440 == 0
-    ? e === 1440
+export function leadTimeText(leadMinutes) {
+  return leadMinutes >= 1440 && leadMinutes % 1440 == 0
+    ? leadMinutes === 1440
       ? 'morgen'
-      : `in ${e / 1440} Tagen`
-    : e >= 60 && e % 60 == 0
-      ? e === 60
+      : `in ${leadMinutes / 1440} Tagen`
+    : leadMinutes >= 60 && leadMinutes % 60 == 0
+      ? leadMinutes === 60
         ? 'in 1 Stunde'
-        : `in ${e / 60} Stunden`
-      : `in ${e} Minuten`
+        : `in ${leadMinutes / 60} Stunden`
+      : `in ${leadMinutes} Minuten`
 }
 export function planAppointments(events, now, settings, sent, appUrl) {
   if (settings.notif_appointments === false) return []
   let timezone = safeTimezone(settings.timezone),
     planned = []
-  for (let s of events) {
-    if (!s.uhrzeit) continue
-    let e = s.erinnerung_min ?? settings.notif_appointment_minutes ?? 60
-    if (e <= 0) continue
-    let c = localDateTime(s.datum, s.uhrzeit.slice(0, 5), timezone),
-      l = c.getTime() - e * 6e4
+  for (let event of events) {
+    if (!event.uhrzeit) continue
+    let leadMin = event.erinnerung_min ?? settings.notif_appointment_minutes ?? 60
+    if (leadMin <= 0) continue
+    let startsAt = localDateTime(event.datum, event.uhrzeit.slice(0, 5), timezone),
+      remindAt = startsAt.getTime() - leadMin * 6e4
     if (
-      now.getTime() < l ||
-      now.getTime() >= c.getTime() ||
-      sent.some((e) => e.kind === 'appointment' && e.ref === s.id)
+      now.getTime() < remindAt ||
+      now.getTime() >= startsAt.getTime() ||
+      sent.some((entry) => entry.kind === 'appointment' && entry.ref === event.id)
     )
       continue
-    let u = leadTimeText(e)
+    let leadText = leadTimeText(leadMin)
     planned.push({
       kind: 'appointment',
-      ref: s.id,
-      title: `Termin ${u}`,
-      body: `${s.titel} um ${s.uhrzeit.slice(0, 5)} Uhr${s.vorlage_name ? ` · Vorlage: ${s.vorlage_name}` : ''}`,
+      ref: event.id,
+      title: `Termin ${leadText}`,
+      body: `${event.titel} um ${event.uhrzeit.slice(0, 5)} Uhr${event.vorlage_name ? ` · Vorlage: ${event.vorlage_name}` : ''}`,
       url: `${appUrl}#/calendar`,
     })
   }
