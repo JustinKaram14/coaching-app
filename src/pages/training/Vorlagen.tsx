@@ -21,26 +21,26 @@ export const HQ = {
   6: 6,
   0: 7,
 }
-export function UQ(e) {
-  let t = e.plan_name ? `${e.plan_name} · ` : ''
-  return t && e.name.startsWith(t) && e.name.length > t.length ? e.name.slice(t.length) : e.name
+export function UQ(template) {
+  let prefix = template.plan_name ? `${template.plan_name} · ` : ''
+  return prefix && template.name.startsWith(prefix) && template.name.length > prefix.length ? template.name.slice(prefix.length) : template.name
 }
-export function WQ(e) {
-  return e ? e.split(',').map(Number).filter(Boolean) : []
+export function WQ(text) {
+  return text ? text.split(',').map(Number).filter(Boolean) : []
 }
-export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
-  let { user: n } = useAuth(),
-    r = useNavigate(),
-    [i, a] = useState([]),
-    [o, s] = useState(true),
-    [c, l] = useState(false),
-    [u, d] = useState(false),
-    [f, p] = useState({
+export function TrainingVorlagen({ embedded: isEmbedded = false, onBuildPlan: handleBuildPlan }) {
+  let { user: authUser } = useAuth(),
+    navigate = useNavigate(),
+    [templates, setTemplates] = useState([]),
+    [loading, setLoading] = useState(true),
+    [showCreate, setShowCreate] = useState(false),
+    [saving, setSaving] = useState(false),
+    [draft, setDraft] = useState({
       name: '',
       trainingstyp: 'Kraft',
       wochentage: [],
     }),
-    [m, h] = useState([
+    [exerciseRows, setExerciseRows] = useState([
       {
         uebungsname: '',
         saetze: '',
@@ -48,57 +48,57 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
         gewicht_kg: '',
       },
     ]),
-    [g, _] = useState(null),
-    [y, b] = useState('8'),
-    [x, S] = useState(format(new Date(), 'yyyy-MM-dd')),
-    [C, w] = useState(false),
-    [T, E] = useState('')
-  async function D() {
-    if (!n) return
-    let { data: e } = await supabase.from('training_vorlagen').select('*').eq('user_id', n.id).order('created_at', {
+    [planTarget, setPlanTarget] = useState(null),
+    [weeks, setWeeks] = useState('8'),
+    [startDay, setStartDay] = useState(format(new Date(), 'yyyy-MM-dd')),
+    [scheduling, setScheduling] = useState(false),
+    [notice, setNotice] = useState('')
+  async function loadTemplates() {
+    if (!authUser) return
+    let { data: templateRows } = await supabase.from('training_vorlagen').select('*').eq('user_id', authUser.id).order('created_at', {
       ascending: false,
     })
-    if (!e?.length) {
-      ;(a([]), s(false))
+    if (!templateRows?.length) {
+      ;(setTemplates([]), setLoading(false))
       return
     }
-    let t = e.map((e) => e.id),
-      { data: r } = await supabase.from('vorlagen_uebungen').select('*').in('vorlage_id', t).order('reihenfolge'),
-      i = (r ?? []).reduce(
-        (e, t) => (
-          e[t.vorlage_id] || (e[t.vorlage_id] = []),
-          e[t.vorlage_id].push({
-            id: t.id,
-            uebungsname: t.uebungsname,
-            wdh_text: t.wdh_text ?? null,
-            saetze: String(t.saetze ?? ''),
-            wdh: String(t.wdh ?? ''),
-            gewicht_kg: String(t.gewicht_kg ?? ''),
+    let templateIds = templateRows.map((templateRow) => templateRow.id),
+      { data: exerciseData } = await supabase.from('vorlagen_uebungen').select('*').in('vorlage_id', templateIds).order('reihenfolge'),
+      byTemplate = (exerciseData ?? []).reduce(
+        (acc, row) => (
+          acc[row.vorlage_id] || (acc[row.vorlage_id] = []),
+          acc[row.vorlage_id].push({
+            id: row.id,
+            uebungsname: row.uebungsname,
+            wdh_text: row.wdh_text ?? null,
+            saetze: String(row.saetze ?? ''),
+            wdh: String(row.wdh ?? ''),
+            gewicht_kg: String(row.gewicht_kg ?? ''),
           }),
-          e
+          acc
         ),
         {},
       )
-    ;(a(
-      e.map((e) => ({
-        ...e,
-        uebungen: i[e.id] ?? [],
+    ;(setTemplates(
+      templateRows.map((templateRow) => ({
+        ...templateRow,
+        uebungen: byTemplate[templateRow.id] ?? [],
       })),
     ),
-      s(false))
+      setLoading(false))
   }
   useEffect(() => {
-    D()
-  }, [n])
-  function O(e) {
-    p((t) => ({
-      ...t,
-      wochentage: t.wochentage.includes(e) ? t.wochentage.filter((t) => t !== e) : [...t.wochentage, e].sort(),
+    loadTemplates()
+  }, [authUser])
+  function toggleWeekday(weekday) {
+    setDraft((prev) => ({
+      ...prev,
+      wochentage: prev.wochentage.includes(weekday) ? prev.wochentage.filter((other) => other !== weekday) : [...prev.wochentage, weekday].sort(),
     }))
   }
-  function k() {
-    h((e) => [
-      ...e,
+  function addExerciseRow() {
+    setExerciseRows((prev) => [
+      ...prev,
       {
         uebungsname: '',
         saetze: '',
@@ -107,56 +107,56 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
       },
     ])
   }
-  function A(e) {
-    h((t) => t.filter((t, n) => n !== e))
+  function removeExerciseRow(rowIndex) {
+    setExerciseRows((prev) => prev.filter((row, index) => index !== rowIndex))
   }
-  function j(e, t, n) {
-    h((r) => {
-      let i = [...r]
+  function updateExerciseRow(rowIndex, field, newValue) {
+    setExerciseRows((prev) => {
+      let copy = [...prev]
       return (
-        (i[e] = {
-          ...i[e],
-          [t]: n,
+        (copy[rowIndex] = {
+          ...copy[rowIndex],
+          [field]: newValue,
         }),
-        i
+        copy
       )
     })
   }
-  async function M() {
-    if (!n || !f.name) return
-    d(true)
-    let { data: e } = await supabase
+  async function saveTemplate() {
+    if (!authUser || !draft.name) return
+    setSaving(true)
+    let { data: created } = await supabase
       .from('training_vorlagen')
       .insert({
-        user_id: n.id,
-        name: f.name,
-        trainingstyp: f.trainingstyp,
-        wochentage: f.wochentage.join(',') || null,
+        user_id: authUser.id,
+        name: draft.name,
+        trainingstyp: draft.trainingstyp,
+        wochentage: draft.wochentage.join(',') || null,
       })
       .select()
       .single()
-    if (e) {
-      let t = m.filter((e) => e.uebungsname.trim())
-      t.length &&
+    if (created) {
+      let filled = exerciseRows.filter((row) => row.uebungsname.trim())
+      filled.length &&
         (await supabase.from('vorlagen_uebungen').insert(
-          t.map((t, n) => ({
-            vorlage_id: e.id,
-            uebungsname: t.uebungsname,
-            saetze: t.saetze ? parseInt(t.saetze) : null,
-            wdh: t.wdh ? parseInt(t.wdh) : null,
-            gewicht_kg: t.gewicht_kg ? parseFloat(t.gewicht_kg) : null,
-            reihenfolge: n,
+          filled.map((row, sortOrder) => ({
+            vorlage_id: created.id,
+            uebungsname: row.uebungsname,
+            saetze: row.saetze ? parseInt(row.saetze) : null,
+            wdh: row.wdh ? parseInt(row.wdh) : null,
+            gewicht_kg: row.gewicht_kg ? parseFloat(row.gewicht_kg) : null,
+            reihenfolge: sortOrder,
           })),
         ))
     }
-    ;(await D(),
-      l(false),
-      p({
+    ;(await loadTemplates(),
+      setShowCreate(false),
+      setDraft({
         name: '',
         trainingstyp: 'Kraft',
         wochentage: [],
       }),
-      h([
+      setExerciseRows([
         {
           uebungsname: '',
           saetze: '',
@@ -164,92 +164,92 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
           gewicht_kg: '',
         },
       ]),
-      d(false))
+      setSaving(false))
   }
-  async function N(e) {
-    ;(await supabase.from('training_vorlagen').delete().eq('id', e), a((t) => t.filter((t) => t.id !== e)))
+  async function deleteTemplate(templateId) {
+    ;(await supabase.from('training_vorlagen').delete().eq('id', templateId), setTemplates((list) => list.filter((template) => template.id !== templateId)))
   }
-  function P(e) {
-    a((t) =>
-      t.map((t) =>
-        t.id === e
+  function toggleExpanded(templateId) {
+    setTemplates((list) =>
+      list.map((template) =>
+        template.id === templateId
           ? {
-              ...t,
-              expanded: !t.expanded,
+              ...template,
+              expanded: !template.expanded,
             }
-          : t,
+          : template,
       ),
     )
   }
-  async function F() {
-    if (!n || !g) return
-    let e = WQ(g.wochentage)
-    if (!e.length) return
-    w(true)
-    let t = parseInt(y) || 8,
-      r = [],
-      i = parseISO(x)
-    for (let a = 0; a < t; a++)
-      for (let t of e) {
-        let e = addWeeks(i, a),
-          o = t - HQ[getDay(e)]
-        o < 0 && (o += 7)
-        let s = addDays(e, o)
-        format(s, 'yyyy-MM-dd') >= x &&
-          r.push({
-            user_id: n.id,
-            coach_id: n.id,
-            client_id: n.id,
-            titel: g.name,
-            datum: format(s, 'yyyy-MM-dd'),
+  async function scheduleWeeks() {
+    if (!authUser || !planTarget) return
+    let weekdays = WQ(planTarget.wochentage)
+    if (!weekdays.length) return
+    setScheduling(true)
+    let weekCount = parseInt(weeks) || 8,
+      events = [],
+      firstDay = parseISO(startDay)
+    for (let week = 0; week < weekCount; week++)
+      for (let weekday of weekdays) {
+        let weekStart = addWeeks(firstDay, week),
+          offset = weekday - HQ[getDay(weekStart)]
+        offset < 0 && (offset += 7)
+        let targetDate = addDays(weekStart, offset)
+        format(targetDate, 'yyyy-MM-dd') >= startDay &&
+          events.push({
+            user_id: authUser.id,
+            coach_id: authUser.id,
+            client_id: authUser.id,
+            titel: planTarget.name,
+            datum: format(targetDate, 'yyyy-MM-dd'),
             typ: 'training',
           })
       }
-    let a = r.filter((e, t, n) => n.findIndex((t) => t.datum === e.datum) === t || true)
-    ;(await supabase.from('kalender_events').insert(a),
-      w(false),
-      _(null),
-      E(`${a.length} Kalendereinträge erstellt.`),
-      window.setTimeout(() => E(''), 4e3))
+    let unique = events.filter((event, position, all) => all.findIndex((other) => other.datum === event.datum) === position || true)
+    ;(await supabase.from('kalender_events').insert(unique),
+      setScheduling(false),
+      setPlanTarget(null),
+      setNotice(`${unique.length} Kalendereinträge erstellt.`),
+      window.setTimeout(() => setNotice(''), 4e3))
   }
-  let I = (() => {
-      let e = new Map(),
-        t = []
-      for (let n of i) n.plan_name ? (e.get(n.plan_name) ?? e.set(n.plan_name, []).get(n.plan_name)).push(n) : t.push(n)
-      for (let t of e.values()) t.sort((e, t) => (e.plan_reihenfolge ?? 0) - (t.plan_reihenfolge ?? 0))
+  let grouped = (() => {
+      let planMap = new Map(),
+        singles = []
+      for (let template of templates) template.plan_name ? (planMap.get(template.plan_name) ?? planMap.set(template.plan_name, []).get(template.plan_name)).push(template) : singles.push(template)
+      for (let planTemplates of planMap.values()) planTemplates.sort((first, second) => (first.plan_reihenfolge ?? 0) - (second.plan_reihenfolge ?? 0))
       return {
-        plans: [...e],
-        single: t,
+        plans: [...planMap],
+        single: singles,
       }
     })(),
-    L = (e, t) => {
-      let n = WQ(e.wochentage)
+    renderTemplate = (template, position) => {
+      let weekdays = WQ(template.wochentage)
       return (
         <div
           className="card enter"
           style={{
-            '--d': 60 + t * 55,
+            '--d': 60 + position * 55,
           }}
-          key={e.id}
+          key={template.id}
         >
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
               <BookOpen size={18} className="text-brand" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-text-primary truncate">{UQ(e)}</div>
+              <div className="font-semibold text-text-primary truncate">{UQ(template)}</div>
               <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                 <span className="text-xs text-text-muted">
-                  {e.trainingstyp} · {e.uebungen?.length ?? 0} Übungen
+                  {template.trainingstyp} · {template.uebungen?.length ?? 0} Übungen
                 </span>
-                {n.length > 0 && (
+                {weekdays.length > 0 && (
                   <div className="flex gap-1">
-                    {VQ.map((e, t) => (
+                    {VQ.map((dayLabel, dayIndex) => (
                       <span
-                        className={`text-xs w-5 h-5 rounded flex items-center justify-center font-medium ${n.includes(t + 1) ? 'bg-brand/20 text-brand' : 'text-text-muted'}`}
-                        key={e}
+                        className={`text-xs w-5 h-5 rounded flex items-center justify-center font-medium ${weekdays.includes(dayIndex + 1) ? 'bg-brand/20 text-brand' : 'text-text-muted'}`}
+                        key={dayLabel}
                       >
-                        {e[0]}
+                        {dayLabel[0]}
                       </span>
                     ))}
                   </div>
@@ -257,9 +257,9 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              {n.length > 0 && (
+              {weekdays.length > 0 && (
                 <button
-                  onClick={() => _(e)}
+                  onClick={() => setPlanTarget(template)}
                   className="p-1.5 rounded-lg hover:bg-success/10 hover:text-success text-text-muted transition-colors"
                   title="Im Kalender eintragen"
                   aria-label="Im Kalender eintragen"
@@ -268,14 +268,14 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
                 </button>
               )}
               <button
-                onClick={() => P(e.id)}
+                onClick={() => toggleExpanded(template.id)}
                 className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
-                aria-label={e.expanded ? 'Übungen ausblenden' : 'Übungen anzeigen'}
+                aria-label={template.expanded ? 'Übungen ausblenden' : 'Übungen anzeigen'}
               >
-                {e.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {template.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
               <button
-                onClick={() => N(e.id)}
+                onClick={() => deleteTemplate(template.id)}
                 className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors"
                 aria-label="Vorlage löschen"
               >
@@ -283,17 +283,17 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
               </button>
             </div>
           </div>
-          {e.expanded && (e.uebungen?.length ?? 0) > 0 && (
+          {template.expanded && (template.uebungen?.length ?? 0) > 0 && (
             <div className="mt-4 pt-4 border-t border-border space-y-2">
-              {e.uebungen.map((e, t) => (
+              {template.uebungen.map((exercise, exerciseIndex) => (
                 <div
                   className="flex items-center justify-between gap-3 text-sm p-2.5 rounded-xl bg-bg-elevated"
-                  key={t}
+                  key={exerciseIndex}
                 >
-                  <span className="font-medium text-text-primary min-w-0 truncate">{e.uebungsname}</span>
+                  <span className="font-medium text-text-primary min-w-0 truncate">{exercise.uebungsname}</span>
                   <span className="text-text-secondary text-xs whitespace-nowrap">
-                    {e.saetze && (e.wdh_text || e.wdh) ? `${e.saetze}×${e.wdh_text || e.wdh}` : ''}
-                    {e.gewicht_kg ? ` @ ${e.gewicht_kg}kg` : ''}
+                    {exercise.saetze && (exercise.wdh_text || exercise.wdh) ? `${exercise.saetze}×${exercise.wdh_text || exercise.wdh}` : ''}
+                    {exercise.gewicht_kg ? ` @ ${exercise.gewicht_kg}kg` : ''}
                   </span>
                 </div>
               ))}
@@ -305,12 +305,12 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        {e ? (
+        {isEmbedded ? (
           <p className="text-text-secondary text-sm">Deine Trainingstage zum Starten und für den Kalender.</p>
         ) : (
           <div className="flex items-center gap-3">
             <button
-              onClick={() => r('/training')}
+              onClick={() => navigate('/training')}
               className="p-2 rounded-lg hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
               aria-label="Zurück"
             >
@@ -323,39 +323,39 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
           </div>
         )}
         <div className="flex items-center gap-2 flex-wrap">
-          {t && (
-            <button onClick={t} className="btn-secondary flex items-center gap-2 text-sm">
+          {handleBuildPlan && (
+            <button onClick={handleBuildPlan} className="btn-secondary flex items-center gap-2 text-sm">
               <Layers size={16} /> Eigenen Plan bauen
             </button>
           )}
-          <button onClick={() => l(true)} className="btn-primary flex items-center gap-2 text-sm">
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 text-sm">
             <Plus size={16} /> Vorlage erstellen
           </button>
         </div>
       </div>
-      {T && (
+      {notice && (
         <div className="card !p-4 border-success/40 bg-success/5 text-sm text-text-primary enter" role="status">
-          {T}
+          {notice}
         </div>
       )}
       <div className="space-y-6">
-        {o ? (
+        {loading ? (
           <div className="flex justify-center py-8">
             <Spinner />
           </div>
-        ) : i.length === 0 ? (
+        ) : templates.length === 0 ? (
           <div className="card">
             <EmptyState
               icon={BookOpen}
               title="Noch keine Vorlagen"
               description="Erstelle eine Vorlage für deinen typischen Trainingstag oder baue dir einen kompletten Plan aus dem Übungspool."
               action={
-                t ? (
-                  <button onClick={t} className="btn-primary flex items-center gap-2 mx-auto">
+                handleBuildPlan ? (
+                  <button onClick={handleBuildPlan} className="btn-primary flex items-center gap-2 mx-auto">
                     <Layers size={16} /> Eigenen Plan bauen
                   </button>
                 ) : (
-                  <button onClick={() => l(true)} className="btn-primary flex items-center gap-2 mx-auto">
+                  <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 mx-auto">
                     <Plus size={16} /> Erste Vorlage erstellen
                   </button>
                 )
@@ -364,28 +364,28 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
           </div>
         ) : (
           <>
-            {I.plans.map(([e, t]) => (
-              <section className="space-y-3" aria-label={`Plan ${e}`} key={e}>
+            {grouped.plans.map(([planName, planDays]) => (
+              <section className="space-y-3" aria-label={`Plan ${planName}`} key={planName}>
                 <div className="flex items-center gap-2 px-1">
                   <Layers size={16} className="text-brand" aria-hidden="true" />
-                  <h2 className="section-title text-base">{e}</h2>
+                  <h2 className="section-title text-base">{planName}</h2>
                   <span className="text-xs text-text-muted">
-                    {t.length} {t.length === 1 ? 'Tag' : 'Tage'}
+                    {planDays.length} {planDays.length === 1 ? 'Tag' : 'Tage'}
                   </span>
                 </div>
-                {t.map((e, t) => L(e, t))}
+                {planDays.map((template, position) => renderTemplate(template, position))}
               </section>
             ))}
-            {I.single.length > 0 && (
+            {grouped.single.length > 0 && (
               <section className="space-y-3" aria-label="Einzelne Vorlagen">
-                {I.plans.length > 0 && <h2 className="section-title text-base px-1">Einzelne Vorlagen</h2>}
-                {I.single.map((e, t) => L(e, t))}
+                {grouped.plans.length > 0 && <h2 className="section-title text-base px-1">Einzelne Vorlagen</h2>}
+                {grouped.single.map((template, position) => renderTemplate(template, position))}
               </section>
             )}
           </>
         )}
       </div>
-      <Modal open={c} onClose={() => l(false)} title="Vorlage erstellen" size="lg">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Vorlage erstellen" size="lg">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -394,11 +394,11 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
                 type="text"
                 className="input"
                 placeholder="z.B. Push Day"
-                value={f.name}
-                onChange={(e) =>
-                  p((t) => ({
-                    ...t,
-                    name: e.target.value,
+                value={draft.name}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    name: event.target.value,
                   }))
                 }
                 autoFocus
@@ -408,16 +408,16 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
               <label className="label">Typ</label>
               <select
                 className="input"
-                value={f.trainingstyp}
-                onChange={(e) =>
-                  p((t) => ({
-                    ...t,
-                    trainingstyp: e.target.value,
+                value={draft.trainingstyp}
+                onChange={(event) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    trainingstyp: event.target.value,
                   }))
                 }
               >
-                {BQ.map((e) => (
-                  <option key={e}>{e}</option>
+                {BQ.map((trainingType) => (
+                  <option key={trainingType}>{trainingType}</option>
                 ))}
               </select>
             </div>
@@ -425,20 +425,20 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
           <div>
             <label className="label">Wiederkehrende Tage (optional)</label>
             <div className="flex gap-2">
-              {VQ.map((e, t) => (
+              {VQ.map((dayLabel, dayIndex) => (
                 <button
                   type="button"
-                  onClick={() => O(t + 1)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all border ${f.wochentage.includes(t + 1) ? 'bg-brand/20 text-brand border-brand/40' : 'bg-bg-elevated text-text-muted border-border hover:border-border-light'}`}
-                  key={e}
+                  onClick={() => toggleWeekday(dayIndex + 1)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all border ${draft.wochentage.includes(dayIndex + 1) ? 'bg-brand/20 text-brand border-brand/40' : 'bg-bg-elevated text-text-muted border-border hover:border-border-light'}`}
+                  key={dayLabel}
                 >
-                  {e}
+                  {dayLabel}
                 </button>
               ))}
             </div>
-            {f.wochentage.length > 0 && (
+            {draft.wochentage.length > 0 && (
               <p className="text-xs text-text-muted mt-1.5">
-                Jede Woche: {f.wochentage.map((e) => VQ[e - 1]).join(', ')} — du kannst diese Tage dann automatisch im
+                Jede Woche: {draft.wochentage.map((day) => VQ[day - 1]).join(', ')} — du kannst diese Tage dann automatisch im
                 Kalender eintragen lassen.
               </p>
             )}
@@ -446,17 +446,17 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
           <div className="border-t border-border pt-4">
             <div className="text-sm font-medium text-text-primary mb-3">Übungen</div>
             <div className="space-y-3">
-              {m.map((e, t) => (
-                <div className="p-3 bg-bg-elevated rounded-lg space-y-2" key={t}>
+              {exerciseRows.map((row, rowIndex) => (
+                <div className="p-3 bg-bg-elevated rounded-lg space-y-2" key={rowIndex}>
                   <div className="flex gap-2">
                     <input
                       className="input flex-1 text-sm py-2"
                       placeholder="Übungsname (z.B. Bankdrücken)"
-                      value={e.uebungsname}
-                      onChange={(e) => j(t, 'uebungsname', e.target.value)}
+                      value={row.uebungsname}
+                      onChange={(event) => updateExerciseRow(rowIndex, 'uebungsname', event.target.value)}
                     />
                     <button
-                      onClick={() => A(t)}
+                      onClick={() => removeExerciseRow(rowIndex)}
                       className="p-2 rounded hover:bg-danger/10 hover:text-danger text-text-muted"
                     >
                       <Trash2 size={14} />
@@ -469,8 +469,8 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
                         type="number"
                         className="input text-sm py-2"
                         placeholder="4"
-                        value={e.saetze}
-                        onChange={(e) => j(t, 'saetze', e.target.value)}
+                        value={row.saetze}
+                        onChange={(event) => updateExerciseRow(rowIndex, 'saetze', event.target.value)}
                       />
                     </div>
                     <div>
@@ -479,8 +479,8 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
                         type="number"
                         className="input text-sm py-2"
                         placeholder="8"
-                        value={e.wdh}
-                        onChange={(e) => j(t, 'wdh', e.target.value)}
+                        value={row.wdh}
+                        onChange={(event) => updateExerciseRow(rowIndex, 'wdh', event.target.value)}
                       />
                     </div>
                     <div>
@@ -490,64 +490,64 @@ export function TrainingVorlagen({ embedded: e = false, onBuildPlan: t }) {
                         step="0.5"
                         className="input text-sm py-2"
                         placeholder="80"
-                        value={e.gewicht_kg}
-                        onChange={(e) => j(t, 'gewicht_kg', e.target.value)}
+                        value={row.gewicht_kg}
+                        onChange={(event) => updateExerciseRow(rowIndex, 'gewicht_kg', event.target.value)}
                       />
                     </div>
                   </div>
                 </div>
               ))}
-              <button onClick={k} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+              <button onClick={addExerciseRow} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
                 <Plus size={14} /> Übung hinzufügen
               </button>
             </div>
           </div>
           <div className="flex gap-3 pt-2 border-t border-border">
-            <button onClick={() => l(false)} className="btn-secondary flex-1">
+            <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">
               Abbrechen
             </button>
             <button
-              onClick={M}
+              onClick={saveTemplate}
               className="btn-primary flex-1 flex items-center justify-center gap-2"
-              disabled={u || !f.name}
+              disabled={saving || !draft.name}
             >
-              {u && <Spinner size={16} />}Vorlage speichern
+              {saving && <Spinner size={16} />}Vorlage speichern
             </button>
           </div>
         </div>
       </Modal>
-      <Modal open={!!g} onClose={() => _(null)} title="Im Kalender eintragen">
-        {g && (
+      <Modal open={!!planTarget} onClose={() => setPlanTarget(null)} title="Im Kalender eintragen">
+        {planTarget && (
           <div className="space-y-4">
             <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl">
-              <div className="font-medium text-text-primary">{g.name}</div>
+              <div className="font-medium text-text-primary">{planTarget.name}</div>
               <div className="text-xs text-text-muted mt-0.5">
                 Tage:{' '}
-                {WQ(g.wochentage)
-                  .map((e) => VQ[e - 1])
+                {WQ(planTarget.wochentage)
+                  .map((day) => VQ[day - 1])
                   .join(', ')}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Startdatum</label>
-                <input type="date" className="input" value={x} onChange={(e) => S(e.target.value)} />
+                <input type="date" className="input" value={startDay} onChange={(event) => setStartDay(event.target.value)} />
               </div>
               <div>
                 <label className="label">Wie viele Wochen?</label>
-                <input type="number" className="input" min="1" max="52" value={y} onChange={(e) => b(e.target.value)} />
+                <input type="number" className="input" min="1" max="52" value={weeks} onChange={(event) => setWeeks(event.target.value)} />
               </div>
             </div>
             <p className="text-xs text-text-muted">
-              Es werden ca. {WQ(g.wochentage).length * (parseInt(y) || 8)} Kalendereinträge erstellt. Jeder kann danach
+              Es werden ca. {WQ(planTarget.wochentage).length * (parseInt(weeks) || 8)} Kalendereinträge erstellt. Jeder kann danach
               einzeln bearbeitet oder gelöscht werden.
             </p>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => _(null)} className="btn-secondary flex-1">
+              <button onClick={() => setPlanTarget(null)} className="btn-secondary flex-1">
                 Abbrechen
               </button>
-              <button onClick={F} className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={C}>
-                {C && <Spinner size={16} />}Einträge erstellen
+              <button onClick={scheduleWeeks} className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={scheduling}>
+                {scheduling && <Spinner size={16} />}Einträge erstellen
               </button>
             </div>
           </div>
