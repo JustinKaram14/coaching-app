@@ -13,7 +13,7 @@ import { BottomSheet } from '../ui/BottomSheet'
 export const REWARD_EMOJIS = ['🍦', '🍰', '🍕', '📱', '📺', '🎧', '🎬', '😴', '🍽️', '💆', '👟', '🎁']
 export function RewardsTab() {
   let { user } = useAuth(),
-    { stats, spend } = useGame(),
+    { stats, redeemReward } = useGame(),
     [rewards, setRewards] = useState(null),
     [redemptions, setRedemptions] = useState([]),
     [unavailable, setUnavailable] = useState(false),
@@ -49,35 +49,16 @@ export function RewardsTab() {
   async function redeem(t) {
     if (!user || redeemingId) return
     ;(setRedeemingId(t.id), setNotice(null))
-    let r = await supabase
-      .from('einloesungen')
-      .insert({
-        user_id: user.id,
-        titel: t.titel,
-        preis: t.preis,
-        emoji: t.emoji,
-      })
-      .select('id')
-      .single()
-    if (r.error || !r.data) {
+    let r = await redeemReward(t)
+    if (r.error) {
       ;(setRedeemingId(null),
         setNotice({
           tone: 'warn',
-          text: 'Das hat nicht geklappt. Versuche es noch einmal.',
+          text: r.error,
         }))
       return
     }
-    let i = r.data.id,
-      a = await spend('belohnung', i, t.preis, `${t.titel} eingelöst`)
-    if (a) {
-      ;(await supabase.from('einloesungen').delete().eq('id', i),
-        setRedeemingId(null),
-        setNotice({
-          tone: 'warn',
-          text: a,
-        }))
-      return
-    }
+    let i = r.id
     ;(setRedeemingId(null),
       setNewVoucherId(i),
       window.setTimeout(() => setNewVoucherId(null), 1200),

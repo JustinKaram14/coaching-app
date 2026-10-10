@@ -28,6 +28,7 @@ export const GameContext = createContext({
   updateCharacter: noopFalse,
   award: async () => [],
   spend: async () => 'Nicht verfügbar',
+  redeemReward: async () => ({ error: 'Nicht verfügbar' }),
   buy: async () => 'Nicht verfügbar',
   equip: async () => {},
 })
@@ -310,6 +311,26 @@ export function GameProvider({ children }) {
       },
       [user, updateStats],
     ),
+    // Einlösen läuft in einem Schritt in der Datenbank: Gutschein anlegen und Punkte abziehen, oder beides nicht
+    redeemReward = useCallback(
+      async (e) => {
+        if (!user) return { error: 'Nicht angemeldet' }
+        if (statsRef.current.punkte < e.preis) return { error: 'Dafür reichen deine Punkte noch nicht.' }
+        let { data: a, error: r } = await supabase.rpc('belohnung_einloesen', { p_belohnung: e.id })
+        if (r || !a)
+          return {
+            error: /Nicht genug/i.test(r?.message ?? '')
+              ? 'Dafür reichen deine Punkte noch nicht.'
+              : 'Das hat nicht geklappt. Versuche es noch einmal.',
+          }
+        updateStats((t) => ({
+          ...t,
+          punkte: t.punkte - e.preis,
+        }))
+        return { id: a }
+      },
+      [user, updateStats],
+    ),
     buy = useCallback(
       async (e) =>
         owned.has(e.id)
@@ -352,6 +373,7 @@ export function GameProvider({ children }) {
         updateCharacter,
         award,
         spend,
+        redeemReward,
         buy,
         equip,
       }),
@@ -370,6 +392,7 @@ export function GameProvider({ children }) {
         updateCharacter,
         award,
         spend,
+        redeemReward,
         buy,
         equip,
       ],
