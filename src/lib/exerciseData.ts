@@ -67,26 +67,26 @@ export const MUSCLE_GROUPS = [
     label: 'Sonstige',
   },
 ]
-export const muscleGroupLabel = (e) => MUSCLE_GROUPS.find((t) => t.key === e)?.label ?? 'Sonstige'
+export const muscleGroupLabel = (groupKey) => MUSCLE_GROUPS.find((groupEntry) => groupEntry.key === groupKey)?.label ?? 'Sonstige'
 export const EXERCISE_BASE = './exercises/'
-export const exerciseImageUrl = (e) => EXERCISE_BASE + e.image
-export const exerciseGifUrl = (e) => EXERCISE_BASE + e.gif
+export const exerciseImageUrl = (exercise) => EXERCISE_BASE + exercise.image
+export const exerciseGifUrl = (exercise) => EXERCISE_BASE + exercise.gif
 export let exerciseCache = null
 export function loadExerciseData() {
   return (
     (exerciseCache ||= fetch('./exercises/data/exercises_de.json')
-      .then((e) => {
-        if (!e.ok) throw Error('Übungsdaten nicht gefunden')
-        return e.json()
+      .then((response) => {
+        if (!response.ok) throw Error('Übungsdaten nicht gefunden')
+        return response.json()
       })
-      .catch((e) => {
-        throw ((exerciseCache = null), e)
+      .catch((error) => {
+        throw ((exerciseCache = null), error)
       })),
     exerciseCache
   )
 }
-export function normalizeText(e) {
-  return e
+export function normalizeText(text) {
+  return text
     .toLowerCase()
     .replace(/ß/g, 'ss')
     .normalize('NFD')
@@ -95,12 +95,12 @@ export function normalizeText(e) {
     .replace(/\s+/g, ' ')
     .trim()
 }
-export function searchHaystack(e) {
-  return normalizeText(`${e.name} ${e.name_en} ${e.equipment_de} ${e.target_de} ${e.body_part_de}`)
+export function searchHaystack(exercise) {
+  return normalizeText(`${exercise.name} ${exercise.name_en} ${exercise.equipment_de} ${exercise.target_de} ${exercise.body_part_de}`)
 }
-export function findExerciseByName(e, t) {
-  let n = normalizeText(e)
-  if (n) return t.find((e) => normalizeText(e.name) === n) ?? t.find((e) => normalizeText(e.name_en) === n)
+export function findExerciseByName(exerciseName, exercises) {
+  let wanted = normalizeText(exerciseName)
+  if (wanted) return exercises.find((exercise) => normalizeText(exercise.name) === wanted) ?? exercises.find((exercise) => normalizeText(exercise.name_en) === wanted)
 }
 export const EQUIPMENT_ORDER = {
   Langhantel: 0,
@@ -109,19 +109,19 @@ export const EQUIPMENT_ORDER = {
   Kabel: 3,
   Körpergewicht: 4,
 }
-export const equipmentRank = (e) => EQUIPMENT_ORDER[e.equipment_group] ?? 5
-export function findExercise(e, t) {
-  let n = findExerciseByName(e, t)
-  if (n) return n
-  let r = normalizeText(e).split(' ').filter(Boolean)
-  if (!r.length) return
-  let i = t.filter((e) => {
-    let t = normalizeText(`${e.name} ${e.name_en}`)
-    return r.every((e) => t.includes(e) || (e.length > 4 && t.includes(e.slice(0, -1))))
+export const equipmentRank = (exercise) => EQUIPMENT_ORDER[exercise.equipment_group] ?? 5
+export function findExercise(query, exercises) {
+  let exact = findExerciseByName(query, exercises)
+  if (exact) return exact
+  let words = normalizeText(query).split(' ').filter(Boolean)
+  if (!words.length) return
+  let matches = exercises.filter((exercise) => {
+    let haystack = normalizeText(`${exercise.name} ${exercise.name_en}`)
+    return words.every((word) => haystack.includes(word) || (word.length > 4 && haystack.includes(word.slice(0, -1))))
   })
   return (
-    i.sort((e, t) => t.compound - e.compound || equipmentRank(e) - equipmentRank(t) || e.name.length - t.name.length),
-    i[0]
+    matches.sort((first, second) => second.compound - first.compound || equipmentRank(first) - equipmentRank(second) || first.name.length - second.name.length),
+    matches[0]
   )
 }
 export const GROUP_PATTERNS = [
@@ -143,12 +143,12 @@ export const GROUP_PATTERNS = [
   [/bauch|crunch|sit.?up|plank|abs|beinheben|russian|twist/, 'bauch'],
   [/laufen|rad|cardio|rudergeraet|crosstrainer|seilspringen|hiit|burpee/, 'cardio'],
 ]
-export function guessMuscleGroup(e, t) {
-  if (t) {
-    let n = findExerciseByName(e, t)
-    if (n) return n.group
+export function guessMuscleGroup(exerciseName, exercises) {
+  if (exercises) {
+    let found = findExerciseByName(exerciseName, exercises)
+    if (found) return found.group
   }
-  let n = normalizeText(e)
-  for (let [e, t] of GROUP_PATTERNS) if (e.test(n)) return t
+  let normalized = normalizeText(exerciseName)
+  for (let [pattern, groupResult] of GROUP_PATTERNS) if (pattern.test(normalized)) return groupResult
   return 'sonstige'
 }

@@ -59,59 +59,59 @@ export function DayStatusProvider({ children }) {
     enabled = !!user && profile?.role !== 'coach',
     load = useCallback(async () => {
       if (!user || !enabled) return
-      let e = todayISO(),
-        n = new Date()
-      n.setDate(n.getDate() - 1)
-      let r = [e, toLocalISO(n)],
-        i = (e, n) => supabase.from(e).select(n).eq('user_id', user.id).in('datum', r)
+      let today = todayISO(),
+        yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      let dayList = [today, toLocalISO(yesterday)],
+        query = (table, columns) => supabase.from(table).select(columns).eq('user_id', user.id).in('datum', dayList)
       try {
-        let [n, o, c, u, d, f, p] = await Promise.all([
-            i('gewicht', 'datum'),
-            i('schlaf', 'datum'),
-            i('training', 'id,datum'),
-            i('food_log', 'mahlzeit,datum'),
+        let [weightResult, sleepResult, trainingResult, foodResult, suppsResult, suppLogResult, waterResult] = await Promise.all([
+            query('gewicht', 'datum'),
+            query('schlaf', 'datum'),
+            query('training', 'id,datum'),
+            query('food_log', 'mahlzeit,datum'),
             supabase.from('supplements').select('id').eq('user_id', user.id).eq('aktiv', true),
-            i('supplement_log', 'supplement_id,eingenommen,datum'),
-            i('wasser_log', 'menge_ml,datum'),
+            query('supplement_log', 'supplement_id,eingenommen,datum'),
+            query('wasser_log', 'menge_ml,datum'),
           ]),
-          m = (e) => e.data ?? [],
-          h = new Set((d.data ?? []).map((e) => e.id)),
-          g = {}
-        for (let e of r) {
-          let t = new Set(
-              m(u)
-                .filter((t) => t.datum === e)
-                .map((e) => e.mahlzeit),
+          rowsOf = (result) => result.data ?? [],
+          activeSuppIds = new Set((suppsResult.data ?? []).map((supp) => supp.id)),
+          byDay = {}
+        for (let day of dayList) {
+          let meals = new Set(
+              rowsOf(foodResult)
+                .filter((row) => row.datum === day)
+                .map((row) => row.mahlzeit),
             ),
-            r = new Set(
-              m(f)
-                .filter((t) => t.datum === e && t.eingenommen && h.has(t.supplement_id))
-                .map((e) => e.supplement_id),
+            takenSupps = new Set(
+              rowsOf(suppLogResult)
+                .filter((row) => row.datum === day && row.eingenommen && activeSuppIds.has(row.supplement_id))
+                .map((row) => row.supplement_id),
             )
-          g[e] = {
-            date: e,
-            mealsMain: MAIN_MEALS.filter((e) => t.has(e)),
-            sleep: m(o).some((t) => t.datum === e),
-            weight: m(n).some((t) => t.datum === e),
-            trainingIds: m(c)
-              .filter((t) => t.datum === e)
-              .map((e) => e.id),
-            supplementsTotal: h.size,
-            supplementsTaken: r.size,
-            waterMl: m(p)
-              .filter((t) => t.datum === e)
-              .reduce((e, t) => e + (t.menge_ml ?? 0), 0),
+          byDay[day] = {
+            date: day,
+            mealsMain: MAIN_MEALS.filter((meal) => meals.has(meal)),
+            sleep: rowsOf(sleepResult).some((row) => row.datum === day),
+            weight: rowsOf(weightResult).some((row) => row.datum === day),
+            trainingIds: rowsOf(trainingResult)
+              .filter((row) => row.datum === day)
+              .map((row) => row.id),
+            supplementsTotal: activeSuppIds.size,
+            supplementsTaken: takenSupps.size,
+            waterMl: rowsOf(waterResult)
+              .filter((row) => row.datum === day)
+              .reduce((sum, row) => sum + (row.menge_ml ?? 0), 0),
           }
         }
-        let _ = g[e]
+        let todayStatus = byDay[today]
         ;(setStatus({
-          weight: progress(+!!_.weight, 1),
-          sleep: progress(+!!_.sleep, 1),
-          training: progress(+(_.trainingIds.length > 0), 1),
-          nutrition: progress(_.mealsMain.length, MAIN_MEALS.length),
-          supplements: progress(_.supplementsTaken, _.supplementsTotal),
+          weight: progress(+!!todayStatus.weight, 1),
+          sleep: progress(+!!todayStatus.sleep, 1),
+          training: progress(+(todayStatus.trainingIds.length > 0), 1),
+          nutrition: progress(todayStatus.mealsMain.length, MAIN_MEALS.length),
+          supplements: progress(todayStatus.supplementsTaken, todayStatus.supplementsTotal),
         }),
-          setDays(g),
+          setDays(byDay),
           setLoaded(true))
       } catch {}
     }, [user, enabled]),
@@ -126,14 +126,14 @@ export function DayStatusProvider({ children }) {
   }, [load, location.pathname]),
     useEffect(() => {
       window.addEventListener(DATA_CHANGED_EVENT, scheduleRefresh)
-      let e = () => {
+      let onVisibility = () => {
         document.visibilityState === 'visible' && scheduleRefresh()
       }
       return (
-        document.addEventListener('visibilitychange', e),
+        document.addEventListener('visibilitychange', onVisibility),
         () => {
           ;(window.removeEventListener(DATA_CHANGED_EVENT, scheduleRefresh),
-            document.removeEventListener('visibilitychange', e),
+            document.removeEventListener('visibilitychange', onVisibility),
             window.clearTimeout(timer.current))
         }
       )
