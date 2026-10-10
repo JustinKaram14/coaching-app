@@ -71,201 +71,201 @@ export const Q4 = [
     label: '1 Tag vorher',
   },
 ]
-export const $4 = (e) => Q4.find((t) => t.value === String(e))?.label ?? `${e} Minuten vorher`
-export const e3 = (e) =>
-  e.plan_name && e.name.startsWith(`${e.plan_name} · `) ? e.name.slice(e.plan_name.length + 3) : e.name
-export function t3(e, t, n) {
-  let r = [],
-    i = parseISO(e)
-  for (let e = 0; e < n; e++) {
-    let n
-    ;((n = t === 'weekly' ? addWeeks(i, e) : t === 'biweekly' ? addWeeks(i, e * 2) : addMonths(i, e)),
-      r.push(format(n, 'yyyy-MM-dd')))
+export const $4 = (minutes) => Q4.find((choice) => choice.value === String(minutes))?.label ?? `${minutes} Minuten vorher`
+export const e3 = (workout) =>
+  workout.plan_name && workout.name.startsWith(`${workout.plan_name} · `) ? workout.name.slice(workout.plan_name.length + 3) : workout.name
+export function t3(startDate, frequency, count) {
+  let dates = [],
+    firstDate = parseISO(startDate)
+  for (let step = 0; step < count; step++) {
+    let day
+    ;((day = frequency === 'weekly' ? addWeeks(firstDate, step) : frequency === 'biweekly' ? addWeeks(firstDate, step * 2) : addMonths(firstDate, step)),
+      dates.push(format(day, 'yyyy-MM-dd')))
   }
-  return r
+  return dates
 }
 export function Calendar() {
-  let { user: e, profile: t } = useAuth(),
-    n = useNavigate(),
-    r = t?.role === 'coach',
-    [i, a] = useState([]),
-    [o, s] = useState(60),
-    [c, l] = useState(''),
-    [u, d] = useState([]),
-    [f, p] = useState(true),
-    [m, h] = useState([]),
-    [g, _] = useState(new Date()),
-    [y, b] = useState(null),
-    [x, S] = useState(false),
-    [C, w] = useState(null),
-    [T, E] = useState(false),
-    [D, O] = useState(Z4)
-  async function k() {
-    if (!e) return
-    let { data: t } = await supabase
+  let { user: authUser, profile: authProfile } = useAuth(),
+    navigate = useNavigate(),
+    isCoach = authProfile?.role === 'coach',
+    [workouts, setWorkouts] = useState([]),
+    [reminderDefault, setReminderDefault] = useState(60),
+    [notice, setNotice] = useState(''),
+    [events, setEvents] = useState([]),
+    [loading, setLoading] = useState(true),
+    [clients, setClients] = useState([]),
+    [viewMonth, setViewMonth] = useState(new Date()),
+    [selectedDay, setSelectedDay] = useState(null),
+    [modalOpen, setModalOpen] = useState(false),
+    [editingId, setEditingId] = useState(null),
+    [saving, setSaving] = useState(false),
+    [form, setForm] = useState(Z4)
+  async function loadEvents() {
+    if (!authUser) return
+    let { data: eventRows } = await supabase
       .from('kalender_events')
       .select('*')
-      .or(`coach_id.eq.${e.id},client_id.eq.${e.id}`)
+      .or(`coach_id.eq.${authUser.id},client_id.eq.${authUser.id}`)
       .order('datum', {
         ascending: true,
       })
-    ;(d(t ?? []), p(false))
+    ;(setEvents(eventRows ?? []), setLoading(false))
   }
-  async function A() {
-    if (!e || !r) return
-    let { data: t } = await supabase
+  async function loadClients() {
+    if (!authUser || !isCoach) return
+    let { data: clientRows } = await supabase
       .from('profiles')
       .select('id, name, email')
-      .eq('coach_id', e.id)
+      .eq('coach_id', authUser.id)
       .eq('role', 'client')
-    h(t ?? [])
+    setClients(clientRows ?? [])
   }
-  async function j() {
-    if (!e || r) return
-    let [t, n] = await Promise.all([
-      supabase.from('training_vorlagen').select('*').eq('user_id', e.id).order('created_at', {
+  async function loadWorkouts() {
+    if (!authUser || isCoach) return
+    let [workoutsResult, settingsResult] = await Promise.all([
+      supabase.from('training_vorlagen').select('*').eq('user_id', authUser.id).order('created_at', {
         ascending: false,
       }),
-      supabase.from('client_settings').select('notif_appointment_minutes').eq('user_id', e.id).maybeSingle(),
+      supabase.from('client_settings').select('notif_appointment_minutes').eq('user_id', authUser.id).maybeSingle(),
     ])
-    ;(a(t.data ?? []), s(n.data?.notif_appointment_minutes ?? 60))
+    ;(setWorkouts(workoutsResult.data ?? []), setReminderDefault(settingsResult.data?.notif_appointment_minutes ?? 60))
   }
   useEffect(() => {
-    ;(k(), A(), j())
-  }, [e, t])
-  function M(e) {
-    ;(w(null),
-      O({
+    ;(loadEvents(), loadClients(), loadWorkouts())
+  }, [authUser, authProfile])
+  function openNew(day) {
+    ;(setEditingId(null),
+      setForm({
         ...Z4,
-        datum: e ? format(e, 'yyyy-MM-dd') : todayISO(),
+        datum: day ? format(day, 'yyyy-MM-dd') : todayISO(),
       }),
-      S(true))
+      setModalOpen(true))
   }
-  function N(e) {
-    ;(w(e.id),
-      O({
-        titel: e.titel,
-        datum: e.datum,
-        uhrzeit: e.uhrzeit ?? '',
-        dauer_min: e.dauer_min ? String(e.dauer_min) : '',
-        typ: e.typ,
-        notizen: e.notizen ?? '',
-        client_id: e.client_id ?? '',
-        vorlage_id: e.vorlage_id ?? '',
-        erinnerung: e.erinnerung_min == null ? '' : String(e.erinnerung_min),
+  function openEdit(event) {
+    ;(setEditingId(event.id),
+      setForm({
+        titel: event.titel,
+        datum: event.datum,
+        uhrzeit: event.uhrzeit ?? '',
+        dauer_min: event.dauer_min ? String(event.dauer_min) : '',
+        typ: event.typ,
+        notizen: event.notizen ?? '',
+        client_id: event.client_id ?? '',
+        vorlage_id: event.vorlage_id ?? '',
+        erinnerung: event.erinnerung_min == null ? '' : String(event.erinnerung_min),
         recurring: false,
         recur_freq: 'weekly',
         recur_count: '8',
       }),
-      S(true))
+      setModalOpen(true))
   }
-  async function P() {
-    if (!e || !D.titel) return
-    E(true)
-    let n = {
-        coach_id: r ? e.id : (t?.coach_id ?? e.id),
-        client_id: r ? D.client_id || null : e.id,
-        titel: D.titel,
-        uhrzeit: D.uhrzeit || null,
-        dauer_min: D.dauer_min ? parseInt(D.dauer_min) : null,
-        typ: D.typ,
-        notizen: D.notizen || null,
-        vorlage_id: !r && D.vorlage_id ? D.vorlage_id : null,
-        erinnerung_min: D.erinnerung === '' ? null : parseInt(D.erinnerung),
+  async function saveEvent() {
+    if (!authUser || !form.titel) return
+    setSaving(true)
+    let payload = {
+        coach_id: isCoach ? authUser.id : (authProfile?.coach_id ?? authUser.id),
+        client_id: isCoach ? form.client_id || null : authUser.id,
+        titel: form.titel,
+        uhrzeit: form.uhrzeit || null,
+        dauer_min: form.dauer_min ? parseInt(form.dauer_min) : null,
+        typ: form.typ,
+        notizen: form.notizen || null,
+        vorlage_id: !isCoach && form.vorlage_id ? form.vorlage_id : null,
+        erinnerung_min: form.erinnerung === '' ? null : parseInt(form.erinnerung),
       },
-      i = ['vorlage_id', 'erinnerung_min'],
-      a = async (e) => {
-        let t = (t) => (e ? omitKeys(t, i) : t)
-        if (C)
+      optionalKeys = ['vorlage_id', 'erinnerung_min'],
+      write = async (withoutOptional) => {
+        let prune = (row) => (withoutOptional ? omitKeys(row, optionalKeys) : row)
+        if (editingId)
           return supabase
             .from('kalender_events')
             .update(
-              t({
-                ...n,
-                datum: D.datum,
+              prune({
+                ...payload,
+                datum: form.datum,
               }),
             )
-            .eq('id', C)
-        if (D.recurring) {
-          let e = t3(D.datum, D.recur_freq, parseInt(D.recur_count) || 8)
+            .eq('id', editingId)
+        if (form.recurring) {
+          let dates = t3(form.datum, form.recur_freq, parseInt(form.recur_count) || 8)
           return supabase.from('kalender_events').insert(
-            e.map((e) =>
-              t({
-                ...n,
-                datum: e,
+            dates.map((date) =>
+              prune({
+                ...payload,
+                datum: date,
               }),
             ),
           )
         }
         return supabase.from('kalender_events').insert(
-          t({
-            ...n,
-            datum: D.datum,
+          prune({
+            ...payload,
+            datum: form.datum,
           }),
         )
       },
-      o = await a(false)
+      result = await write(false)
     if (
-      (isMissingColumn(o.error) &&
-        ((o = await a(true)),
-        o.error || l('Gespeichert. Vorlage und eigene Erinnerung brauchen noch das Datenbank-Update.')),
-      o.error && l('Der Termin konnte nicht gespeichert werden. Bitte versuche es noch einmal.'),
-      r && n.client_id && n.client_id !== e.id)
+      (isMissingColumn(result.error) &&
+        ((result = await write(true)),
+        result.error || setNotice('Gespeichert. Vorlage und eigene Erinnerung brauchen noch das Datenbank-Update.')),
+      result.error && setNotice('Der Termin konnte nicht gespeichert werden. Bitte versuche es noch einmal.'),
+      isCoach && payload.client_id && payload.client_id !== authUser.id)
     ) {
-      let e = C ? 'aktualisiert' : 'erstellt'
+      let verb = editingId ? 'aktualisiert' : 'erstellt'
       sendPushToUser(
-        n.client_id,
-        `Neuer Termin ${e}`,
-        `${D.titel} am ${D.datum}${D.uhrzeit ? ' um ' + D.uhrzeit : ''}`,
+        payload.client_id,
+        `Neuer Termin ${verb}`,
+        `${form.titel} am ${form.datum}${form.uhrzeit ? ' um ' + form.uhrzeit : ''}`,
         'https://justinkaram14.github.io/coaching-app/#/calendar',
       )
     }
-    ;(await k(), S(false), w(null), O(Z4), E(false))
+    ;(await loadEvents(), setModalOpen(false), setEditingId(null), setForm(Z4), setSaving(false))
   }
-  async function F(e) {
-    ;(await supabase.from('kalender_events').delete().eq('id', e), d((t) => t.filter((t) => t.id !== e)))
+  async function deleteEvent(eventId) {
+    ;(await supabase.from('kalender_events').delete().eq('id', eventId), setEvents((list) => list.filter((event) => event.id !== eventId)))
   }
-  let I = startOfMonth(g),
-    L = endOfMonth(g),
-    ee = eachDayOfInterval({
-      start: startOfWeek(I, {
+  let monthStart = startOfMonth(viewMonth),
+    monthEnd = endOfMonth(viewMonth),
+    gridDays = eachDayOfInterval({
+      start: startOfWeek(monthStart, {
         weekStartsOn: 1,
       }),
-      end: endOfWeek(L, {
+      end: endOfWeek(monthEnd, {
         weekStartsOn: 1,
       }),
     }),
-    te = (t) => (r ? t.coach_id === e?.id : t.created_by === e?.id),
-    ne = (e) => {
-      let t = i.find((t) => t.id === e)
-      return t ? e3(t) : null
+    isOwn = (event) => (isCoach ? event.coach_id === authUser?.id : event.created_by === authUser?.id),
+    workoutName = (workoutId) => {
+      let found = workouts.find((item) => item.id === workoutId)
+      return found ? e3(found) : null
     },
-    re = todayISO(),
-    ie = (e) => !r && !!e.vorlage_id && e.datum === re && !!i.find((t) => t.id === e.vorlage_id),
-    R = (e) => u.filter((t) => isSameDay(parseISO(t.datum), e)),
-    ae = y ? R(y) : [],
-    oe = u.filter((e) => e.datum >= todayISO()).slice(0, 5)
+    todayStr = todayISO(),
+    isPlannedToday = (event) => !isCoach && !!event.vorlage_id && event.datum === todayStr && !!workouts.find((item) => item.id === event.vorlage_id),
+    eventsOn = (day) => events.filter((event) => isSameDay(parseISO(event.datum), day)),
+    selectedEvents = selectedDay ? eventsOn(selectedDay) : [],
+    upcoming = events.filter((event) => event.datum >= todayISO()).slice(0, 5)
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="section-title text-2xl">Kalender</h1>
           <p className="text-text-secondary text-sm mt-0.5">
-            {r ? 'Termine für deine Klienten' : 'Deine Termine und geplantes Training'}
+            {isCoach ? 'Termine für deine Klienten' : 'Deine Termine und geplantes Training'}
           </p>
         </div>
-        <button onClick={() => M()} className="btn-primary flex items-center gap-2">
-          <Plus size={18} /> {r ? 'Termin erstellen' : 'Training planen'}
+        <button onClick={() => openNew()} className="btn-primary flex items-center gap-2">
+          <Plus size={18} /> {isCoach ? 'Termin erstellen' : 'Training planen'}
         </button>
       </div>
-      {c && (
+      {notice && (
         <div
           role="status"
           className="flex items-start justify-between gap-3 rounded-2xl bg-bg-elevated border border-border px-4 py-3 text-sm text-text-secondary"
         >
-          <span>{c}</span>
+          <span>{notice}</span>
           <button
-            onClick={() => l('')}
+            onClick={() => setNotice('')}
             className="text-text-muted hover:text-text-primary shrink-0"
             aria-label="Hinweis schließen"
           >
@@ -277,19 +277,19 @@ export function Calendar() {
         <div className="lg:col-span-2 card">
           <div className="flex items-center justify-between mb-6">
             <button
-              onClick={() => _(subMonths(g, 1))}
+              onClick={() => setViewMonth(subMonths(viewMonth, 1))}
               aria-label="Vorheriger Monat"
               className="p-2 rounded-lg hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
             >
               <ChevronLeft size={18} />
             </button>
             <h2 className="font-semibold text-text-primary">
-              {format(g, 'MMMM yyyy', {
+              {format(viewMonth, 'MMMM yyyy', {
                 locale: de,
               })}
             </h2>
             <button
-              onClick={() => _(addMonths(g, 1))}
+              onClick={() => setViewMonth(addMonths(viewMonth, 1))}
               aria-label="Nächster Monat"
               className="p-2 rounded-lg hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors"
             >
@@ -297,41 +297,41 @@ export function Calendar() {
             </button>
           </div>
           <div className="grid grid-cols-7 mb-2">
-            {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((e) => (
-              <div className="text-center text-xs font-medium text-text-muted py-2" key={e}>
-                {e}
+            {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((weekday) => (
+              <div className="text-center text-xs font-medium text-text-muted py-2" key={weekday}>
+                {weekday}
               </div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
-            {ee.map((e) => {
-              let t = R(e),
-                n = isSameDay(e, new Date()),
-                r = isSameMonth(e, g),
-                i = y && isSameDay(e, y)
+            {gridDays.map((day) => {
+              let dayEvents = eventsOn(day),
+                isToday = isSameDay(day, new Date()),
+                inMonth = isSameMonth(day, viewMonth),
+                isSelected = selectedDay && isSameDay(day, selectedDay)
               return (
                 <div
-                  onClick={() => b(i ? null : e)}
+                  onClick={() => setSelectedDay(isSelected ? null : day)}
                   className={`min-h-[64px] p-1.5 rounded-lg cursor-pointer transition-all border
-                    ${r ? 'text-text-primary' : 'text-text-muted'}
-                    ${n ? 'bg-brand/10 border-brand/30' : i ? 'bg-bg-elevated border-border-light' : 'border-transparent hover:bg-bg-elevated'}`}
-                  key={e.toISOString()}
+                    ${inMonth ? 'text-text-primary' : 'text-text-muted'}
+                    ${isToday ? 'bg-brand/10 border-brand/30' : isSelected ? 'bg-bg-elevated border-border-light' : 'border-transparent hover:bg-bg-elevated'}`}
+                  key={day.toISOString()}
                 >
                   <div
-                    className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1 ${n ? 'bg-primary text-white' : ''}`}
+                    className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isToday ? 'bg-primary text-white' : ''}`}
                   >
-                    {format(e, 'd')}
+                    {format(day, 'd')}
                   </div>
                   <div className="space-y-0.5">
-                    {t.slice(0, 2).map((e) => (
+                    {dayEvents.slice(0, 2).map((event) => (
                       <div
-                        className={`text-xs px-1 py-0.5 rounded truncate border ${X4[e.typ] || X4.sonstiges}`}
-                        key={e.id}
+                        className={`text-xs px-1 py-0.5 rounded truncate border ${X4[event.typ] || X4.sonstiges}`}
+                        key={event.id}
                       >
-                        {e.titel}
+                        {event.titel}
                       </div>
                     ))}
-                    {t.length > 2 && <div className="text-xs text-text-muted px-1">+{t.length - 2}</div>}
+                    {dayEvents.length > 2 && <div className="text-xs text-text-muted px-1">+{dayEvents.length - 2}</div>}
                   </div>
                 </div>
               )
@@ -339,50 +339,50 @@ export function Calendar() {
           </div>
         </div>
         <div className="space-y-4">
-          {y && (
+          {selectedDay && (
             <div className="card">
-              <h3 className="font-semibold text-text-primary mb-3">{formatDate(y, 'EEEE, dd. MMM')}</h3>
-              {ae.length === 0 ? (
+              <h3 className="font-semibold text-text-primary mb-3">{formatDate(selectedDay, 'EEEE, dd. MMM')}</h3>
+              {selectedEvents.length === 0 ? (
                 <div className="text-sm text-text-muted py-2">Keine Termine</div>
               ) : (
                 <div className="space-y-2">
-                  {ae.map((e) => {
-                    let t = m.find((t) => t.id === e.client_id)?.name,
-                      r = ne(e.vorlage_id)
+                  {selectedEvents.map((event) => {
+                    let clientName = clients.find((client) => client.id === event.client_id)?.name,
+                      workoutLabel = workoutName(event.vorlage_id)
                     return (
-                      <div className={`p-3 rounded-lg border ${X4[e.typ] || X4.sonstiges}`} key={e.id}>
+                      <div className={`p-3 rounded-lg border ${X4[event.typ] || X4.sonstiges}`} key={event.id}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{e.titel}</div>
-                            {t && <div className="text-xs mt-0.5">👤 {t}</div>}
-                            {e.uhrzeit && (
+                            <div className="font-medium text-sm">{event.titel}</div>
+                            {clientName && <div className="text-xs mt-0.5">👤 {clientName}</div>}
+                            {event.uhrzeit && (
                               <div className="flex items-center gap-1 text-xs mt-1">
-                                <Clock size={11} /> {e.uhrzeit.slice(0, 5)} {e.dauer_min ? `(${e.dauer_min} min)` : ''}
+                                <Clock size={11} /> {event.uhrzeit.slice(0, 5)} {event.dauer_min ? `(${event.dauer_min} min)` : ''}
                               </div>
                             )}
-                            {r && (
+                            {workoutLabel && (
                               <div className="flex items-center gap-1 text-xs mt-1">
-                                <Layers size={11} aria-hidden="true" /> Vorlage: {r}
+                                <Layers size={11} aria-hidden="true" /> Vorlage: {workoutLabel}
                               </div>
                             )}
-                            {e.uhrzeit && e.erinnerung_min != null && e.erinnerung_min > 0 && (
+                            {event.uhrzeit && event.erinnerung_min != null && event.erinnerung_min > 0 && (
                               <div className="flex items-center gap-1 text-xs mt-1">
-                                <Bell size={11} aria-hidden="true" /> {$4(e.erinnerung_min)}
+                                <Bell size={11} aria-hidden="true" /> {$4(event.erinnerung_min)}
                               </div>
                             )}
-                            {e.notizen && <div className="text-xs mt-1">{e.notizen}</div>}
+                            {event.notizen && <div className="text-xs mt-1">{event.notizen}</div>}
                           </div>
-                          {te(e) && (
+                          {isOwn(event) && (
                             <div className="flex items-center gap-1 shrink-0">
                               <button
-                                onClick={() => N(e)}
+                                onClick={() => openEdit(event)}
                                 className="p-1 rounded hover:bg-black/10 transition-colors"
                                 aria-label="Termin bearbeiten"
                               >
                                 <Pencil size={12} />
                               </button>
                               <button
-                                onClick={() => F(e.id)}
+                                onClick={() => deleteEvent(event.id)}
                                 className="p-1 rounded hover:bg-black/10 transition-colors"
                                 aria-label="Termin löschen"
                               >
@@ -391,9 +391,9 @@ export function Calendar() {
                             </div>
                           )}
                         </div>
-                        {ie(e) && (
+                        {isPlannedToday(event) && (
                           <button
-                            onClick={() => n(`/training?start=${e.vorlage_id}`)}
+                            onClick={() => navigate(`/training?start=${event.vorlage_id}`)}
                             className="mt-2.5 w-full btn-primary !py-2 text-sm flex items-center justify-center gap-2"
                           >
                             <Play size={14} aria-hidden="true" /> Training starten
@@ -405,57 +405,57 @@ export function Calendar() {
                 </div>
               )}
               <button
-                onClick={() => M(y)}
+                onClick={() => openNew(selectedDay)}
                 className="btn-secondary w-full mt-3 text-sm flex items-center justify-center gap-2"
               >
-                <Plus size={14} /> {r ? 'Termin für diesen Tag' : 'Training für diesen Tag planen'}
+                <Plus size={14} /> {isCoach ? 'Termin für diesen Tag' : 'Training für diesen Tag planen'}
               </button>
             </div>
           )}
           <div className="card">
             <h3 className="font-semibold text-text-primary mb-3">Nächste Termine</h3>
-            {f ? (
+            {loading ? (
               <div className="flex justify-center py-4">
                 <Spinner />
               </div>
-            ) : oe.length === 0 ? (
+            ) : upcoming.length === 0 ? (
               <div className="text-sm text-text-muted">Keine anstehenden Termine</div>
             ) : (
               <div className="space-y-2">
-                {oe.map((e) => {
-                  let t = r ? m.find((t) => t.id === e.client_id)?.name : null
+                {upcoming.map((event) => {
+                  let clientName = isCoach ? clients.find((client) => client.id === event.client_id)?.name : null
                   return (
-                    <div className="flex items-start gap-3" key={e.id}>
+                    <div className="flex items-start gap-3" key={event.id}>
                       <div className="text-center shrink-0 w-10">
                         <div className="text-xs text-text-muted">
-                          {format(parseISO(e.datum), 'MMM', {
+                          {format(parseISO(event.datum), 'MMM', {
                             locale: de,
                           })}
                         </div>
                         <div className="text-lg font-bold text-text-primary leading-none">
-                          {format(parseISO(e.datum), 'd')}
+                          {format(parseISO(event.datum), 'd')}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div
-                          className={`text-xs font-medium inline-block px-2 py-0.5 rounded-full border ${X4[e.typ]}`}
+                          className={`text-xs font-medium inline-block px-2 py-0.5 rounded-full border ${X4[event.typ]}`}
                         >
-                          {e.typ}
+                          {event.typ}
                         </div>
-                        <div className="text-sm text-text-primary mt-0.5 truncate">{e.titel}</div>
-                        {t && <div className="text-xs text-text-muted">👤 {t}</div>}
-                        {e.uhrzeit && <div className="text-xs text-text-muted">{e.uhrzeit.slice(0, 5)}</div>}
-                        {ne(e.vorlage_id) && (
+                        <div className="text-sm text-text-primary mt-0.5 truncate">{event.titel}</div>
+                        {clientName && <div className="text-xs text-text-muted">👤 {clientName}</div>}
+                        {event.uhrzeit && <div className="text-xs text-text-muted">{event.uhrzeit.slice(0, 5)}</div>}
+                        {workoutName(event.vorlage_id) && (
                           <div className="text-xs text-text-muted flex items-center gap-1">
-                            <Layers size={11} aria-hidden="true" /> {ne(e.vorlage_id)}
+                            <Layers size={11} aria-hidden="true" /> {workoutName(event.vorlage_id)}
                           </div>
                         )}
                       </div>
-                      {ie(e) && (
+                      {isPlannedToday(event) && (
                         <button
-                          onClick={() => n(`/training?start=${e.vorlage_id}`)}
+                          onClick={() => navigate(`/training?start=${event.vorlage_id}`)}
                           className="btn-primary !px-3 !py-1.5 text-xs flex items-center gap-1.5 shrink-0"
-                          aria-label={`Training starten: ${e.titel}`}
+                          aria-label={`Training starten: ${event.titel}`}
                         >
                           <Play size={12} aria-hidden="true" /> Starten
                         </button>
@@ -469,11 +469,11 @@ export function Calendar() {
         </div>
       </div>
       <Modal
-        open={x}
+        open={modalOpen}
         onClose={() => {
-          ;(S(false), w(null), O(Z4))
+          ;(setModalOpen(false), setEditingId(null), setForm(Z4))
         }}
-        title={C ? 'Termin bearbeiten' : r ? 'Termin erstellen' : 'Training planen'}
+        title={editingId ? 'Termin bearbeiten' : isCoach ? 'Termin erstellen' : 'Training planen'}
       >
         <div className="space-y-4">
           <div>
@@ -482,33 +482,33 @@ export function Calendar() {
               type="text"
               className="input"
               placeholder="Z.B. Pull Day Training"
-              value={D.titel}
-              onChange={(e) =>
-                O((t) => ({
-                  ...t,
-                  titel: e.target.value,
+              value={form.titel}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  titel: event.target.value,
                 }))
               }
               autoFocus
             />
           </div>
-          {r && m.length > 0 && (
+          {isCoach && clients.length > 0 && (
             <div>
               <label className="label">Klient</label>
               <select
                 className="input"
-                value={D.client_id}
-                onChange={(e) =>
-                  O((t) => ({
-                    ...t,
-                    client_id: e.target.value,
+                value={form.client_id}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    client_id: event.target.value,
                   }))
                 }
               >
                 <option value="">— Kein Klient (nur für mich) —</option>
-                {m.map((e) => (
-                  <option value={e.id} key={e.id}>
-                    {e.name ?? e.email}
+                {clients.map((client) => (
+                  <option value={client.id} key={client.id}>
+                    {client.name ?? client.email}
                   </option>
                 ))}
               </select>
@@ -520,11 +520,11 @@ export function Calendar() {
               <input
                 type="date"
                 className="input"
-                value={D.datum}
-                onChange={(e) =>
-                  O((t) => ({
-                    ...t,
-                    datum: e.target.value,
+                value={form.datum}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    datum: event.target.value,
                   }))
                 }
               />
@@ -534,11 +534,11 @@ export function Calendar() {
               <input
                 type="time"
                 className="input"
-                value={D.uhrzeit}
-                onChange={(e) =>
-                  O((t) => ({
-                    ...t,
-                    uhrzeit: e.target.value,
+                value={form.uhrzeit}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    uhrzeit: event.target.value,
                   }))
                 }
               />
@@ -547,11 +547,11 @@ export function Calendar() {
               <label className="label">Typ</label>
               <select
                 className="input"
-                value={D.typ}
-                onChange={(e) =>
-                  O((t) => ({
-                    ...t,
-                    typ: e.target.value,
+                value={form.typ}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    typ: event.target.value,
                   }))
                 }
               >
@@ -566,57 +566,57 @@ export function Calendar() {
                 type="number"
                 className="input"
                 placeholder="60"
-                value={D.dauer_min}
-                onChange={(e) =>
-                  O((t) => ({
-                    ...t,
-                    dauer_min: e.target.value,
+                value={form.dauer_min}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    dauer_min: event.target.value,
                   }))
                 }
               />
             </div>
           </div>
-          {!r && (
+          {!isCoach && (
             <div>
               <label className="label" htmlFor="cal-vorlage">
                 Trainingsvorlage
               </label>
-              {i.length > 0 ? (
+              {workouts.length > 0 ? (
                 <select
                   id="cal-vorlage"
                   className="input"
-                  value={D.vorlage_id}
-                  onChange={(e) => {
-                    let t = i.find((t) => t.id === e.target.value)
-                    O((n) => {
-                      let r = !n.titel || i.some((e) => e3(e) === n.titel)
+                  value={form.vorlage_id}
+                  onChange={(event) => {
+                    let chosen = workouts.find((item) => item.id === event.target.value)
+                    setForm((prev) => {
+                      let titleIsAuto = !prev.titel || workouts.some((item) => e3(item) === prev.titel)
                       return {
-                        ...n,
-                        vorlage_id: e.target.value,
-                        typ: t ? 'training' : n.typ,
-                        titel: t && r ? e3(t) : n.titel,
+                        ...prev,
+                        vorlage_id: event.target.value,
+                        typ: chosen ? 'training' : prev.typ,
+                        titel: chosen && titleIsAuto ? e3(chosen) : prev.titel,
                       }
                     })
                   }}
                 >
                   <option value="">Keine Vorlage</option>
-                  {Array.from(new Set(i.map((e) => e.plan_name ?? ''))).map((e) =>
-                    e ? (
-                      <optgroup label={e} key={e}>
-                        {i
-                          .filter((t) => t.plan_name === e)
-                          .map((e) => (
-                            <option value={e.id} key={e.id}>
-                              {e3(e)}
+                  {Array.from(new Set(workouts.map((item) => item.plan_name ?? ''))).map((planName) =>
+                    planName ? (
+                      <optgroup label={planName} key={planName}>
+                        {workouts
+                          .filter((item) => item.plan_name === planName)
+                          .map((item) => (
+                            <option value={item.id} key={item.id}>
+                              {e3(item)}
                             </option>
                           ))}
                       </optgroup>
                     ) : (
-                      i
-                        .filter((e) => !e.plan_name)
-                        .map((e) => (
-                          <option value={e.id} key={e.id}>
-                            {e.name}
+                      workouts
+                        .filter((item) => !item.plan_name)
+                        .map((item) => (
+                          <option value={item.id} key={item.id}>
+                            {item.name}
                           </option>
                         ))
                     ),
@@ -627,7 +627,7 @@ export function Calendar() {
                   Noch keine Vorlage vorhanden. Lege unter{' '}
                   <button
                     type="button"
-                    onClick={() => n('/training?tab=vorlagen')}
+                    onClick={() => navigate('/training?tab=vorlagen')}
                     className="text-brand font-semibold underline underline-offset-2"
                   >
                     Training, Vorlagen
@@ -644,23 +644,23 @@ export function Calendar() {
             <select
               id="cal-remind"
               className="input"
-              value={D.erinnerung}
-              disabled={!D.uhrzeit}
-              onChange={(e) =>
-                O((t) => ({
-                  ...t,
-                  erinnerung: e.target.value,
+              value={form.erinnerung}
+              disabled={!form.uhrzeit}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  erinnerung: event.target.value,
                 }))
               }
             >
-              <option value="">{r ? 'Standard des Klienten' : `Standard (${$4(o)})`}</option>
-              {Q4.map((e) => (
-                <option value={e.value} key={e.value}>
-                  {e.label}
+              <option value="">{isCoach ? 'Standard des Klienten' : `Standard (${$4(reminderDefault)})`}</option>
+              {Q4.map((choice) => (
+                <option value={choice.value} key={choice.value}>
+                  {choice.label}
                 </option>
               ))}
             </select>
-            {!D.uhrzeit && (
+            {!form.uhrzeit && (
               <p className="text-xs text-text-muted mt-1">
                 Trage eine Uhrzeit ein, dann erinnert dich HLX Together per Push.
               </p>
@@ -672,26 +672,26 @@ export function Calendar() {
               type="text"
               className="input"
               placeholder="Optional"
-              value={D.notizen}
-              onChange={(e) =>
-                O((t) => ({
-                  ...t,
-                  notizen: e.target.value,
+              value={form.notizen}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  notizen: event.target.value,
                 }))
               }
             />
           </div>
-          {!C && (
+          {!editingId && (
             <div className="border border-border rounded-xl p-3 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   className="accent-brand"
-                  checked={D.recurring}
-                  onChange={(e) =>
-                    O((t) => ({
-                      ...t,
-                      recurring: e.target.checked,
+                  checked={form.recurring}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      recurring: event.target.checked,
                     }))
                   }
                 />
@@ -699,17 +699,17 @@ export function Calendar() {
                   <RefreshCw size={14} className="text-brand" /> Wiederkehrender Termin
                 </span>
               </label>
-              {D.recurring && (
+              {form.recurring && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-text-muted mb-1 block">Frequenz</label>
                     <select
                       className="input text-sm"
-                      value={D.recur_freq}
-                      onChange={(e) =>
-                        O((t) => ({
-                          ...t,
-                          recur_freq: e.target.value,
+                      value={form.recur_freq}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          recur_freq: event.target.value,
                         }))
                       }
                     >
@@ -725,11 +725,11 @@ export function Calendar() {
                       className="input text-sm"
                       min="2"
                       max="52"
-                      value={D.recur_count}
-                      onChange={(e) =>
-                        O((t) => ({
-                          ...t,
-                          recur_count: e.target.value,
+                      value={form.recur_count}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          recur_count: event.target.value,
                         }))
                       }
                     />
@@ -741,19 +741,19 @@ export function Calendar() {
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => {
-                ;(S(false), w(null), O(Z4))
+                ;(setModalOpen(false), setEditingId(null), setForm(Z4))
               }}
               className="btn-secondary flex-1"
             >
               Abbrechen
             </button>
             <button
-              onClick={P}
+              onClick={saveEvent}
               className="btn-primary flex-1 flex items-center justify-center gap-2"
-              disabled={T || !D.titel}
+              disabled={saving || !form.titel}
             >
-              {T && <Spinner size={16} />}
-              {D.recurring && !C ? `${D.recur_count}× speichern` : 'Speichern'}
+              {saving && <Spinner size={16} />}
+              {form.recurring && !editingId ? `${form.recur_count}× speichern` : 'Speichern'}
             </button>
           </div>
         </div>
