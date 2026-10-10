@@ -32,15 +32,15 @@ import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Modal } from '../../components/ui/Modal'
 
-export const TQ = ['Kraft', 'Cardio', 'HIIT', 'Yoga', 'Stretching', 'Schwimmen', 'Radfahren', 'Laufen', 'Sonstiges']
-export const EQ = ({ active: e, payload: t, label: n }) =>
-  !e || !t?.length ? null : (
+export const TRAINING_TYPES = ['Kraft', 'Cardio', 'HIIT', 'Yoga', 'Stretching', 'Schwimmen', 'Radfahren', 'Laufen', 'Sonstiges']
+export const DurationTooltip = ({ active: isActive, payload: tooltipItems, label: tooltipLabel }) =>
+  !isActive || !tooltipItems?.length ? null : (
     <div className="card !p-3 text-xs">
-      <div className="text-text-muted mb-1">{n}</div>
-      <div className="text-text-primary font-bold">{t[0]?.value} min</div>
+      <div className="text-text-muted mb-1">{tooltipLabel}</div>
+      <div className="text-text-primary font-bold">{tooltipItems[0]?.value} min</div>
     </div>
   )
-export const DQ = {
+export const EXERCISE_TIPS = {
   bankdrücken: {
     muskel: 'Brust (Pectoralis)',
     sekundaer: 'Trizeps · Vordere Schulter',
@@ -745,7 +745,7 @@ export const DQ = {
     fehler: ['Nicht tief genug gehen', 'Knie nach innen fallen lassen', 'Oberkörper zu weit vorbeugen'],
   },
 }
-export const OQ = {
+export const EXERCISE_ALIASES = {
   'lat pulldown': 'latzug',
   'lat-pulldown': 'latzug',
   latziehen: 'latzug',
@@ -846,25 +846,25 @@ export const OQ = {
   chinup: 'klimmzug',
   'pull-up': 'klimmzug',
 }
-export function kQ(e) {
-  let t = e.toLowerCase().trim()
-  if (DQ[t]) return DQ[t]
-  let n = OQ[t]
-  if (n && DQ[n]) return DQ[n]
-  let r = Object.keys(DQ).find((e) => t.includes(e) || e.includes(t))
-  if (r) return DQ[r]
-  let i = Object.entries(OQ).find(([e]) => t.includes(e) || e.includes(t))
-  return i ? DQ[i[1]] : null
+export function findTips(exerciseKey) {
+  let lowered = exerciseKey.toLowerCase().trim()
+  if (EXERCISE_TIPS[lowered]) return EXERCISE_TIPS[lowered]
+  let aliasTarget = EXERCISE_ALIASES[lowered]
+  if (aliasTarget && EXERCISE_TIPS[aliasTarget]) return EXERCISE_TIPS[aliasTarget]
+  let partialKey = Object.keys(EXERCISE_TIPS).find((tipKey) => lowered.includes(tipKey) || tipKey.includes(lowered))
+  if (partialKey) return EXERCISE_TIPS[partialKey]
+  let aliasMatch = Object.entries(EXERCISE_ALIASES).find(([aliasKey]) => lowered.includes(aliasKey) || aliasKey.includes(lowered))
+  return aliasMatch ? EXERCISE_TIPS[aliasMatch[1]] : null
 }
-export async function AQ() {
+export async function loadPool() {
   try {
     return await loadExerciseData()
   } catch {
     return []
   }
 }
-export const jQ = (e, t) => findExercise(e, t) ?? null
-export const MQ = {
+export const findPoolExercise = (exerciseName, pool) => findExercise(exerciseName, pool) ?? null
+export const MUSCLE_LABELS = {
   chest: 'Brust',
   shoulder: 'Schultern',
   bicep: 'Bizeps',
@@ -878,52 +878,52 @@ export const MQ = {
   glute: 'Gesäß',
   calf: 'Waden',
 }
-export function NQ({ name: e, onClose: t }) {
-  let n = kQ(e),
-    [r, i] = useState(null),
-    [a, o] = useState(true),
-    s = `https://www.youtube.com/results?search_query=${encodeURIComponent(e + ' richtige Ausführung Technik')}`
+export function TipsDialog({ name: tipsName, onClose: closeDialog }) {
+  let tips = findTips(tipsName),
+    [poolExercise, setPoolExercise] = useState(null),
+    [loading, setLoading] = useState(true),
+    youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(tipsName + ' richtige Ausführung Technik')}`
   return (
     useEffect(() => {
-      ;(o(true),
-        i(null),
-        AQ().then((t) => {
-          ;(i(jQ(e, t)), o(false))
+      ;(setLoading(true),
+        setPoolExercise(null),
+        loadPool().then((poolData) => {
+          ;(setPoolExercise(findPoolExercise(tipsName, poolData)), setLoading(false))
         }))
-    }, [e]),
+    }, [tipsName]),
     (
       <div
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-        onClick={t}
+        onClick={closeDialog}
       >
         <div
           className="bg-bg-card rounded-2xl border border-border w-full max-w-sm overflow-y-auto"
           style={{
             maxHeight: '90vh',
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-start justify-between p-5 pb-4">
             <div>
-              <div className="font-bold text-text-primary capitalize text-base">{e}</div>
-              {n ? (
+              <div className="font-bold text-text-primary capitalize text-base">{tipsName}</div>
+              {tips ? (
                 <>
-                  <div className="text-xs text-brand font-medium mt-0.5">{n.muskel}</div>
-                  <div className="text-xs text-text-muted">{n.sekundaer}</div>
+                  <div className="text-xs text-brand font-medium mt-0.5">{tips.muskel}</div>
+                  <div className="text-xs text-text-muted">{tips.sekundaer}</div>
                 </>
-              ) : r?.target_de ? (
+              ) : poolExercise?.target_de ? (
                 <div className="text-xs text-brand font-medium mt-0.5">
-                  {r.target_de}
-                  {r.body_part_de ? ` · ${r.body_part_de}` : ''}
+                  {poolExercise.target_de}
+                  {poolExercise.body_part_de ? ` · ${poolExercise.body_part_de}` : ''}
                 </div>
               ) : null}
             </div>
-            <button onClick={t} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0 ml-3">
+            <button onClick={closeDialog} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0 ml-3">
               <X size={16} />
             </button>
           </div>
           <div className="px-5 pb-6 space-y-5">
-            {a ? (
+            {loading ? (
               <div
                 className="w-full rounded-xl bg-bg-elevated flex items-center justify-center"
                 style={{
@@ -932,7 +932,7 @@ export function NQ({ name: e, onClose: t }) {
               >
                 <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : r ? (
+            ) : poolExercise ? (
               <div
                 className="w-full rounded-xl overflow-hidden bg-bg-elevated"
                 style={{
@@ -940,22 +940,22 @@ export function NQ({ name: e, onClose: t }) {
                 }}
               >
                 <img
-                  src={exerciseGifUrl(r)}
+                  src={exerciseGifUrl(poolExercise)}
                   alt=""
                   className="w-full h-full object-contain"
-                  onError={(e) => {
-                    let t = e.currentTarget
-                    t.dataset.fb || ((t.dataset.fb = '1'), (t.src = exerciseImageUrl(r)))
+                  onError={(event) => {
+                    let imageEl = event.currentTarget
+                    imageEl.dataset.fb || ((imageEl.dataset.fb = '1'), (imageEl.src = exerciseImageUrl(poolExercise)))
                   }}
                 />
               </div>
             ) : null}
-            {n ? (
+            {tips ? (
               <>
                 <div className="flex flex-wrap gap-1.5">
-                  {n.muskeln.map((e) => (
-                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-brand/20 text-brand font-medium" key={e}>
-                      {MQ[e] ?? e}
+                  {tips.muskeln.map((muscleKey) => (
+                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-brand/20 text-brand font-medium" key={muscleKey}>
+                      {MUSCLE_LABELS[muscleKey] ?? muscleKey}
                     </span>
                   ))}
                 </div>
@@ -963,19 +963,19 @@ export function NQ({ name: e, onClose: t }) {
                   <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
                     Warum diese Übung?
                   </div>
-                  <p className="text-sm text-text-secondary leading-relaxed">{n.warum}</p>
+                  <p className="text-sm text-text-secondary leading-relaxed">{tips.warum}</p>
                 </div>
                 <div>
                   <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
                     Richtige Ausführung
                   </div>
                   <ul className="space-y-2">
-                    {n.tipps.map((e, t) => (
-                      <li className="flex gap-2.5 text-sm text-text-secondary" key={t}>
+                    {tips.tipps.map((tip, tipIndex) => (
+                      <li className="flex gap-2.5 text-sm text-text-secondary" key={tipIndex}>
                         <span className="w-5 h-5 rounded-full bg-brand/20 text-brand text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {t + 1}
+                          {tipIndex + 1}
                         </span>
-                        {e}
+                        {tip}
                       </li>
                     ))}
                   </ul>
@@ -985,38 +985,38 @@ export function NQ({ name: e, onClose: t }) {
                     Häufige Fehler
                   </div>
                   <ul className="space-y-1.5">
-                    {n.fehler.map((e, t) => (
-                      <li className="flex gap-2 text-sm text-text-secondary" key={t}>
+                    {tips.fehler.map((mistake, mistakeIndex) => (
+                      <li className="flex gap-2 text-sm text-text-secondary" key={mistakeIndex}>
                         <span className="text-danger shrink-0">✕</span>
-                        {e}
+                        {mistake}
                       </li>
                     ))}
                   </ul>
                 </div>
               </>
-            ) : r?.steps?.length ? (
+            ) : poolExercise?.steps?.length ? (
               <div>
                 <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
                   Richtige Ausführung
                 </div>
                 <ul className="space-y-2">
-                  {r.steps.map((e, t) => (
-                    <li className="flex gap-2.5 text-sm text-text-secondary" key={t}>
+                  {poolExercise.steps.map((stepText, stepIndex) => (
+                    <li className="flex gap-2.5 text-sm text-text-secondary" key={stepIndex}>
                       <span className="w-5 h-5 rounded-full bg-brand/20 text-brand text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                        {t + 1}
+                        {stepIndex + 1}
                       </span>
-                      {e}
+                      {stepText}
                     </li>
                   ))}
                 </ul>
               </div>
-            ) : a ? null : (
+            ) : loading ? null : (
               <p className="text-sm text-text-muted">
-                Für <span className="text-text-primary font-medium">"{e}"</span> sind noch keine Tipps hinterlegt.
+                Für <span className="text-text-primary font-medium">"{tipsName}"</span> sind noch keine Tipps hinterlegt.
               </p>
             )}
             <a
-              href={s}
+              href={youtubeUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border hover:border-brand/50 hover:bg-brand/5 text-sm text-text-secondary hover:text-brand transition-colors"
@@ -1029,11 +1029,11 @@ export function NQ({ name: e, onClose: t }) {
     )
   )
 }
-export function FQ({ entries: e, onChange: t }) {
-  let [n, r] = useState(null)
-  function i() {
-    t([
-      ...e,
+export function ExerciseRows({ entries: rowList, onChange: onChangeRows }) {
+  let [tipsFor, setTipsFor] = useState(null)
+  function addRow() {
+    onChangeRows([
+      ...rowList,
       {
         uebungsname: '',
         saetze: '',
@@ -1043,33 +1043,33 @@ export function FQ({ entries: e, onChange: t }) {
       },
     ])
   }
-  function a(n) {
-    t(e.filter((e, t) => t !== n))
+  function removeRow(rowIndex) {
+    onChangeRows(rowList.filter((row, index) => index !== rowIndex))
   }
-  function o(n, r, i) {
-    let a = [...e]
-    ;((a[n] = {
-      ...a[n],
-      [r]: i,
+  function updateRow(index, field, newValue) {
+    let copy = [...rowList]
+    ;((copy[index] = {
+      ...copy[index],
+      [field]: newValue,
     }),
-      t(a))
+      onChangeRows(copy))
   }
   return (
     <div className="space-y-3">
-      {n && <NQ name={n} onClose={() => r(null)} />}
-      {e.map((e, t) => (
-        <div className="p-3 bg-bg-elevated rounded-lg space-y-2" key={t}>
+      {tipsFor && <TipsDialog name={tipsFor} onClose={() => setTipsFor(null)} />}
+      {rowList.map((row, rowIndex) => (
+        <div className="p-3 bg-bg-elevated rounded-lg space-y-2" key={rowIndex}>
           <div className="flex gap-2">
-            <ExerciseNameInput value={e.uebungsname} onChange={(e) => o(t, 'uebungsname', e)} />
+            <ExerciseNameInput value={row.uebungsname} onChange={(nameValue) => updateRow(rowIndex, 'uebungsname', nameValue)} />
             <button
-              onClick={() => r(e.uebungsname || null)}
+              onClick={() => setTipsFor(row.uebungsname || null)}
               title="Tipps anzeigen"
               className="p-2 rounded-lg border border-border hover:bg-brand/10 hover:text-brand text-text-muted transition-colors"
             >
               <CircleQuestionMark size={14} />
             </button>
             <button
-              onClick={() => a(t)}
+              onClick={() => removeRow(rowIndex)}
               className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted"
             >
               <Trash2 size={14} />
@@ -1082,8 +1082,8 @@ export function FQ({ entries: e, onChange: t }) {
                 type="number"
                 className="input text-sm py-2"
                 placeholder="3"
-                value={e.saetze}
-                onChange={(e) => o(t, 'saetze', e.target.value)}
+                value={row.saetze}
+                onChange={(event) => updateRow(rowIndex, 'saetze', event.target.value)}
               />
             </div>
             <div>
@@ -1092,8 +1092,8 @@ export function FQ({ entries: e, onChange: t }) {
                 type="number"
                 className="input text-sm py-2"
                 placeholder="10"
-                value={e.wdh}
-                onChange={(e) => o(t, 'wdh', e.target.value)}
+                value={row.wdh}
+                onChange={(event) => updateRow(rowIndex, 'wdh', event.target.value)}
               />
             </div>
             <div>
@@ -1103,8 +1103,8 @@ export function FQ({ entries: e, onChange: t }) {
                 step="0.5"
                 className="input text-sm py-2"
                 placeholder="80"
-                value={e.gewicht_kg}
-                onChange={(e) => o(t, 'gewicht_kg', e.target.value)}
+                value={row.gewicht_kg}
+                onChange={(event) => updateRow(rowIndex, 'gewicht_kg', event.target.value)}
               />
             </div>
           </div>
@@ -1114,139 +1114,139 @@ export function FQ({ entries: e, onChange: t }) {
               type="text"
               className="input text-sm py-2"
               placeholder="z. B. Sitzhöhe 4, linke Schulter zwickt"
-              value={e.notizen}
-              onChange={(e) => o(t, 'notizen', e.target.value)}
+              value={row.notizen}
+              onChange={(event) => updateRow(rowIndex, 'notizen', event.target.value)}
             />
           </div>
         </div>
       ))}
-      <button onClick={i} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+      <button onClick={addRow} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
         <Plus size={14} /> Übung hinzufügen
       </button>
     </div>
   )
 }
-export const IQ = 120
-export const LQ = 'hlx_activeWorkout'
-export function RQ({ workout: e, onFinish: t, onAbort: n }) {
-  let [r, i] = useState(e.exercises),
-    [a, o] = useState(0),
-    [s, c] = useState(null),
-    [l, u] = useState(null),
-    [d, f] = useState(''),
-    [p, m] = useState({})
-  function h(e, t) {
-    i((n) =>
-      n.map((n, r) =>
-        r === e
+export const REST_SECONDS = 120
+export const ACTIVE_WORKOUT_KEY = 'hlx_activeWorkout'
+export function WorkoutRunner({ workout: runningWorkout, onFinish: finishWorkout, onAbort: abortWorkout }) {
+  let [workoutList, setExercises] = useState(runningWorkout.exercises),
+    [elapsedSec, setElapsedSec] = useState(0),
+    [tipsOf, setTipsOf] = useState(null),
+    [rest, setRest] = useState(null),
+    [newName, setNewName] = useState(''),
+    [noteOpen, setNoteOpen] = useState({})
+  function setNote(exerciseIndex, noteText) {
+    setExercises((itemList) =>
+      itemList.map((exerciseItem, itemIndex) =>
+        itemIndex === exerciseIndex
           ? {
-              ...n,
-              note: t,
+              ...exerciseItem,
+              note: noteText,
             }
-          : n,
+          : exerciseItem,
       ),
     )
   }
   ;(useEffect(() => {
     localStorage.setItem(
-      LQ,
+      ACTIVE_WORKOUT_KEY,
       JSON.stringify({
-        ...e,
-        exercises: r,
+        ...runningWorkout,
+        exercises: workoutList,
       }),
     )
-  }, [r]),
+  }, [workoutList]),
     useEffect(() => {
-      let t = setInterval(() => o(Math.floor((Date.now() - e.startTime) / 1e3)), 1e3)
-      return () => clearInterval(t)
-    }, [e.startTime]),
+      let timer = setInterval(() => setElapsedSec(Math.floor((Date.now() - runningWorkout.startTime) / 1e3)), 1e3)
+      return () => clearInterval(timer)
+    }, [runningWorkout.startTime]),
     useEffect(() => {
-      if (!l) return
-      if (l.remaining <= 0) {
-        u(null)
+      if (!rest) return
+      if (rest.remaining <= 0) {
+        setRest(null)
         return
       }
-      let e = setTimeout(
+      let timeout = setTimeout(
         () =>
-          u((e) =>
-            e
+          setRest((prevRest) =>
+            prevRest
               ? {
-                  ...e,
-                  remaining: e.remaining - 1,
+                  ...prevRest,
+                  remaining: prevRest.remaining - 1,
                 }
               : null,
           ),
         1e3,
       )
-      return () => clearTimeout(e)
-    }, [l]))
-  function g(e, t, n, r) {
-    i((i) => {
-      let a = i.map((e) => ({
-        ...e,
-        sets: [...e.sets],
+      return () => clearTimeout(timeout)
+    }, [rest]))
+  function updateSet(exerciseIndex, setIndex, field, newValue) {
+    setExercises((itemList) => {
+      let copy = itemList.map((exerciseItem) => ({
+        ...exerciseItem,
+        sets: [...exerciseItem.sets],
       }))
       return (
-        (a[e].sets[t] = {
-          ...a[e].sets[t],
-          [n]: r,
+        (copy[exerciseIndex].sets[setIndex] = {
+          ...copy[exerciseIndex].sets[setIndex],
+          [field]: newValue,
         }),
-        a
+        copy
       )
     })
   }
-  function _(e, t) {
-    i((n) => {
-      let r = n.map((e) => ({
-          ...e,
-          sets: [...e.sets],
+  function toggleSet(exerciseIndex, setIndex) {
+    setExercises((itemList) => {
+      let copy = itemList.map((exerciseItem) => ({
+          ...exerciseItem,
+          sets: [...exerciseItem.sets],
         })),
-        i = r[e].sets[t].done
+        wasDone = copy[exerciseIndex].sets[setIndex].done
       return (
-        (r[e].sets[t] = {
-          ...r[e].sets[t],
-          done: !i,
+        (copy[exerciseIndex].sets[setIndex] = {
+          ...copy[exerciseIndex].sets[setIndex],
+          done: !wasDone,
         }),
-        u(
-          i
+        setRest(
+          wasDone
             ? null
             : {
-                exIdx: e,
-                setIdx: t,
-                remaining: IQ,
+                exIdx: exerciseIndex,
+                setIdx: setIndex,
+                remaining: REST_SECONDS,
               },
         ),
-        r
+        copy
       )
     })
   }
-  function y(e) {
-    i((t) => {
-      let n = t.map((e) => ({
-          ...e,
-          sets: [...e.sets],
+  function addSet(exerciseIndex) {
+    setExercises((itemList) => {
+      let copy = itemList.map((exerciseItem) => ({
+          ...exerciseItem,
+          sets: [...exerciseItem.sets],
         })),
-        r = n[e].sets.at(-1)
+        lastSet = copy[exerciseIndex].sets.at(-1)
       return (
-        n[e].sets.push({
-          wdh: r?.wdh ?? '',
-          kg: r?.kg ?? '',
+        copy[exerciseIndex].sets.push({
+          wdh: lastSet?.wdh ?? '',
+          kg: lastSet?.kg ?? '',
           done: false,
         }),
-        n
+        copy
       )
     })
   }
-  function b(e) {
-    i((t) => t.filter((t, n) => n !== e))
+  function removeExercise(exerciseIndex) {
+    setExercises((itemList) => itemList.filter((item, position) => position !== exerciseIndex))
   }
-  function x() {
-    let e = d.trim()
-    e &&
-      (i((t) => [
-        ...t,
+  function addExercise() {
+    let trimmed = newName.trim()
+    trimmed &&
+      (setExercises((itemList) => [
+        ...itemList,
         {
-          name: e,
+          name: trimmed,
           sets: [
             {
               wdh: '',
@@ -1268,35 +1268,35 @@ export function RQ({ workout: e, onFinish: t, onAbort: n }) {
           note: '',
         },
       ]),
-      f(''))
+      setNewName(''))
   }
-  let S = r.reduce((e, t) => e + t.sets.filter((e) => e.done).length, 0),
-    C = r.reduce((e, t) => e + t.sets.length, 0),
-    w = Math.floor(a / 60)
+  let doneSets = workoutList.reduce((sum, exerciseItem) => sum + exerciseItem.sets.filter((setRow) => setRow.done).length, 0),
+    totalSets = workoutList.reduce((sum, exerciseItem) => sum + exerciseItem.sets.length, 0),
+    minutes = Math.floor(elapsedSec / 60)
       .toString()
       .padStart(2, '0'),
-    T = (a % 60).toString().padStart(2, '0')
+    seconds = (elapsedSec % 60).toString().padStart(2, '0')
   return (
     <div className="fixed inset-0 z-40 bg-bg overflow-y-auto">
-      {s && <NQ name={s} onClose={() => c(null)} />}
+      {tipsOf && <TipsDialog name={tipsOf} onClose={() => setTipsOf(null)} />}
       <div className="sticky top-0 z-10 bg-bg-card/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between">
         <div>
-          <div className="font-bold text-text-primary">{e.vorlage.name}</div>
+          <div className="font-bold text-text-primary">{runningWorkout.vorlage.name}</div>
           <div className="text-xs text-text-muted flex items-center gap-1.5 mt-0.5">
-            <Timer size={11} /> {w}:{T} · {S}/{C} Sätze
-            {l && (
+            <Timer size={11} /> {minutes}:{seconds} · {doneSets}/{totalSets} Sätze
+            {rest && (
               <span className="ml-2 text-brand font-semibold">
-                Pause {Math.floor(l.remaining / 60)}:{String(l.remaining % 60).padStart(2, '0')}
+                Pause {Math.floor(rest.remaining / 60)}:{String(rest.remaining % 60).padStart(2, '0')}
               </span>
             )}
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={n} className="btn-secondary text-sm px-3 py-1.5">
+          <button onClick={abortWorkout} className="btn-secondary text-sm px-3 py-1.5">
             Abbrechen
           </button>
           <button
-            onClick={() => t(r, Math.floor(a / 60))}
+            onClick={() => finishWorkout(workoutList, Math.floor(elapsedSec / 60))}
             className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5"
           >
             <Check size={14} /> Beenden
@@ -1304,22 +1304,22 @@ export function RQ({ workout: e, onFinish: t, onAbort: n }) {
         </div>
       </div>
       <div className="p-4 space-y-4 max-w-lg mx-auto pb-8">
-        {r.map((e, t) => (
+        {workoutList.map((exerciseItem, exerciseIndex) => (
           <div
-            className={`card transition-opacity ${e.sets.length > 0 && e.sets.every((e) => e.done) ? 'opacity-50' : ''}`}
-            key={t}
+            className={`card transition-opacity ${exerciseItem.sets.length > 0 && exerciseItem.sets.every((setRow) => setRow.done) ? 'opacity-50' : ''}`}
+            key={exerciseIndex}
           >
             <div className="flex items-center justify-between mb-4">
-              <span className="font-bold text-text-primary text-base">{e.name}</span>
+              <span className="font-bold text-text-primary text-base">{exerciseItem.name}</span>
               <div className="flex gap-1.5">
                 <button
-                  onClick={() => c(e.name)}
+                  onClick={() => setTipsOf(exerciseItem.name)}
                   className="p-1.5 rounded-lg border border-border hover:bg-brand/10 hover:text-brand text-text-muted transition-colors"
                 >
                   <CircleQuestionMark size={14} />
                 </button>
                 <button
-                  onClick={() => b(t)}
+                  onClick={() => removeExercise(exerciseIndex)}
                   className="p-1.5 rounded-lg border border-border hover:bg-danger/10 hover:text-danger text-text-muted transition-colors"
                 >
                   <X size={14} />
@@ -1333,48 +1333,48 @@ export function RQ({ workout: e, onFinish: t, onAbort: n }) {
               <span className="text-center">Wdh.</span>
               <span />
             </div>
-            {e.sets.map((n, r) => {
-              let i = e.prevSets[r],
-                a = i?.kg ? `${i.kg} kg × ${i.wdh ?? '?'}` : '—',
-                o = l?.exIdx === t && l?.setIdx === r
+            {exerciseItem.sets.map((setRow, setIndex) => {
+              let previous = exerciseItem.prevSets[setIndex],
+                previousText = previous?.kg ? `${previous.kg} kg × ${previous.wdh ?? '?'}` : '—',
+                isResting = rest?.exIdx === exerciseIndex && rest?.setIdx === setIndex
               return (
-                <div key={r}>
+                <div key={setIndex}>
                   <div
-                    className={`grid grid-cols-[36px_1fr_76px_76px_40px] gap-2 items-center py-1 transition-opacity ${n.done ? 'opacity-40' : ''}`}
+                    className={`grid grid-cols-[36px_1fr_76px_76px_40px] gap-2 items-center py-1 transition-opacity ${setRow.done ? 'opacity-40' : ''}`}
                   >
                     <span className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center text-sm font-bold text-text-muted">
-                      {r + 1}
+                      {setIndex + 1}
                     </span>
-                    <span className="text-sm text-text-muted">{a}</span>
+                    <span className="text-sm text-text-muted">{previousText}</span>
                     <input
                       type="number"
                       inputMode="decimal"
                       step="0.5"
-                      value={n.kg}
-                      onChange={(e) => g(t, r, 'kg', e.target.value)}
+                      value={setRow.kg}
+                      onChange={(event) => updateSet(exerciseIndex, setIndex, 'kg', event.target.value)}
                       placeholder="—"
                       className="input text-center text-sm py-2 font-semibold"
                     />
                     <input
                       type="number"
                       inputMode="numeric"
-                      value={n.wdh}
-                      onChange={(e) => g(t, r, 'wdh', e.target.value)}
+                      value={setRow.wdh}
+                      onChange={(event) => updateSet(exerciseIndex, setIndex, 'wdh', event.target.value)}
                       placeholder="10"
                       className="input text-center text-sm py-2 font-semibold"
                     />
                     <button
-                      onClick={() => _(t, r)}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${n.done ? 'bg-success text-bg' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'}`}
+                      onClick={() => toggleSet(exerciseIndex, setIndex)}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${setRow.done ? 'bg-success text-bg' : 'bg-bg-elevated text-text-muted hover:bg-success/20 hover:text-success'}`}
                     >
                       <Check size={16} />
                     </button>
                   </div>
-                  {r < e.sets.length - 1 && (
+                  {setIndex < exerciseItem.sets.length - 1 && (
                     <div className="flex items-center gap-2 my-1 px-1">
                       <div className="flex-1 h-px bg-border" />
-                      <span className={`text-xs font-semibold ${o ? 'text-brand' : 'text-text-muted'}`}>
-                        {o ? `${Math.floor(l.remaining / 60)}:${String(l.remaining % 60).padStart(2, '0')}` : '2:00'}
+                      <span className={`text-xs font-semibold ${isResting ? 'text-brand' : 'text-text-muted'}`}>
+                        {isResting ? `${Math.floor(rest.remaining / 60)}:${String(rest.remaining % 60).padStart(2, '0')}` : '2:00'}
                       </span>
                       <div className="flex-1 h-px bg-border" />
                     </div>
@@ -1383,41 +1383,41 @@ export function RQ({ workout: e, onFinish: t, onAbort: n }) {
               )
             })}
             <button
-              onClick={() => y(t)}
+              onClick={() => addSet(exerciseIndex)}
               className="mt-3 w-full py-2.5 rounded-xl bg-bg-elevated text-sm text-text-muted hover:text-text-primary hover:bg-border transition-colors flex items-center justify-center gap-1.5"
             >
               <Plus size={14} /> Satz hinzufügen (2:00)
             </button>
-            {e.prevNote && !(p[t] ?? !!e.note) && (
+            {exerciseItem.prevNote && !(noteOpen[exerciseIndex] ?? !!exerciseItem.note) && (
               <p className="mt-3 text-xs text-text-muted flex items-start gap-1.5">
                 <StickyNote size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-                <span>Letztes Mal: {e.prevNote}</span>
+                <span>Letztes Mal: {exerciseItem.prevNote}</span>
               </p>
             )}
-            {(p[t] ?? !!e.note) ? (
+            {(noteOpen[exerciseIndex] ?? !!exerciseItem.note) ? (
               <div className="mt-3">
-                <label htmlFor={`note-${t}`} className="text-xs text-text-muted mb-1 flex items-center gap-1.5">
+                <label htmlFor={`note-${exerciseIndex}`} className="text-xs text-text-muted mb-1 flex items-center gap-1.5">
                   <StickyNote size={12} aria-hidden="true" /> Notiz zu dieser Übung
                 </label>
                 <textarea
-                  id={`note-${t}`}
+                  id={`note-${exerciseIndex}`}
                   rows={2}
                   className="input text-sm resize-none"
                   placeholder={
-                    e.prevNote
-                      ? `Letztes Mal: ${e.prevNote}`
+                    exerciseItem.prevNote
+                      ? `Letztes Mal: ${exerciseItem.prevNote}`
                       : 'z. B. Sitzhöhe 4, Schulter zwickt, nächstes Mal mehr Gewicht'
                   }
-                  value={e.note ?? ''}
-                  onChange={(e) => h(t, e.target.value)}
+                  value={exerciseItem.note ?? ''}
+                  onChange={(event) => setNote(exerciseIndex, event.target.value)}
                 />
               </div>
             ) : (
               <button
                 onClick={() =>
-                  m((e) => ({
-                    ...e,
-                    [t]: true,
+                  setNoteOpen((prev) => ({
+                    ...prev,
+                    [exerciseIndex]: true,
                   }))
                 }
                 className="mt-2 text-xs text-brand hover:text-brand/80 flex items-center gap-1.5 transition-colors"
@@ -1433,13 +1433,13 @@ export function RQ({ workout: e, onFinish: t, onAbort: n }) {
             <input
               className="input flex-1 text-sm"
               placeholder="Übungsname…"
-              value={d}
-              onChange={(e) => f(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && x()}
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && addExercise()}
             />
             <button
-              onClick={x}
-              disabled={!d.trim()}
+              onClick={addExercise}
+              disabled={!newName.trim()}
               className="btn-primary px-4 text-sm flex items-center gap-1.5 disabled:opacity-40"
             >
               <Plus size={14} /> Hinzufügen
@@ -1450,25 +1450,25 @@ export function RQ({ workout: e, onFinish: t, onAbort: n }) {
     </div>
   )
 }
-export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, startVorlageId: n, onStartHandled: r }) {
-  let { user: i } = useAuth(),
-    { colors: a } = useTheme(),
-    o = useNavigate(),
-    [s, c] = useState([]),
-    [l, u] = useState(true),
-    [d, f] = useState(false),
-    [p, m] = useState(false),
-    [h, g] = useState(null),
-    [_, y] = useState(false),
-    [b, x] = useState(null),
-    S = useRef(null),
-    [C, w] = useState([]),
-    [T, E] = useState(false),
-    D = useRef(null),
-    [O, k] = useState(''),
-    [A, j] = useState(null),
-    [M, N] = useState(null),
-    [P, F] = useState({
+export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen: openTemplates, startVorlageId: startTemplateId, onStartHandled: onStartDone }) {
+  let { user: authUser } = useAuth(),
+    { colors: chartColors } = useTheme(),
+    navigate = useNavigate(),
+    [sessions, setSessions] = useState([]),
+    [loading, setLoading] = useState(true),
+    [modalOpen, setModalOpen] = useState(false),
+    [saving, setSaving] = useState(false),
+    [editingId, setEditingId] = useState(null),
+    [analyzing, setAnalyzing] = useState(false),
+    [screenshot, setScreenshot] = useState(null),
+    fileInput = useRef(null),
+    [templates, setTemplates] = useState([]),
+    [templatesLoaded, setTemplatesLoaded] = useState(false),
+    startedRef = useRef(null),
+    [unusedText, setUnusedText] = useState(''),
+    [activeWorkout, setActiveWorkout] = useState(null),
+    [savedWorkout, setSavedWorkout] = useState(null),
+    [form, setForm] = useState({
       datum: todayISO(),
       trainingstyp: 'Kraft',
       dauer_h: '0',
@@ -1477,234 +1477,234 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
       kalorien_verbrannt: '',
       notizen: '',
     }),
-    [I, L] = useState([])
-  async function ee() {
-    if (!i) return
-    let { data: e } = await supabase.from('training').select('*').eq('user_id', i.id).order('datum', {
+    [formExercises, setFormExercises] = useState([])
+  async function loadSessions() {
+    if (!authUser) return
+    let { data: sessionRows } = await supabase.from('training').select('*').eq('user_id', authUser.id).order('datum', {
         ascending: false,
       }),
-      t = e ?? [],
-      n = t.map((e) => e.id)
-    if (n.length) {
-      let { data: e } = await supabase.from('uebungen').select('*').in('training_id', n),
-        r = (e ?? []).reduce((e, t) => (e[t.training_id] || (e[t.training_id] = []), e[t.training_id].push(t), e), {})
-      t.forEach((e) => {
-        e.uebungen = r[e.id] ?? []
+      sessionList = sessionRows ?? [],
+      sessionIds = sessionList.map((sessionRow) => sessionRow.id)
+    if (sessionIds.length) {
+      let { data: exerciseRows } = await supabase.from('uebungen').select('*').in('training_id', sessionIds),
+        byTraining = (exerciseRows ?? []).reduce((acc, row) => (acc[row.training_id] || (acc[row.training_id] = []), acc[row.training_id].push(row), acc), {})
+      sessionList.forEach((sessionItem) => {
+        sessionItem.uebungen = byTraining[sessionItem.id] ?? []
       })
     }
-    ;(c(t), u(false))
+    ;(setSessions(sessionList), setLoading(false))
   }
-  async function te() {
-    if (!i) return
-    let { data: e } = await supabase.from('training_vorlagen').select('*').eq('user_id', i.id)
-    if (!e?.length) {
-      E(true)
+  async function loadTemplates() {
+    if (!authUser) return
+    let { data: templateRows } = await supabase.from('training_vorlagen').select('*').eq('user_id', authUser.id)
+    if (!templateRows?.length) {
+      setTemplatesLoaded(true)
       return
     }
-    let { data: t } = await supabase
+    let { data: templateExercises } = await supabase
         .from('vorlagen_uebungen')
         .select('*')
         .in(
           'vorlage_id',
-          e.map((e) => e.id),
+          templateRows.map((templateRow) => templateRow.id),
         )
         .order('reihenfolge'),
-      n = (t ?? []).reduce((e, t) => (e[t.vorlage_id] || (e[t.vorlage_id] = []), e[t.vorlage_id].push(t), e), {})
-    ;(w(
-      e.map((e) => ({
-        ...e,
-        uebungen: n[e.id] ?? [],
+      byTemplate = (templateExercises ?? []).reduce((acc, row) => (acc[row.vorlage_id] || (acc[row.vorlage_id] = []), acc[row.vorlage_id].push(row), acc), {})
+    ;(setTemplates(
+      templateRows.map((templateItem) => ({
+        ...templateItem,
+        uebungen: byTemplate[templateItem.id] ?? [],
       })),
     ),
-      E(true))
+      setTemplatesLoaded(true))
   }
-  async function ne(e) {
-    if (!i) return
-    let t = (e.uebungen ?? []).map((e) => e.uebungsname).filter(Boolean),
-      n = {},
-      r = {}
-    if (t.length) {
-      let { data: e } = await supabase
+  async function startFromTemplate(template) {
+    if (!authUser) return
+    let names = (template.uebungen ?? []).map((exerciseEntry) => exerciseEntry.uebungsname).filter(Boolean),
+      previousSets = {},
+      prevNotes = {}
+    if (names.length) {
+      let { data: history } = await supabase
         .from('uebungen')
         .select('uebungsname, saetze_log, saetze, wdh, gewicht_kg, notizen')
-        .eq('user_id', i.id)
-        .in('uebungsname', t)
+        .eq('user_id', authUser.id)
+        .in('uebungsname', names)
         .order('created_at', {
           ascending: false,
         })
-      for (let t of e ?? [])
-        (t.notizen && !r[t.uebungsname] && (r[t.uebungsname] = t.notizen),
-          !n[t.uebungsname] &&
-            (Array.isArray(t.saetze_log) && t.saetze_log.length > 0
-              ? (n[t.uebungsname] = t.saetze_log)
-              : t.saetze &&
-                (n[t.uebungsname] = Array.from(
+      for (let entry of history ?? [])
+        (entry.notizen && !prevNotes[entry.uebungsname] && (prevNotes[entry.uebungsname] = entry.notizen),
+          !previousSets[entry.uebungsname] &&
+            (Array.isArray(entry.saetze_log) && entry.saetze_log.length > 0
+              ? (previousSets[entry.uebungsname] = entry.saetze_log)
+              : entry.saetze &&
+                (previousSets[entry.uebungsname] = Array.from(
                   {
-                    length: t.saetze,
+                    length: entry.saetze,
                   },
                   () => ({
-                    wdh: t.wdh ?? null,
-                    kg: t.gewicht_kg ?? null,
+                    wdh: entry.wdh ?? null,
+                    kg: entry.gewicht_kg ?? null,
                   }),
                 ))))
     }
-    let a = (e.uebungen ?? []).map((e) => {
-      let t = parseInt(e.saetze) || 3,
-        i = n[e.uebungsname] ?? []
+    let workoutExercises = (template.uebungen ?? []).map((exerciseEntry) => {
+      let setCount = parseInt(exerciseEntry.saetze) || 3,
+        previous = previousSets[exerciseEntry.uebungsname] ?? []
       return {
-        name: e.uebungsname,
+        name: exerciseEntry.uebungsname,
         sets: Array.from(
           {
-            length: t,
+            length: setCount,
           },
-          (t, n) => ({
-            wdh: String(i[n]?.wdh ?? e.wdh ?? ''),
-            kg: String(i[n]?.kg ?? e.gewicht_kg ?? ''),
+          (_slot, setNumber) => ({
+            wdh: String(previous[setNumber]?.wdh ?? exerciseEntry.wdh ?? ''),
+            kg: String(previous[setNumber]?.kg ?? exerciseEntry.gewicht_kg ?? ''),
             done: false,
           }),
         ),
-        prevSets: i,
+        prevSets: previous,
         note: '',
-        prevNote: r[e.uebungsname] ?? '',
+        prevNote: prevNotes[exerciseEntry.uebungsname] ?? '',
       }
     })
-    ;(N(null),
-      j({
-        vorlage: e,
+    ;(setSavedWorkout(null),
+      setActiveWorkout({
+        vorlage: template,
         startTime: Date.now(),
-        exercises: a,
+        exercises: workoutExercises,
       }))
   }
   useEffect(() => {
-    if (!n || !T || D.current === n) return
-    D.current = n
-    let e = C.find((e) => e.id === n)
-    ;(e && ne(e), r?.())
-  }, [n, T, C])
-  async function re(e, t) {
-    if (!i || !A) return
-    let n = s.length,
-      r = `E-${String(n + 1).padStart(3, '0')}`,
-      { data: a } = await supabase
+    if (!startTemplateId || !templatesLoaded || startedRef.current === startTemplateId) return
+    startedRef.current = startTemplateId
+    let foundTemplate = templates.find((item) => item.id === startTemplateId)
+    ;(foundTemplate && startFromTemplate(foundTemplate), onStartDone?.())
+  }, [startTemplateId, templatesLoaded, templates])
+  async function saveWorkout(doneExercises, minutes) {
+    if (!authUser || !activeWorkout) return
+    let count = sessions.length,
+      sessionCode = `E-${String(count + 1).padStart(3, '0')}`,
+      { data: created } = await supabase
         .from('training')
         .insert({
-          user_id: i.id,
-          einheit_id: r,
+          user_id: authUser.id,
+          einheit_id: sessionCode,
           datum: todayISO(),
-          trainingstyp: A.vorlage.trainingstyp ?? 'Kraft',
-          dauer_min: t > 0 ? t : null,
+          trainingstyp: activeWorkout.vorlage.trainingstyp ?? 'Kraft',
+          dauer_min: minutes > 0 ? minutes : null,
         })
         .select()
         .single()
-    if (a) {
-      let t = e
-        .filter((e) => e.sets.some((e) => e.done || e.wdh || e.kg) || e.note?.trim())
-        .map((e) => {
-          let t = e.sets.filter((e) => e.done || e.wdh || e.kg)
+    if (created) {
+      let rowsToSave = doneExercises
+        .filter((exerciseEntry) => exerciseEntry.sets.some((setEntry) => setEntry.done || setEntry.wdh || setEntry.kg) || exerciseEntry.note?.trim())
+        .map((exerciseEntry) => {
+          let doneSetList = exerciseEntry.sets.filter((setEntry) => setEntry.done || setEntry.wdh || setEntry.kg)
           return {
-            user_id: i.id,
-            training_id: a.id,
-            uebungsname: e.name,
-            saetze: t.length,
-            wdh: (t[0] && parseInt(t[0].wdh)) || null,
-            gewicht_kg: (t[0] && parseFloat(t[0].kg)) || null,
-            saetze_log: t.map((e) => ({
-              wdh: parseInt(e.wdh) || null,
-              kg: parseFloat(e.kg) || null,
+            user_id: authUser.id,
+            training_id: created.id,
+            uebungsname: exerciseEntry.name,
+            saetze: doneSetList.length,
+            wdh: (doneSetList[0] && parseInt(doneSetList[0].wdh)) || null,
+            gewicht_kg: (doneSetList[0] && parseFloat(doneSetList[0].kg)) || null,
+            saetze_log: doneSetList.map((setEntry) => ({
+              wdh: parseInt(setEntry.wdh) || null,
+              kg: parseFloat(setEntry.kg) || null,
             })),
-            notizen: e.note?.trim() || null,
+            notizen: exerciseEntry.note?.trim() || null,
           }
         })
-      t.length && (await supabase.from('uebungen').insert(t))
+      rowsToSave.length && (await supabase.from('uebungen').insert(rowsToSave))
     }
-    ;(localStorage.removeItem(LQ), N(null), j(null), await ee())
+    ;(localStorage.removeItem(ACTIVE_WORKOUT_KEY), setSavedWorkout(null), setActiveWorkout(null), await loadSessions())
   }
   useEffect(() => {
-    ;(ee(), te())
-    let e = localStorage.getItem(LQ)
-    if (e)
+    ;(loadSessions(), loadTemplates())
+    let savedRaw = localStorage.getItem(ACTIVE_WORKOUT_KEY)
+    if (savedRaw)
       try {
-        N(JSON.parse(e))
+        setSavedWorkout(JSON.parse(savedRaw))
       } catch {}
-  }, [i])
-  async function ie(e) {
-    y(true)
-    let t = new FileReader()
-    ;((t.onload = async () => {
-      let n = t.result.split(',')[1]
-      x(t.result)
+  }, [authUser])
+  async function analyzeScreenshot(imageFile) {
+    setAnalyzing(true)
+    let reader = new FileReader()
+    ;((reader.onload = async () => {
+      let base64 = reader.result.split(',')[1]
+      setScreenshot(reader.result)
       try {
-        let { data: t } = await supabase.functions.invoke('analyze-screenshot', {
+        let { data: response } = await supabase.functions.invoke('analyze-screenshot', {
           body: {
-            imageBase64: n,
-            mimeType: e.type,
+            imageBase64: base64,
+            mimeType: imageFile.type,
             context: 'training',
           },
         })
-        if (t?.result) {
-          let e = t.result
-          F((t) => ({
-            ...t,
-            dauer_h: e.dauer_min ? String(Math.floor(e.dauer_min / 60)) : t.dauer_h,
-            dauer_m: e.dauer_min ? String(e.dauer_min % 60) : t.dauer_m,
-            avg_puls: e.avg_puls ? String(e.avg_puls) : t.avg_puls,
-            kalorien_verbrannt: e.kalorien_verbrannt ? String(e.kalorien_verbrannt) : t.kalorien_verbrannt,
-            trainingstyp: e.trainingstyp && TQ.includes(e.trainingstyp) ? e.trainingstyp : t.trainingstyp,
-            notizen: e.notizen || t.notizen,
+        if (response?.result) {
+          let analysis = response.result
+          setForm((prev) => ({
+            ...prev,
+            dauer_h: analysis.dauer_min ? String(Math.floor(analysis.dauer_min / 60)) : prev.dauer_h,
+            dauer_m: analysis.dauer_min ? String(analysis.dauer_min % 60) : prev.dauer_m,
+            avg_puls: analysis.avg_puls ? String(analysis.avg_puls) : prev.avg_puls,
+            kalorien_verbrannt: analysis.kalorien_verbrannt ? String(analysis.kalorien_verbrannt) : prev.kalorien_verbrannt,
+            trainingstyp: analysis.trainingstyp && TRAINING_TYPES.includes(analysis.trainingstyp) ? analysis.trainingstyp : prev.trainingstyp,
+            notizen: analysis.notizen || prev.notizen,
           }))
         }
-      } catch (e) {
-        let t = e instanceof Error ? e.message : ''
+      } catch (error) {
+        let errorMessage = error instanceof Error ? error.message : ''
         alert(
-          t.includes('429')
+          errorMessage.includes('429')
             ? 'Zu viele Anfragen – bitte kurz warten und erneut versuchen.'
             : 'Foto-Analyse fehlgeschlagen. Bitte erneut versuchen.',
         )
       }
-      y(false)
+      setAnalyzing(false)
     }),
-      t.readAsDataURL(e))
+      reader.readAsDataURL(imageFile))
   }
-  function R(e) {
-    c((t) =>
-      t.map((t) =>
-        t.id === e
+  function toggleExpanded(sessionId) {
+    setSessions((itemList) =>
+      itemList.map((sessionItem) =>
+        sessionItem.id === sessionId
           ? {
-              ...t,
-              expanded: !t.expanded,
+              ...sessionItem,
+              expanded: !sessionItem.expanded,
             }
-          : t,
+          : sessionItem,
       ),
     )
   }
-  function ae(e) {
-    ;(g(e.id),
-      F({
-        datum: e.datum,
-        trainingstyp: e.trainingstyp ?? 'Kraft',
-        dauer_h: e.dauer_min ? String(Math.floor(e.dauer_min / 60)) : '0',
-        dauer_m: e.dauer_min ? String(e.dauer_min % 60) : '0',
-        avg_puls: e.avg_puls ? String(e.avg_puls) : '',
-        kalorien_verbrannt: e.kalorien_verbrannt ? String(e.kalorien_verbrannt) : '',
-        notizen: e.notizen ?? '',
+  function startEdit(sessionToEdit) {
+    ;(setEditingId(sessionToEdit.id),
+      setForm({
+        datum: sessionToEdit.datum,
+        trainingstyp: sessionToEdit.trainingstyp ?? 'Kraft',
+        dauer_h: sessionToEdit.dauer_min ? String(Math.floor(sessionToEdit.dauer_min / 60)) : '0',
+        dauer_m: sessionToEdit.dauer_min ? String(sessionToEdit.dauer_min % 60) : '0',
+        avg_puls: sessionToEdit.avg_puls ? String(sessionToEdit.avg_puls) : '',
+        kalorien_verbrannt: sessionToEdit.kalorien_verbrannt ? String(sessionToEdit.kalorien_verbrannt) : '',
+        notizen: sessionToEdit.notizen ?? '',
       }),
-      L(
-        e.uebungen?.map((e) => ({
-          uebungsname: e.uebungsname,
-          saetze: e.saetze ? String(e.saetze) : '',
-          wdh: e.wdh ? String(e.wdh) : '',
-          gewicht_kg: e.gewicht_kg ? String(e.gewicht_kg) : '',
-          notizen: e.notizen ?? '',
+      setFormExercises(
+        sessionToEdit.uebungen?.map((exerciseEntry) => ({
+          uebungsname: exerciseEntry.uebungsname,
+          saetze: exerciseEntry.saetze ? String(exerciseEntry.saetze) : '',
+          wdh: exerciseEntry.wdh ? String(exerciseEntry.wdh) : '',
+          gewicht_kg: exerciseEntry.gewicht_kg ? String(exerciseEntry.gewicht_kg) : '',
+          notizen: exerciseEntry.notizen ?? '',
         })) ?? [],
       ),
-      x(null),
-      f(true))
+      setScreenshot(null),
+      setModalOpen(true))
   }
-  function oe() {
-    ;(f(false),
-      g(null),
-      x(null),
-      F({
+  function closeModal() {
+    ;(setModalOpen(false),
+      setEditingId(null),
+      setScreenshot(null),
+      setForm({
         datum: todayISO(),
         trainingstyp: 'Kraft',
         dauer_h: '0',
@@ -1713,86 +1713,86 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
         kalorien_verbrannt: '',
         notizen: '',
       }),
-      L([]))
+      setFormExercises([]))
   }
-  async function se() {
-    if (!i) return
-    m(true)
-    let e = parseInt(P.dauer_h || '0') * 60 + parseInt(P.dauer_m || '0'),
-      t = {
-        datum: P.datum,
-        trainingstyp: P.trainingstyp || null,
-        dauer_min: e > 0 ? e : null,
-        avg_puls: P.avg_puls ? parseInt(P.avg_puls) : null,
-        kalorien_verbrannt: P.kalorien_verbrannt ? parseInt(P.kalorien_verbrannt) : null,
-        notizen: P.notizen || null,
+  async function saveSession() {
+    if (!authUser) return
+    setSaving(true)
+    let totalMinutes = parseInt(form.dauer_h || '0') * 60 + parseInt(form.dauer_m || '0'),
+      fields = {
+        datum: form.datum,
+        trainingstyp: form.trainingstyp || null,
+        dauer_min: totalMinutes > 0 ? totalMinutes : null,
+        avg_puls: form.avg_puls ? parseInt(form.avg_puls) : null,
+        kalorien_verbrannt: form.kalorien_verbrannt ? parseInt(form.kalorien_verbrannt) : null,
+        notizen: form.notizen || null,
       },
-      n
-    if (h)
-      (await supabase.from('training').update(t).eq('id', h),
-        (n = h),
-        await supabase.from('uebungen').delete().eq('training_id', h))
+      sessionId
+    if (editingId)
+      (await supabase.from('training').update(fields).eq('id', editingId),
+        (sessionId = editingId),
+        await supabase.from('uebungen').delete().eq('training_id', editingId))
     else {
-      let e = s.length,
-        r = `E-${String(e + 1).padStart(3, '0')}`,
-        { data: a } = await supabase
+      let count = sessions.length,
+        sessionCode = `E-${String(count + 1).padStart(3, '0')}`,
+        { data: created } = await supabase
           .from('training')
           .insert({
-            user_id: i.id,
-            einheit_id: r,
-            ...t,
+            user_id: authUser.id,
+            einheit_id: sessionCode,
+            ...fields,
           })
           .select()
           .single()
-      n = a.id
+      sessionId = created.id
     }
-    ;(I.filter((e) => e.uebungsname).length > 0 &&
+    ;(formExercises.filter((row) => row.uebungsname).length > 0 &&
       (await supabase.from('uebungen').insert(
-        I.filter((e) => e.uebungsname).map((e) => ({
-          user_id: i.id,
-          training_id: n,
-          uebungsname: e.uebungsname,
-          saetze: e.saetze ? parseInt(e.saetze) : null,
-          wdh: e.wdh ? parseInt(e.wdh) : null,
-          gewicht_kg: e.gewicht_kg ? parseFloat(e.gewicht_kg) : null,
-          notizen: e.notizen || null,
+        formExercises.filter((row) => row.uebungsname).map((row) => ({
+          user_id: authUser.id,
+          training_id: sessionId,
+          uebungsname: row.uebungsname,
+          saetze: row.saetze ? parseInt(row.saetze) : null,
+          wdh: row.wdh ? parseInt(row.wdh) : null,
+          gewicht_kg: row.gewicht_kg ? parseFloat(row.gewicht_kg) : null,
+          notizen: row.notizen || null,
         })),
       )),
-      await ee(),
-      oe(),
-      m(false))
+      await loadSessions(),
+      closeModal(),
+      setSaving(false))
   }
-  async function ce(e) {
-    ;(await supabase.from('uebungen').delete().eq('training_id', e),
-      await supabase.from('training').delete().eq('id', e),
-      c((t) => t.filter((t) => t.id !== e)))
+  async function deleteSession(sessionId) {
+    ;(await supabase.from('uebungen').delete().eq('training_id', sessionId),
+      await supabase.from('training').delete().eq('id', sessionId),
+      setSessions((itemList) => itemList.filter((sessionItem) => sessionItem.id !== sessionId)))
   }
-  let le = [...s]
+  let chartData = [...sessions]
       .reverse()
       .slice(-14)
-      .map((e) => ({
-        datum: formatDate(e.datum, 'dd.MM'),
-        dauer: e.dauer_min ?? 0,
+      .map((sessionItem) => ({
+        datum: formatDate(sessionItem.datum, 'dd.MM'),
+        dauer: sessionItem.dauer_min ?? 0,
       })),
-    ue = s.reduce((e, t) => e + (t.dauer_min ?? 0), 0),
-    de = s.filter((e) => e.avg_puls).length
-      ? Math.round(s.reduce((e, t) => e + (t.avg_puls ?? 0), 0) / s.filter((e) => e.avg_puls).length)
+    totalMinutesAll = sessions.reduce((sum, sessionItem) => sum + (sessionItem.dauer_min ?? 0), 0),
+    avgPulse = sessions.filter((sessionItem) => sessionItem.avg_puls).length
+      ? Math.round(sessions.reduce((sum, sessionItem) => sum + (sessionItem.avg_puls ?? 0), 0) / sessions.filter((sessionItem) => sessionItem.avg_puls).length)
       : null
-  return A ? (
-    <RQ workout={A} onFinish={re} onAbort={() => j(null)} />
+  return activeWorkout ? (
+    <WorkoutRunner workout={activeWorkout} onFinish={saveWorkout} onAbort={() => setActiveWorkout(null)} />
   ) : (
     <div className="space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        {!e && (
+        {!isEmbedded && (
           <div>
             <h1 className="section-title text-2xl">Training</h1>
             <p className="text-text-secondary text-sm mt-0.5">{'Einheiten & Übungslog'}</p>
           </div>
         )}
         <div className="flex items-center gap-2 flex-wrap">
-          {!e && (
+          {!isEmbedded && (
             <button
-              onClick={() => (t ? t() : o('/training?tab=vorlagen'))}
+              onClick={() => (openTemplates ? openTemplates() : navigate('/training?tab=vorlagen'))}
               className="btn-secondary flex items-center gap-2"
             >
               <BookOpen size={16} /> Vorlagen
@@ -1800,8 +1800,8 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
           )}
           <button
             onClick={() => {
-              ;(g(null),
-                F({
+              ;(setEditingId(null),
+                setForm({
                   datum: todayISO(),
                   trainingstyp: 'Kraft',
                   dauer_h: '0',
@@ -1810,9 +1810,9 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                   kalorien_verbrannt: '',
                   notizen: '',
                 }),
-                L([]),
-                x(null),
-                f(true))
+                setFormExercises([]),
+                setScreenshot(null),
+                setModalOpen(true))
             }}
             className="btn-secondary flex items-center gap-2"
           >
@@ -1820,18 +1820,18 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
           </button>
         </div>
       </div>
-      {M && (
+      {savedWorkout && (
         <div className="card border-brand/40 bg-brand/5 flex items-center justify-between gap-4 p-4">
           <div className="min-w-0">
-            <div className="font-semibold text-text-primary">Workout pausiert: {M.vorlage?.name}</div>
+            <div className="font-semibold text-text-primary">Workout pausiert: {savedWorkout.vorlage?.name}</div>
             <div className="text-xs text-text-muted mt-0.5">
-              {M.exercises.length} Übungen · Fortsetzen oder verwerfen
+              {savedWorkout.exercises.length} Übungen · Fortsetzen oder verwerfen
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
             <button
               onClick={() => {
-                ;(N(null), localStorage.removeItem(LQ))
+                ;(setSavedWorkout(null), localStorage.removeItem(ACTIVE_WORKOUT_KEY))
               }}
               className="btn-secondary text-sm px-3 py-1.5"
             >
@@ -1839,7 +1839,7 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
             </button>
             <button
               onClick={() => {
-                ;(j(M), N(null))
+                ;(setActiveWorkout(savedWorkout), setSavedWorkout(null))
               }}
               className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5"
             >
@@ -1848,20 +1848,20 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
           </div>
         </div>
       )}
-      {C.length > 0 && (
+      {templates.length > 0 && (
         <div>
           <h2 className="section-title mb-3 text-base">Workout starten</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {C.map((e) => (
-              <div className="card flex items-center justify-between gap-3" key={e.id}>
+            {templates.map((templateItem) => (
+              <div className="card flex items-center justify-between gap-3" key={templateItem.id}>
                 <div className="min-w-0">
-                  <div className="font-semibold text-text-primary truncate">{e.name}</div>
+                  <div className="font-semibold text-text-primary truncate">{templateItem.name}</div>
                   <div className="text-xs text-text-muted mt-0.5">
-                    {e.trainingstyp ?? 'Kraft'} · {(e.uebungen ?? []).length} Übungen
+                    {templateItem.trainingstyp ?? 'Kraft'} · {(templateItem.uebungen ?? []).length} Übungen
                   </div>
                 </div>
                 <button
-                  onClick={() => ne(e)}
+                  onClick={() => startFromTemplate(templateItem)}
                   className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5 shrink-0"
                 >
                   <Play size={14} /> Starten
@@ -1873,28 +1873,28 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
       )}
       <div className="grid grid-cols-3 gap-4">
         <div className="card text-center">
-          <div className="text-2xl font-bold text-text-primary">{s.length}</div>
+          <div className="text-2xl font-bold text-text-primary">{sessions.length}</div>
           <div className="text-xs text-text-muted mt-1">Einheiten gesamt</div>
         </div>
         <div className="card text-center">
-          <div className="text-2xl font-bold text-text-primary">{ue > 0 ? `${Math.round(ue / 60)}h` : '--'}</div>
+          <div className="text-2xl font-bold text-text-primary">{totalMinutesAll > 0 ? `${Math.round(totalMinutesAll / 60)}h` : '--'}</div>
           <div className="text-xs text-text-muted mt-1">Trainingszeit gesamt</div>
         </div>
         <div className="card text-center">
-          <div className="text-2xl font-bold text-text-primary">{de ? `${de} bpm` : '--'}</div>
+          <div className="text-2xl font-bold text-text-primary">{avgPulse ? `${avgPulse} bpm` : '--'}</div>
           <div className="text-xs text-text-muted mt-1">Ø Herzfrequenz</div>
         </div>
       </div>
-      {s.length > 1 && (
+      {sessions.length > 1 && (
         <div className="card">
           <h2 className="section-title mb-6">Trainingsdauer (letzte 14 Einheiten)</h2>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={le}>
-              <CartesianGrid strokeDasharray="3 3" stroke={a.grid} vertical={false} />
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false} />
               <XAxis
                 dataKey="datum"
                 tick={{
-                  fill: a.tick,
+                  fill: chartColors.tick,
                   fontSize: 11,
                 }}
                 axisLine={false}
@@ -1902,24 +1902,24 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
               />
               <YAxis
                 tick={{
-                  fill: a.tick,
+                  fill: chartColors.tick,
                   fontSize: 11,
                 }}
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip content={<EQ />} />
-              <Bar isAnimationActive={false} dataKey="dauer" fill={a.brand} radius={[4, 4, 0, 0]} />
+              <Tooltip content={<DurationTooltip />} />
+              <Bar isAnimationActive={false} dataKey="dauer" fill={chartColors.brand} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
       <div className="space-y-3">
-        {l ? (
+        {loading ? (
           <div className="flex justify-center py-8">
             <Spinner />
           </div>
-        ) : s.length === 0 ? (
+        ) : sessions.length === 0 ? (
           <div className="card">
             <EmptyState
               icon={Dumbbell}
@@ -1928,89 +1928,89 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
             />
           </div>
         ) : (
-          s.map((e) => (
-            <div className="card" key={e.id}>
+          sessions.map((sessionItem) => (
+            <div className="card" key={sessionItem.id}>
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
                   <Dumbbell size={18} className="text-brand" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-text-primary">{e.trainingstyp ?? 'Training'}</span>
-                    <span className="text-xs text-text-muted">{formatDate(e.datum)}</span>
+                    <span className="font-semibold text-text-primary">{sessionItem.trainingstyp ?? 'Training'}</span>
+                    <span className="text-xs text-text-muted">{formatDate(sessionItem.datum)}</span>
                   </div>
                   <div className="flex items-center gap-4 mt-1 text-xs text-text-secondary">
-                    {e.dauer_min && (
+                    {sessionItem.dauer_min && (
                       <span className="flex items-center gap-1">
                         <Timer size={12} />{' '}
-                        {e.dauer_min >= 60
-                          ? `${Math.floor(e.dauer_min / 60)}h ${e.dauer_min % 60 > 0 ? `${e.dauer_min % 60}min` : ''}`.trim()
-                          : `${e.dauer_min} min`}
+                        {sessionItem.dauer_min >= 60
+                          ? `${Math.floor(sessionItem.dauer_min / 60)}h ${sessionItem.dauer_min % 60 > 0 ? `${sessionItem.dauer_min % 60}min` : ''}`.trim()
+                          : `${sessionItem.dauer_min} min`}
                       </span>
                     )}
-                    {e.avg_puls && (
+                    {sessionItem.avg_puls && (
                       <span className="flex items-center gap-1">
-                        <Activity size={12} /> {e.avg_puls} bpm
+                        <Activity size={12} /> {sessionItem.avg_puls} bpm
                       </span>
                     )}
-                    {e.kalorien_verbrannt && (
+                    {sessionItem.kalorien_verbrannt && (
                       <span className="flex items-center gap-1">
-                        <Flame size={12} /> {e.kalorien_verbrannt} kcal
+                        <Flame size={12} /> {sessionItem.kalorien_verbrannt} kcal
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {(e.uebungen?.length ?? 0) > 0 && (
+                  {(sessionItem.uebungen?.length ?? 0) > 0 && (
                     <button
-                      onClick={() => R(e.id)}
+                      onClick={() => toggleExpanded(sessionItem.id)}
                       className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
                     >
-                      {e.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {sessionItem.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                   )}
                   <button
-                    onClick={() => ae(e)}
+                    onClick={() => startEdit(sessionItem)}
                     className="p-1.5 rounded-lg hover:bg-brand/10 hover:text-brand text-text-muted transition-colors"
                   >
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => ce(e.id)}
+                    onClick={() => deleteSession(sessionItem.id)}
                     className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-              {e.expanded && e.uebungen && e.uebungen.length > 0 && (
+              {sessionItem.expanded && sessionItem.uebungen && sessionItem.uebungen.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-border">
                   <div className="text-xs font-medium text-text-muted mb-3">Übungen</div>
                   <div className="space-y-2">
-                    {e.uebungen.map((e) => {
-                      let t = e.saetze_log
+                    {sessionItem.uebungen.map((exerciseEntry) => {
+                      let setLog = exerciseEntry.saetze_log
                       return (
-                        <div className="p-2 rounded-lg bg-bg-elevated" key={e.id}>
+                        <div className="p-2 rounded-lg bg-bg-elevated" key={exerciseEntry.id}>
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-text-primary text-sm">{e.uebungsname}</span>
-                            {(!t || t.length === 0) && (
+                            <span className="font-medium text-text-primary text-sm">{exerciseEntry.uebungsname}</span>
+                            {(!setLog || setLog.length === 0) && (
                               <span className="text-text-secondary text-xs">
-                                {e.saetze}×{e.wdh}
-                                {e.gewicht_kg ? ` @ ${e.gewicht_kg}kg` : ''}
+                                {exerciseEntry.saetze}×{exerciseEntry.wdh}
+                                {exerciseEntry.gewicht_kg ? ` @ ${exerciseEntry.gewicht_kg}kg` : ''}
                               </span>
                             )}
                           </div>
-                          {e.notizen && (
+                          {exerciseEntry.notizen && (
                             <p className="mt-1.5 text-xs text-text-secondary flex items-start gap-1.5">
                               <StickyNote size={12} className="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
-                              <span>{e.notizen}</span>
+                              <span>{exerciseEntry.notizen}</span>
                             </p>
                           )}
-                          {t && t.length > 0 && (
+                          {setLog && setLog.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              {t.map((e, t) => (
-                                <span className="text-[11px] bg-bg px-2 py-0.5 rounded text-text-secondary" key={t}>
-                                  S{t + 1}: {e.wdh ?? '?'}×{e.kg ?? '?'}kg
+                              {setLog.map((setEntry, setPosition) => (
+                                <span className="text-[11px] bg-bg px-2 py-0.5 rounded text-text-secondary" key={setPosition}>
+                                  S{setPosition + 1}: {setEntry.wdh ?? '?'}×{setEntry.kg ?? '?'}kg
                                 </span>
                               ))}
                             </div>
@@ -2025,27 +2025,27 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
           ))
         )}
       </div>
-      <Modal open={d} onClose={oe} title={h ? 'Trainingseinheit bearbeiten' : 'Trainingseinheit eintragen'} size="lg">
+      <Modal open={modalOpen} onClose={closeModal} title={editingId ? 'Trainingseinheit bearbeiten' : 'Trainingseinheit eintragen'} size="lg">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <input
-            ref={S}
+            ref={fileInput}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(e) => {
-              e.target.files?.[0] && ie(e.target.files[0])
+            onChange={(event) => {
+              event.target.files?.[0] && analyzeScreenshot(event.target.files[0])
             }}
           />
           <div
-            onClick={() => S.current?.click()}
+            onClick={() => fileInput.current?.click()}
             className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
-              ${b ? 'border-brand/50 bg-brand/5' : 'border-border hover:border-brand/40 hover:bg-brand/5'}`}
+              ${screenshot ? 'border-brand/50 bg-brand/5' : 'border-border hover:border-brand/40 hover:bg-brand/5'}`}
           >
-            {b ? (
+            {screenshot ? (
               <>
-                <img src={b} alt="Workout" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                <img src={screenshot} alt="Workout" className="w-14 h-14 rounded-lg object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
-                  {_ ? (
+                  {analyzing ? (
                     <div className="flex items-center gap-2 text-sm text-brand">
                       <Spinner size={14} />
                       <span>Analysiere Workout...</span>
@@ -2059,8 +2059,8 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                   <div className="text-xs text-text-muted mt-0.5">Anderes Bild wählen</div>
                 </div>
                 <button
-                  onClick={(e) => {
-                    ;(e.stopPropagation(), x(null))
+                  onClick={(event) => {
+                    ;(event.stopPropagation(), setScreenshot(null))
                   }}
                   className="p-1 rounded hover:bg-danger/10 hover:text-danger text-text-muted transition-colors shrink-0"
                 >
@@ -2090,11 +2090,11 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
               <input
                 type="date"
                 className="input"
-                value={P.datum}
-                onChange={(e) =>
-                  F((t) => ({
-                    ...t,
-                    datum: e.target.value,
+                value={form.datum}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    datum: event.target.value,
                   }))
                 }
               />
@@ -2104,18 +2104,18 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
               <input
                 className="input"
                 list="training-types-list"
-                value={P.trainingstyp}
-                onChange={(e) =>
-                  F((t) => ({
-                    ...t,
-                    trainingstyp: e.target.value,
+                value={form.trainingstyp}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    trainingstyp: event.target.value,
                   }))
                 }
                 placeholder="z.B. Kraft, Cardio, eigener Typ…"
               />
               <datalist id="training-types-list">
-                {TQ.map((e) => (
-                  <option value={e} key={e} />
+                {TRAINING_TYPES.map((typeName) => (
+                  <option value={typeName} key={typeName} />
                 ))}
               </datalist>
             </div>
@@ -2129,11 +2129,11 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                     max="23"
                     className="input pr-8"
                     placeholder="0"
-                    value={P.dauer_h}
-                    onChange={(e) =>
-                      F((t) => ({
-                        ...t,
-                        dauer_h: e.target.value,
+                    value={form.dauer_h}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        dauer_h: event.target.value,
                       }))
                     }
                   />
@@ -2148,11 +2148,11 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                     max="59"
                     className="input pr-10"
                     placeholder="0"
-                    value={P.dauer_m}
-                    onChange={(e) =>
-                      F((t) => ({
-                        ...t,
-                        dauer_m: e.target.value,
+                    value={form.dauer_m}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        dauer_m: event.target.value,
                       }))
                     }
                   />
@@ -2168,11 +2168,11 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                 type="number"
                 className="input"
                 placeholder="140"
-                value={P.avg_puls}
-                onChange={(e) =>
-                  F((t) => ({
-                    ...t,
-                    avg_puls: e.target.value,
+                value={form.avg_puls}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    avg_puls: event.target.value,
                   }))
                 }
               />
@@ -2183,20 +2183,20 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                 type="number"
                 className="input"
                 placeholder="450"
-                value={P.kalorien_verbrannt}
-                onChange={(e) =>
-                  F((t) => ({
-                    ...t,
-                    kalorien_verbrannt: e.target.value,
+                value={form.kalorien_verbrannt}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    kalorien_verbrannt: event.target.value,
                   }))
                 }
               />
-              {!P.avg_puls && !P.kalorien_verbrannt && (
+              {!form.avg_puls && !form.kalorien_verbrannt && (
                 <button
                   type="button"
                   onClick={() => {
-                    let e = parseInt(P.dauer_h || '0') * 60 + parseInt(P.dauer_m || '0'),
-                      t = {
+                    let totalMin = parseInt(form.dauer_h || '0') * 60 + parseInt(form.dauer_m || '0'),
+                      kcalPerMin = {
                         Kraft: 6,
                         Cardio: 9,
                         HIIT: 12,
@@ -2207,7 +2207,7 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                         Stretching: 2,
                         Sonstiges: 6,
                       },
-                      n = {
+                      defaultPulse = {
                         Kraft: 110,
                         Cardio: 145,
                         HIIT: 165,
@@ -2218,13 +2218,13 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                         Stretching: 75,
                         Sonstiges: 120,
                       },
-                      r = t[P.trainingstyp] ?? 6,
-                      i = e > 0 ? Math.round(e * r) : 0,
-                      a = n[P.trainingstyp] ?? 120
-                    F((e) => ({
-                      ...e,
-                      kalorien_verbrannt: i > 0 ? String(i) : e.kalorien_verbrannt,
-                      avg_puls: String(a),
+                      rate = kcalPerMin[form.trainingstyp] ?? 6,
+                      kcal = totalMin > 0 ? Math.round(totalMin * rate) : 0,
+                      pulse = defaultPulse[form.trainingstyp] ?? 120
+                    setForm((prevForm) => ({
+                      ...prevForm,
+                      kalorien_verbrannt: kcal > 0 ? String(kcal) : prevForm.kalorien_verbrannt,
+                      avg_puls: String(pulse),
                     }))
                   }}
                   className="mt-1.5 text-xs text-brand hover:text-brand/80 flex items-center gap-1 transition-colors"
@@ -2239,11 +2239,11 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
                 type="text"
                 className="input"
                 placeholder="Optionale Notizen"
-                value={P.notizen}
-                onChange={(e) =>
-                  F((t) => ({
-                    ...t,
-                    notizen: e.target.value,
+                value={form.notizen}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    notizen: event.target.value,
                   }))
                 }
               />
@@ -2251,14 +2251,14 @@ export function TrainingEinheiten({ embedded: e = false, onOpenVorlagen: t, star
           </div>
           <div className="border-t border-border pt-4">
             <div className="text-sm font-medium text-text-primary mb-3">Übungen (optional)</div>
-            <FQ entries={I} onChange={L} />
+            <ExerciseRows entries={formExercises} onChange={setFormExercises} />
           </div>
           <div className="flex gap-3 pt-2 border-t border-border">
-            <button onClick={() => f(false)} className="btn-secondary flex-1">
+            <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">
               Abbrechen
             </button>
-            <button onClick={se} className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={p}>
-              {p && <Spinner size={16} />}Speichern
+            <button onClick={saveSession} className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={saving}>
+              {saving && <Spinner size={16} />}Speichern
             </button>
           </div>
         </div>
