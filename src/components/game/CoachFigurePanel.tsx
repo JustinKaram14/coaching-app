@@ -23,7 +23,7 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
     [sending, setSending] = useState(false),
     [error, setError] = useState(null),
     reload = useCallback(async () => {
-      setChallenges(((await fetchChallenges(clientId)) ?? []).filter((e) => e.coach_id === user?.id))
+      setChallenges(((await fetchChallenges(clientId)) ?? []).filter((challenge) => challenge.coach_id === user?.id))
     }, [clientId, user?.id])
   if (
     (useEffect(() => {
@@ -48,7 +48,7 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
   async function send() {
     if (!user || !valid || sending) return
     ;(setSending(true), setError(null))
-    let { error: t } = await supabase.from('challenges').insert({
+    let { error: insertError } = await supabase.from('challenges').insert({
       user_id: clientId,
       coach_id: user.id,
       titel: form.titel.trim(),
@@ -56,7 +56,7 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
       punkte: points,
       frist: form.frist || null,
     })
-    if ((setSending(false), t)) {
+    if ((setSending(false), insertError)) {
       setError('Das hat nicht geklappt. Versuche es noch einmal.')
       return
     }
@@ -68,11 +68,11 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
     }),
       await reload())
   }
-  async function withdraw(e) {
-    ;(await supabase.from('challenges').delete().eq('id', e.id), await reload())
+  async function withdraw(challenge) {
+    ;(await supabase.from('challenges').delete().eq('id', challenge.id), await reload())
   }
-  let open = (challenges ?? []).filter((e) => e.status === 'aktiv'),
-    done = (challenges ?? []).filter((e) => e.status === 'erledigt'),
+  let open = (challenges ?? []).filter((challenge) => challenge.status === 'aktiv'),
+    done = (challenges ?? []).filter((challenge) => challenge.status === 'erledigt'),
     intro = game.kennenlernen
   return (
     <div className="space-y-5">
@@ -173,10 +173,10 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
               className="input"
               maxLength={120}
               value={form.titel}
-              onChange={(e) =>
+              onChange={(event) =>
                 setForm({
                   ...form,
-                  titel: e.target.value,
+                  titel: event.target.value,
                 })
               }
               placeholder="z. B. 3 × diese Woche Spazieren gehen"
@@ -191,10 +191,10 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
               className="input min-h-[72px]"
               maxLength={300}
               value={form.beschreibung}
-              onChange={(e) =>
+              onChange={(event) =>
                 setForm({
                   ...form,
-                  beschreibung: e.target.value,
+                  beschreibung: event.target.value,
                 })
               }
             />
@@ -211,10 +211,10 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
               max={100}
               step={5}
               value={form.punkte}
-              onChange={(e) =>
+              onChange={(event) =>
                 setForm({
                   ...form,
-                  punkte: e.target.value,
+                  punkte: event.target.value,
                 })
               }
             />
@@ -229,10 +229,10 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
               type="date"
               min={todayISO()}
               value={form.frist}
-              onChange={(e) =>
+              onChange={(event) =>
                 setForm({
                   ...form,
-                  frist: e.target.value,
+                  frist: event.target.value,
                 })
               }
             />
@@ -257,40 +257,40 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
         {challenges !== null && challenges.length === 0 && (
           <p className="text-sm text-text-secondary">Noch keine gesetzt.</p>
         )}
-        {open.map((e) => (
-          <div className="flex items-center gap-3 rounded-2xl bg-bg-elevated px-3.5 py-3" key={e.id}>
+        {open.map((challenge) => (
+          <div className="flex items-center gap-3 rounded-2xl bg-bg-elevated px-3.5 py-3" key={challenge.id}>
             <Clock size={16} className="text-text-secondary shrink-0" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-text-primary truncate">{e.titel}</div>
+              <div className="text-sm font-semibold text-text-primary truncate">{challenge.titel}</div>
               <div className="text-xs text-text-secondary">
-                Offen · {e.punkte} Punkte{e.frist ? ` · bis ${formatDate(e.frist, 'dd.MM.')}` : ''}
+                Offen · {challenge.punkte} Punkte{challenge.frist ? ` · bis ${formatDate(challenge.frist, 'dd.MM.')}` : ''}
               </div>
             </div>
             <button
-              onClick={() => withdraw(e)}
-              aria-label={`${e.titel} zurückziehen`}
+              onClick={() => withdraw(challenge)}
+              aria-label={`${challenge.titel} zurückziehen`}
               className="p-2 rounded-full text-text-secondary hover:text-danger transition-colors"
             >
               <Trash2 size={16} aria-hidden="true" />
             </button>
           </div>
         ))}
-        {done.map((e) => (
+        {done.map((challenge) => (
           <div
             className={cn('flex items-start gap-3 rounded-2xl border border-success/30 bg-success/5 px-3.5 py-3')}
-            key={e.id}
+            key={challenge.id}
           >
             <span className="w-8 h-8 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
               <Check size={16} strokeWidth={3} aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-text-primary">{e.titel}</div>
+              <div className="text-sm font-semibold text-text-primary">{challenge.titel}</div>
               <div className="text-xs text-text-secondary">
-                Geschafft{e.erledigt_am ? ` am ${formatDate(e.erledigt_am, 'dd.MM.yyyy')}` : ''} · {e.punkte} Punkte
+                Geschafft{challenge.erledigt_am ? ` am ${formatDate(challenge.erledigt_am, 'dd.MM.yyyy')}` : ''} · {challenge.punkte} Punkte
               </div>
-              {e.nachweis_text && <p className="text-sm text-text-primary mt-1.5">„{e.nachweis_text}“</p>}
+              {challenge.nachweis_text && <p className="text-sm text-text-primary mt-1.5">„{challenge.nachweis_text}“</p>}
             </div>
-            {e.nachweis_pfad && <ProofImage path={e.nachweis_pfad} />}
+            {challenge.nachweis_pfad && <ProofImage path={challenge.nachweis_pfad} />}
           </div>
         ))}
       </div>

@@ -8,9 +8,9 @@ import { Check, Coins, Lock, Shirt } from 'lucide-react'
 import { SegmentedTabs } from '../ui/SegmentedTabs'
 import { cn } from '../../lib/utils'
 
-export const SHOP_TABS = Object.keys(SHOP_CATEGORY_LABELS).map((e) => ({
-  key: e,
-  label: SHOP_CATEGORY_LABELS[e],
+export const SHOP_TABS = Object.keys(SHOP_CATEGORY_LABELS).map((categoryKey) => ({
+  key: categoryKey,
+  label: SHOP_CATEGORY_LABELS[categoryKey],
 }))
 export function ShopTab() {
   let { character, stats, level, owned, buy, equip } = useGame(),
@@ -19,29 +19,29 @@ export function ShopTab() {
     [justBoughtId, setJustBoughtId] = useState(null),
     [busy, setBusy] = useState(false)
   if (!character) return null
-  let items = SHOP_ITEMS.filter((e) => SHOP_CATEGORY_SLOTS[category].includes(e.slot)).sort(
-      (e, t) => e.minLevel - t.minLevel || e.preis - t.preis,
+  let items = SHOP_ITEMS.filter((shopItem) => SHOP_CATEGORY_SLOTS[category].includes(shopItem.slot)).sort(
+      (itemA, itemB) => itemA.minLevel - itemB.minLevel || itemA.preis - itemB.preis,
     ),
     wornCount = Object.values(character.equipped).filter(Boolean).length
-  async function purchase(t) {
+  async function purchase(shopItem) {
     if (busy) return
     ;(setBusy(true), setNotice(null))
-    let n = await buy(t)
-    if (n) {
+    let errorText = await buy(shopItem)
+    if (errorText) {
       ;(setBusy(false),
         setNotice({
           tone: 'warn',
-          text: n,
+          text: errorText,
         }))
       return
     }
-    ;(setJustBoughtId(t.id),
+    ;(setJustBoughtId(shopItem.id),
       window.setTimeout(() => setJustBoughtId(null), 900),
-      await equip(toggleEquipped(character.equipped, t)),
+      await equip(toggleEquipped(character.equipped, shopItem)),
       setBusy(false),
       setNotice({
         tone: 'ok',
-        text: `${t.name} gehört jetzt dir und ist angezogen.`,
+        text: `${shopItem.name} gehört jetzt dir und ist angezogen.`,
       }))
   }
   return (
@@ -74,7 +74,7 @@ export function ShopTab() {
           )}
         </div>
       </div>
-      <SegmentedTabs tabs={SHOP_TABS} value={category} onChange={(e) => setCategory(e)} label="Shop-Bereich" />
+      <SegmentedTabs tabs={SHOP_TABS} value={category} onChange={(nextCategory) => setCategory(nextCategory)} label="Shop-Bereich" />
       {notice && (
         <p
           role="status"
@@ -89,25 +89,25 @@ export function ShopTab() {
         </p>
       )}
       <div className="grid grid-cols-2 gap-3" key={category}>
-        {items.map((i, o) => {
-          let s = shopItemState(i, owned, level.level, stats.punkte),
-            c = character.equipped[i.slot] === i.id
+        {items.map((shopItem, index) => {
+          let state = shopItemState(shopItem, owned, level.level, stats.punkte),
+            isWorn = character.equipped[shopItem.slot] === shopItem.id
           return (
             <div
               style={{
-                '--d': 40 + o * 50,
+                '--d': 40 + index * 50,
               }}
               className={cn(
                 'enter card !p-3 flex flex-col items-center text-center gap-2',
-                c && 'border-brand/60 ring-1 ring-brand/30',
+                isWorn && 'border-brand/60 ring-1 ring-brand/30',
               )}
-              key={i.id}
+              key={shopItem.id}
             >
               <div
                 className={cn(
                   'rounded-3xl bg-bg-elevated px-2 pt-1 transition-transform',
-                  s === 'locked' && 'opacity-50 grayscale',
-                  justBoughtId === i.id && 'pop-in',
+                  state === 'locked' && 'opacity-50 grayscale',
+                  justBoughtId === shopItem.id && 'pop-in',
                 )}
               >
                 <Avatar
@@ -116,27 +116,27 @@ export function ShopTab() {
                   config={character.config}
                   equipped={{
                     ...character.equipped,
-                    [i.slot]: i.id,
+                    [shopItem.slot]: shopItem.id,
                   }}
-                  label={`${i.name} Vorschau`}
+                  label={`${shopItem.name} Vorschau`}
                 />
               </div>
               <div>
-                <div className="font-bold text-text-primary text-sm">{i.name}</div>
-                <div className="text-xs text-text-secondary leading-snug">{i.text}</div>
+                <div className="font-bold text-text-primary text-sm">{shopItem.name}</div>
+                <div className="text-xs text-text-secondary leading-snug">{shopItem.text}</div>
               </div>
-              {s === 'owned' && (
+              {state === 'owned' && (
                 <button
-                  onClick={() => equip(toggleEquipped(character.equipped, i))}
+                  onClick={() => equip(toggleEquipped(character.equipped, shopItem))}
                   className={cn(
                     'w-full rounded-full py-2 text-sm font-semibold border transition-all active:scale-95',
-                    c
+                    isWorn
                       ? 'bg-primary text-white border-brand'
                       : 'bg-bg-elevated text-text-primary border-border-light hover:border-brand/50',
                   )}
-                  aria-pressed={c}
+                  aria-pressed={isWorn}
                 >
-                  {c ? (
+                  {isWorn ? (
                     <span className="inline-flex items-center gap-1.5">
                       <Check size={14} aria-hidden="true" /> Getragen
                     </span>
@@ -145,33 +145,33 @@ export function ShopTab() {
                   )}
                 </button>
               )}
-              {s === 'buyable' && (
+              {state === 'buyable' && (
                 <button
-                  onClick={() => purchase(i)}
+                  onClick={() => purchase(shopItem)}
                   disabled={busy}
                   className="btn-primary w-full !py-2 text-sm flex items-center justify-center gap-1.5 disabled:opacity-60"
                 >
-                  <Coins size={14} aria-hidden="true" /> Kaufen · {i.preis}
+                  <Coins size={14} aria-hidden="true" /> Kaufen · {shopItem.preis}
                 </button>
               )}
-              {s === 'poor' && (
+              {state === 'poor' && (
                 <div className="w-full">
                   <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden" aria-hidden="true">
                     <div
                       className="h-full bg-brand/70 rounded-full"
                       style={{
-                        width: `${Math.min(100, (stats.punkte / i.preis) * 100)}%`,
+                        width: `${Math.min(100, (stats.punkte / shopItem.preis) * 100)}%`,
                       }}
                     />
                   </div>
                   <div className="text-xs text-text-secondary mt-1.5 tabular-nums">
-                    Noch {i.preis - stats.punkte} Punkte ({i.preis})
+                    Noch {shopItem.preis - stats.punkte} Punkte ({shopItem.preis})
                   </div>
                 </div>
               )}
-              {s === 'locked' && (
+              {state === 'locked' && (
                 <div className="w-full rounded-full py-2 text-xs font-semibold bg-bg-elevated text-text-secondary flex items-center justify-center gap-1.5">
-                  <Lock size={13} aria-hidden="true" /> Ab Level {i.minLevel}
+                  <Lock size={13} aria-hidden="true" /> Ab Level {shopItem.minLevel}
                 </div>
               )}
             </div>
