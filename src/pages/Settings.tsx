@@ -261,7 +261,7 @@ export const LEAD_OPTIONS = [
 export function NotificationSettings({ userId: uid, isCoach: coach, settings: notifSettings, onPatch: patch }) {
   let [pushState, setPushState] = useState('loading'),
     [busy, setBusy] = useState(false),
-    [statusNote, setMessage] = useState(null),
+    [statusNote, setStatusNote] = useState(null),
     [devices, setDevices] = useState([]),
     [saveFailed, setSaveFailed] = useState(false),
     previewList = useMemo(buildPreviews, []),
@@ -284,10 +284,10 @@ export function NotificationSettings({ userId: uid, isCoach: coach, settings: no
     updateError && setSaveFailed(true)
   }
   async function activate() {
-    ;(setBusy(true), setMessage(null))
+    ;(setBusy(true), setStatusNote(null))
     let result = await enablePush(uid)
     ;(setBusy(false),
-      setMessage(
+      setStatusNote(
         result === 'ok'
           ? {
               tone: 'ok',
@@ -311,18 +311,18 @@ export function NotificationSettings({ userId: uid, isCoach: coach, settings: no
       await refreshState())
   }
   async function deactivate() {
-    ;(setBusy(true), setMessage(null), await disablePush(uid), setBusy(false), await refreshState())
+    ;(setBusy(true), setStatusNote(null), await disablePush(uid), setBusy(false), await refreshState())
   }
   async function sendTest() {
-    ;(setBusy(true), setMessage(null))
+    ;(setBusy(true), setStatusNote(null))
     let { data: testData, error: testError } = await sendPushToUser(uid, 'Test erfolgreich', 'So meldet sich HLX Together bei dir.')
     ;(setBusy(false),
       !testError && testData && (testData.sent ?? 0) > 0
-        ? setMessage({
+        ? setStatusNote({
             tone: 'ok',
             text: `Test gesendet an ${testData.sent} Gerät${testData.sent === 1 ? '' : 'e'}. Es sollte gleich ankommen.`,
           })
-        : setMessage({
+        : setStatusNote({
             tone: 'warn',
             text: 'Der Test konnte nicht zugestellt werden. Prüfe, ob dieses Gerät aktiviert ist.',
           }))
