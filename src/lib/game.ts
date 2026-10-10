@@ -1,20 +1,20 @@
 // @ts-nocheck
 // Übernommen aus dem Redesign-Paket. Typen und lokale Namen werden schrittweise verbessert.
 
-export const xpForLevel = (e) => 100 + 25 * (e - 1)
-export const xpAtLevelStart = (e) => 100 * (e - 1) + (25 * (e - 1) * (e - 2)) / 2
-export function levelInfo(e) {
-  let t = Math.max(0, Math.floor(e)),
-    n = 1
-  for (; xpAtLevelStart(n + 1) <= t;) n++
-  let r = t - xpAtLevelStart(n),
-    i = xpForLevel(n)
+export const xpForLevel = (levelNumber) => 100 + 25 * (levelNumber - 1)
+export const xpAtLevelStart = (levelNumber) => 100 * (levelNumber - 1) + (25 * (levelNumber - 1) * (levelNumber - 2)) / 2
+export function levelInfo(totalXp) {
+  let xpClamped = Math.max(0, Math.floor(totalXp)),
+    currentLevel = 1
+  for (; xpAtLevelStart(currentLevel + 1) <= xpClamped;) currentLevel++
+  let xpIntoLevel = xpClamped - xpAtLevelStart(currentLevel),
+    xpNeeded = xpForLevel(currentLevel)
   return {
-    level: n,
-    xpInto: r,
-    xpNeed: i,
-    pct: Math.min(100, Math.round((r / i) * 100)),
-    next: n + 1,
+    level: currentLevel,
+    xpInto: xpIntoLevel,
+    xpNeed: xpNeeded,
+    pct: Math.min(100, Math.round((xpIntoLevel / xpNeeded) * 100)),
+    next: currentLevel + 1,
   }
 }
 export const LEVEL_TITLES = [
@@ -27,10 +27,10 @@ export const LEVEL_TITLES = [
   [20, 'Legende'],
   [30, 'Ikone'],
 ]
-export function levelTitle(e) {
-  let t = LEVEL_TITLES[0][1]
-  for (let [n, r] of LEVEL_TITLES) e >= n && (t = r)
-  return t
+export function levelTitle(levelNumber) {
+  let titleFound = LEVEL_TITLES[0][1]
+  for (let [fromLevel, levelName] of LEVEL_TITLES) levelNumber >= fromLevel && (titleFound = levelName)
+  return titleFound
 }
 export const XP_MEALS = ['Frühstück', 'Mittagessen', 'Abendessen']
 export const STREAK_BONUS = {
@@ -79,95 +79,95 @@ export const STREAK_BONUS = {
     punkte: 500,
   },
 }
-export function isGreenDay(e) {
-  let t = XP_MEALS.every((t) => e.mealsMain.includes(t)),
-    n = e.supplementsTotal === 0 || e.supplementsTaken >= e.supplementsTotal
-  return t && e.sleep && n
+export function isGreenDay(day) {
+  let mealsOk = XP_MEALS.every((requiredMeal) => day.mealsMain.includes(requiredMeal)),
+    supplementsOk = day.supplementsTotal === 0 || day.supplementsTaken >= day.supplementsTotal
+  return mealsOk && day.sleep && supplementsOk
 }
-export function dailyXpEvents(e) {
-  let t = []
-  for (let n of XP_MEALS)
-    e.mealsMain.includes(n) &&
-      t.push({
+export function dailyXpEvents(day) {
+  let events = []
+  for (let meal of XP_MEALS)
+    day.mealsMain.includes(meal) &&
+      events.push({
         quelle: 'mahlzeit',
-        ref: `${e.date}:${n}`,
+        ref: `${day.date}:${meal}`,
         xp: 6,
         punkte: 0,
-        titel: `${n} eingetragen`,
+        titel: `${meal} eingetragen`,
       })
-  ;(e.sleep &&
-    t.push({
+  ;(day.sleep &&
+    events.push({
       quelle: 'schlaf',
-      ref: e.date,
+      ref: day.date,
       xp: 8,
       punkte: 0,
       titel: 'Schlaf eingetragen',
     }),
-    e.weight &&
-      t.push({
+    day.weight &&
+      events.push({
         quelle: 'gewicht',
-        ref: e.date,
+        ref: day.date,
         xp: 5,
         punkte: 0,
         titel: 'Gewogen',
       }))
-  for (let n = 0; n < Math.min(2, e.trainingIds.length); n++)
-    t.push({
+  for (let trainingNo = 0; trainingNo < Math.min(2, day.trainingIds.length); trainingNo++)
+    events.push({
       quelle: 'training',
-      ref: `${e.date}:${n + 1}`,
+      ref: `${day.date}:${trainingNo + 1}`,
       xp: 30,
       punkte: 10,
       titel: 'Training geschafft',
     })
   return (
-    e.supplementsTotal > 0 &&
-      e.supplementsTaken >= e.supplementsTotal &&
-      t.push({
+    day.supplementsTotal > 0 &&
+      day.supplementsTaken >= day.supplementsTotal &&
+      events.push({
         quelle: 'supplements',
-        ref: e.date,
+        ref: day.date,
         xp: 8,
         punkte: 0,
         titel: 'Supplements genommen',
       }),
-    e.waterGoalMl > 0 &&
-      e.waterMl >= e.waterGoalMl &&
-      t.push({
+    day.waterGoalMl > 0 &&
+      day.waterMl >= day.waterGoalMl &&
+      events.push({
         quelle: 'wasser',
-        ref: e.date,
+        ref: day.date,
         xp: 20,
         punkte: 10,
         titel: 'Wasserziel erreicht',
       }),
-    isGreenDay(e) &&
-      t.push({
+    isGreenDay(day) &&
+      events.push({
         quelle: 'gruener-tag',
-        ref: e.date,
+        ref: day.date,
         xp: 30,
         punkte: 20,
         titel: 'Grüner Tag',
       }),
-    t
+    events
   )
 }
-export function streakEvent(e, t) {
-  let n = STREAK_BONUS[e]
-  return n
+export function streakEvent(streakDays, startDate) {
+  let bonus = STREAK_BONUS[streakDays]
+  return bonus
     ? {
         quelle: 'streak',
-        ref: `${e}@${t}`,
-        xp: n.xp,
-        punkte: n.punkte,
-        titel: `${e} Tage am Stück`,
+        ref: `${streakDays}@${startDate}`,
+        xp: bonus.xp,
+        punkte: bonus.punkte,
+        titel: `${streakDays} Tage am Stück`,
       }
     : null
 }
-export function challengeEvent(e, t, n) {
+export function challengeEvent(challengeId, challengeTitle, points) {
   return {
     quelle: 'challenge',
-    ref: e,
-    xp: Math.min(500, Math.round(n * 1.5)),
-    punkte: n,
-    titel: t,
+    ref: challengeId,
+    xp: Math.min(500, Math.round(points * 1.5)),
+    punkte: points,
+    titel: challengeTitle,
   }
 }
 export const WELCOME_EVENT = {
@@ -371,14 +371,14 @@ export const SHOP_ITEMS = [
     text: 'Schlau und flink.',
   },
 ]
-export function shopItemState(e, t, n, r) {
-  return t.has(e.id) ? 'owned' : n < e.minLevel ? 'locked' : r >= e.preis ? 'buyable' : 'poor'
+export function shopItemState(shopItem, ownedIds, playerLevel, balance) {
+  return ownedIds.has(shopItem.id) ? 'owned' : playerLevel < shopItem.minLevel ? 'locked' : balance >= shopItem.preis ? 'buyable' : 'poor'
 }
-export function toggleEquipped(e, t) {
-  let n = {
-    ...e,
+export function toggleEquipped(equippedNow, shopItem) {
+  let updated = {
+    ...equippedNow,
   }
-  return (n[t.slot] === t.id ? delete n[t.slot] : (n[t.slot] = t.id), n)
+  return (updated[shopItem.slot] === shopItem.id ? delete updated[shopItem.slot] : (updated[shopItem.slot] = shopItem.id), updated)
 }
 export const CHALLENGE_CATEGORIES = [
   {
@@ -412,12 +412,12 @@ export const CHALLENGE_CATEGORIES = [
     emoji: '🎯',
   },
 ]
-export const challengeTemplate = (e, t, n, r, i) => ({
-  id: e,
-  kategorie: t,
-  punkte: n,
-  titel: r,
-  text: i,
+export const challengeTemplate = (templateId, categoryKey, points, headline, description) => ({
+  id: templateId,
+  kategorie: categoryKey,
+  punkte: points,
+  titel: headline,
+  text: description,
 })
 export const CHALLENGE_TEMPLATES = [
   challengeTemplate('frische-luft', 'draussen', 15, 'Frische Luft', 'Geh heute 20 Minuten draußen spazieren.'),
@@ -651,30 +651,30 @@ export const CHALLENGE_TEMPLATES = [
     'Schau dir deine Zahlen oder Fotos der letzten Wochen an.',
   ),
 ]
-export const findChallengeTemplate = (e) => CHALLENGE_TEMPLATES.find((t) => t.id === e)
-export function isoWeek(e) {
-  let t = new Date(`${e}T00:00:00Z`),
-    n = (t.getUTCDay() + 6) % 7
-  t.setUTCDate(t.getUTCDate() - n + 3)
-  let r = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)),
-    i = 1 + Math.round(((t.getTime() - r.getTime()) / 864e5 - 3 + ((r.getUTCDay() + 6) % 7)) / 7)
-  return `${t.getUTCFullYear()}-W${String(i).padStart(2, '0')}`
+export const findChallengeTemplate = (templateId) => CHALLENGE_TEMPLATES.find((template) => template.id === templateId)
+export function isoWeek(dateISO) {
+  let weekDate = new Date(`${dateISO}T00:00:00Z`),
+    weekday = (weekDate.getUTCDay() + 6) % 7
+  weekDate.setUTCDate(weekDate.getUTCDate() - weekday + 3)
+  let jan4 = new Date(Date.UTC(weekDate.getUTCFullYear(), 0, 4)),
+    weekNumber = 1 + Math.round(((weekDate.getTime() - jan4.getTime()) / 864e5 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7)
+  return `${weekDate.getUTCFullYear()}-W${String(weekNumber).padStart(2, '0')}`
 }
-export function dailyChallengeSuggestions(e, t) {
-  let n = 0
-  for (let t of e) n = (n * 31 + t.charCodeAt(0)) >>> 0
-  let r = () => ((n = (n * 1664525 + 1013904223) >>> 0), n / 4294967296),
-    i = CHALLENGE_CATEGORIES.map((e) => e.key)
-  for (let e = i.length - 1; e > 0; e--) {
-    let t = Math.floor(r() * (e + 1))
-    ;[i[e], i[t]] = [i[t], i[e]]
+export function dailyChallengeSuggestions(seed, excludedIds) {
+  let state = 0
+  for (let seedChar of seed) state = (state * 31 + seedChar.charCodeAt(0)) >>> 0
+  let nextRandom = () => ((state = (state * 1664525 + 1013904223) >>> 0), state / 4294967296),
+    categoryKeys = CHALLENGE_CATEGORIES.map((category) => category.key)
+  for (let position = categoryKeys.length - 1; position > 0; position--) {
+    let swapIndex = Math.floor(nextRandom() * (position + 1))
+    ;[categoryKeys[position], categoryKeys[swapIndex]] = [categoryKeys[swapIndex], categoryKeys[position]]
   }
-  let a = []
-  for (let e of i) {
-    let n = CHALLENGE_TEMPLATES.filter((n) => n.kategorie === e && !t.has(n.id))
-    if ((n.length && a.push(n[Math.floor(r() * n.length)]), a.length === 3)) break
+  let picked = []
+  for (let categoryName of categoryKeys) {
+    let candidates = CHALLENGE_TEMPLATES.filter((candidate) => candidate.kategorie === categoryName && !excludedIds.has(candidate.id))
+    if ((candidates.length && picked.push(candidates[Math.floor(nextRandom() * candidates.length)]), picked.length === 3)) break
   }
-  return a
+  return picked
 }
 export const REWARD_IDEAS = [
   {
@@ -738,8 +738,8 @@ export const REWARD_IDEAS = [
     emoji: '👟',
   },
 ]
-export function normalizeCharacterName(e) {
-  return e.replace(/\s+/g, ' ').trim().slice(0, 16)
+export function normalizeCharacterName(rawName) {
+  return rawName.replace(/\s+/g, ' ').trim().slice(0, 16)
 }
 export const SKIN_COLORS = ['#FAD9C1', '#F2C29B', '#E0A370', '#C68642', '#8D5524', '#5C3A21']
 export const HAIR_COLORS = ['#1D1B1A', '#3B2A20', '#6B4423', '#9A4A22', '#D9B25F', '#A3A3A3', '#C4461F', '#EDEDED']
@@ -875,13 +875,13 @@ export const DEFAULT_CHARACTER = {
   beard: 'none',
   shirt: SHIRT_COLORS[0],
 }
-export function shade(e, t = 0.14) {
-  let n = parseInt(e.slice(1), 16),
-    r = (e) => Math.max(0, Math.round(e * (1 - t))),
-    i = r((n >> 16) & 255),
-    a = r((n >> 8) & 255),
-    o = r(n & 255)
-  return `#${((1 << 24) | (i << 16) | (a << 8) | o).toString(16).slice(1)}`
+export function shade(hex, amount = 0.14) {
+  let colorValue = parseInt(hex.slice(1), 16),
+    darken = (channel) => Math.max(0, Math.round(channel * (1 - amount))),
+    red = darken((colorValue >> 16) & 255),
+    green = darken((colorValue >> 8) & 255),
+    blue = darken(colorValue & 255)
+  return `#${((1 << 24) | (red << 16) | (green << 8) | blue).toString(16).slice(1)}`
 }
 export const RANDOM_NAMES = [
   'Hugo',
@@ -901,7 +901,7 @@ export const RANDOM_NAMES = [
   'Jonas',
   'Lotta',
 ]
-export const pick = (e) => e[Math.floor(Math.random() * e.length)]
+export const pick = (list) => list[Math.floor(Math.random() * list.length)]
 export function randomCharacterConfig() {
   return {
     skin: pick(SKIN_COLORS),
