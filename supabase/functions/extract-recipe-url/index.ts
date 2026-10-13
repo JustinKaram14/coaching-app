@@ -85,17 +85,80 @@ function extractJsonLdRecipe(html: string): string {
   return ''
 }
 
+const MAX_HTML_BYTES = 1_500_000
+const MAX_REDIRECTS = 3
+
+// Nur öffentliche Webadressen: keine internen Adressen, keine Zugangsdaten in der URL, nur die üblichen Ports
+export function isPublicHttpUrl(raw: string): boolean {
+  let u: URL
+  try { u = new URL(raw) } catch { return false }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
+  if (u.username || u.password) return false
+  if (u.port && u.port !== '80' && u.port !== '443') return false
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) return false
+  if (host.includes(':')) {
+    // IPv6: Loopback, unspezifiziert, lokal, link-local und IPv4-abgebildete Adressen sperren
+    return !(host === '::1' || host === '::' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80') || host.startsWith('::ffff:'))
+  }
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false
+    if (a === 169 && b === 254) return false
+    if (a === 172 && b >= 16 && b <= 31) return false
+    if (a === 192 && b === 168) return false
+    if (a === 100 && b >= 64 && b <= 127) return false
+    return true
+  }
+  // Zahlen-Schreibweisen von IP-Adressen (z. B. 2130706433 oder 0x7f000001) sind keine normalen Hostnamen
+  if (/^(0x[0-9a-f]+|\d+)$/i.test(host)) return false
+  return host.includes('.')
+}
+
+async function readCapped(res: Response): Promise<string> {
+  const reader = res.body?.getReader()
+  if (!reader) return ''
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (total < MAX_HTML_BYTES) {
+    const { done, value } = await reader.read()
+    if (done || !value) break
+    chunks.push(value)
+    total += value.length
+  }
+  try { await reader.cancel() } catch { /* schon beendet */ }
+  const all = new Uint8Array(Math.min(total, MAX_HTML_BYTES))
+  let offset = 0
+  for (const chunk of chunks) {
+    const part = chunk.subarray(0, Math.max(0, all.length - offset))
+    all.set(part, offset)
+    offset += part.length
+  }
+  return new TextDecoder().decode(all)
+}
+
 async function fetchText(url: string, userAgent: string): Promise<string> {
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': userAgent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
-      },
-      redirect: 'follow',
-    })
-    return res.ok ? await res.text() : ''
+    let current = url
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (!isPublicHttpUrl(current)) return ''
+      const res = await fetch(current, {
+        headers: {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+        },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+        current = new URL(res.headers.get('location')!, current).toString()
+        continue
+      }
+      return res.ok ? await readCapped(res) : ''
+    }
+    return ''
   } catch (e) {
     console.error('Fetch error:', url, e)
     return ''
@@ -278,7 +341,7 @@ serve(async (req) => {
   const url = typeof body.url === 'string' ? body.url.trim() : ''
   const pastedText = typeof body.text === 'string' ? body.text.trim().slice(0, 12000) : ''
   if (!url && !pastedText) return json({ error: 'Link oder Rezepttext fehlt' }, 400, corsHeaders)
-  if (url && !/^https?:\/\//i.test(url)) return json({ error: 'Bitte einen vollständigen Link mit https:// angeben.' }, 400, corsHeaders)
+  if (url && !isPublicHttpUrl(url)) return json({ error: 'Bitte einen vollständigen, öffentlichen Link mit https:// angeben.' }, 400, corsHeaders)
 
   const platform: Platform = url ? detectPlatform(url) : 'web'
   const source: Source = url ? await collectSource(url, platform) : { context: '', videoUrl: null }
