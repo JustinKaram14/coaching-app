@@ -667,6 +667,9 @@ export const Avatar = forwardRef<any, any>(function (
           },
     clothes = clothesColors(items.kleidung, cfg.shirt, cfg.skin),
     sleeveColor = clothes.sleeve,
+    // Beide Arme gleich hell, ohne Schatten
+    leftArm = clothes.sleeve,
+    leftSkin = cfg.skin,
     foreColor = items.kleidung && items.kleidung !== 'tank' ? clothes.sleeve : cfg.skin,
     parts = useRef({}),
     partRef = (partKey) => (element) => {
@@ -937,7 +940,7 @@ export const Avatar = forwardRef<any, any>(function (
               y1={shape.shoulder.y}
               x2={200 - restElbow.x}
               y2={restElbow.y}
-              stroke={clothes.leftSleeve}
+              stroke={leftArm}
               strokeWidth={shape.upperArm}
               strokeLinecap="round"
             />
@@ -946,27 +949,22 @@ export const Avatar = forwardRef<any, any>(function (
               y1={restElbow.y}
               x2={200 - restPoint.x}
               y2={restPoint.y}
-              stroke={foreColor === cfg.skin ? shade(cfg.skin, 0.1) : clothes.leftSleeve}
+              stroke={foreColor === cfg.skin ? leftSkin : leftArm}
               strokeWidth={foreColor === cfg.skin ? shape.foreArm : shape.foreArm + 5}
               strokeLinecap="round"
             />
-            <circle cx={200 - restPoint.x} cy={restPoint.y} r={9 + 4 * lift} fill={shade(cfg.skin, 0.1)} />
+            <circle cx={200 - restPoint.x} cy={restPoint.y} r={9 + 4 * lift} fill={leftSkin} />
             {lift > 0 && (
               <circle
                 cx={200 - bicepSpot(shape.shoulder, restElbow, shape.upperArm, shape.peak).x}
                 cy={bicepSpot(shape.shoulder, restElbow, shape.upperArm, shape.peak).y}
                 r={bicepSpot(shape.shoulder, restElbow, shape.upperArm, shape.peak).r}
-                fill={clothes.leftSleeve}
+                fill={leftArm}
                 opacity={lift}
               />
             )}
-            {shape.chest > 0 && (
-              <g fill="none" stroke={shade(clothes.leftSleeve, 0.3)} strokeWidth="2.2" strokeLinecap="round" opacity={0.6 * shape.chest}>
-                <path d={`M${200 - shape.shoulder.x - shape.upperArm / 2 + 4} ${shape.shoulder.y + 12} Q${200 - shape.shoulder.x} ${shape.shoulder.y + 20} ${200 - shape.shoulder.x + shape.upperArm / 2 - 4} ${shape.shoulder.y + 12}`} />
-              </g>
-            )}
-            <rect x={100 - shape.neckWidth / 2} y="136" width={shape.neckWidth} height="46" rx="10" fill={skinShade} />
-            <path d="M84 178 Q100 198 116 178 Q100 184 84 178 Z" fill={skinShade} />
+            <rect x={100 - shape.neckWidth / 2} y="136" width={shape.neckWidth} height="46" rx="10" fill={cfg.skin} />
+            <path d="M84 178 Q100 198 116 178 Q100 184 84 178 Z" fill={cfg.skin} />
             <Neckwear item={items.hals} />
             <Pet item={items.tier} />
             <g ref={partRef('head')}>
@@ -1042,16 +1040,6 @@ export const Avatar = forwardRef<any, any>(function (
               strokeWidth={foreColor === cfg.skin ? shape.foreArm : shape.foreArm + 5}
               strokeLinecap="round"
             />
-            {shape.chest > 0 && (
-              <path
-                d={`M${shape.shoulder.x - shape.upperArm / 2 + 4} ${shape.shoulder.y + 12} Q${shape.shoulder.x} ${shape.shoulder.y + 20} ${shape.shoulder.x + shape.upperArm / 2 - 4} ${shape.shoulder.y + 12}`}
-                fill="none"
-                stroke={shade(sleeveColor, 0.3)}
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                opacity={0.6 * shape.chest}
-              />
-            )}
             <g ref={partRef('bottle')} transform={`translate(${HAND_HOLD.x} ${HAND_HOLD.y}) scale(${scale})`}>
               <path d={BOTTLE_PATH} fill="#dcecf6" fillOpacity="0.55" />
               <g clipPath={`url(#${uid}-bottle)`}>
