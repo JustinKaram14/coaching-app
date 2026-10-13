@@ -167,7 +167,14 @@ export function TrainingVorlagen({ embedded: isEmbedded = false, onBuildPlan: ha
       setSaving(false))
   }
   async function deleteTemplate(templateId) {
-    ;(await supabase.from('training_vorlagen').delete().eq('id', templateId), setTemplates((list) => list.filter((template) => template.id !== templateId)))
+    let template = templates.find((item) => item.id === templateId)
+    if (!confirm(`Vorlage „${template?.name ?? ''}“ wirklich löschen? Bereits absolvierte Einheiten bleiben erhalten.`)) return
+    let { error } = await supabase.from('training_vorlagen').delete().eq('id', templateId)
+    if (error) {
+      alert('Die Vorlage konnte nicht gelöscht werden. Bitte versuche es noch einmal.')
+      return
+    }
+    setTemplates((list) => list.filter((item) => item.id !== templateId))
   }
   function toggleExpanded(templateId) {
     setTemplates((list) =>

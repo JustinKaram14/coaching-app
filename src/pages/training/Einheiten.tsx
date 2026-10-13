@@ -1582,6 +1582,15 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
     ),
       setTemplatesLoaded(true))
   }
+  async function deleteTemplate(template) {
+    if (!confirm(`Vorlage „${template.name}“ wirklich löschen? Bereits absolvierte Einheiten bleiben erhalten.`)) return
+    let { error } = await supabase.from('training_vorlagen').delete().eq('id', template.id)
+    if (error) {
+      alert('Die Vorlage konnte nicht gelöscht werden. Bitte versuche es noch einmal.')
+      return
+    }
+    setTemplates((list) => list.filter((item) => item.id !== template.id))
+  }
   async function startFromTemplate(template) {
     if (!authUser) return
     let names = (template.uebungen ?? []).map((exerciseEntry) => exerciseEntry.uebungsname).filter(Boolean),
@@ -1926,12 +1935,21 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
                     {templateItem.trainingstyp ?? 'Kraft'} · {(templateItem.uebungen ?? []).length} Übungen
                   </div>
                 </div>
-                <button
-                  onClick={() => startFromTemplate(templateItem)}
-                  className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5 shrink-0"
-                >
-                  <Play size={14} /> Starten
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => deleteTemplate(templateItem)}
+                    className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors"
+                    aria-label={`Vorlage ${templateItem.name} löschen`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => startFromTemplate(templateItem)}
+                    className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5"
+                  >
+                    <Play size={14} /> Starten
+                  </button>
+                </div>
               </div>
             ))}
           </div>
