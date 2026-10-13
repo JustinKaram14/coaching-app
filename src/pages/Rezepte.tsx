@@ -97,6 +97,20 @@ function fmtWeekRange(monday: Date): string {
   return `${f(monday)} – ${f(sunday)}`
 }
 
+// KI-Antworten können fremde Inhalte enthalten (z. B. aus importierten Links): erst HTML unschädlich machen, dann formatieren
+export function chatTextToHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^\* /gm, '• ')
+    .replace(/\n/g, '<br/>')
+}
+
 // ─── Shopping list export ─────────────────────────────────────────────────────
 
 function buildShareText(liste: Einkaufsliste): string {
@@ -1074,12 +1088,7 @@ function KochplanView({ guide }: { guide: string }) {
                     : 'bg-bg-elevated text-text-primary rounded-bl-sm border border-border'
                 }`}>
                   {msg.role === 'ai' ? (
-                    <span dangerouslySetInnerHTML={{ __html: msg.text
-                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                      .replace(/^\* /gm, '• ')
-                      .replace(/\n/g, '<br/>')
-                    }} />
+                    <span dangerouslySetInnerHTML={{ __html: chatTextToHtml(msg.text) }} />
                   ) : msg.text}
                 </div>
               </div>
