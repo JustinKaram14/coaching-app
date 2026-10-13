@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { DEFAULT_CHARACTER, STREAK_BONUS, WELCOME_EVENT, dailyXpEvents, levelInfo, streakEvent } from '../lib/game'
 import { useAuth } from './useAuth'
 import { useDayStatus } from './useDayStatus'
+import { usePhysique } from './usePhysique'
 import { supabase } from '../lib/supabase'
 import { isMissingTable } from '../lib/dbErrors'
 import { calcStreak, toLocalISO, todayISO } from '../lib/utils'
@@ -18,6 +19,7 @@ export const GameContext = createContext({
     punkte: 0,
   },
   level: levelInfo(0),
+  physique: null,
   owned: new Set(),
   toasts: [],
   levelUp: null,
@@ -52,6 +54,7 @@ export function GameProvider({ children }) {
   let { user, profile } = useAuth(),
     { days, loaded: daysLoaded } = useDayStatus(),
     isClient = !!user && profile?.role === 'client',
+    physique = usePhysique(isClient ? user.id : null),
     [available, setAvailable] = useState(false),
     [loaded, setLoaded] = useState(false),
     [character, setCharacter] = useState(null),
@@ -368,6 +371,7 @@ export function GameProvider({ children }) {
         character,
         stats,
         level: levelInfo(stats.xp),
+        physique,
         owned,
         toasts,
         levelUp,
@@ -387,6 +391,7 @@ export function GameProvider({ children }) {
         loaded,
         character,
         stats,
+        physique,
         owned,
         toasts,
         levelUp,

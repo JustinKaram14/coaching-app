@@ -17,6 +17,7 @@ import { ShopTab } from '../components/game/ShopTab'
 import { RewardsTab } from '../components/game/RewardsTab'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { CharacterEditor } from '../components/game/CharacterEditor'
+import { PhysiqueCard } from '../components/game/PhysiqueCard'
 
 export const CHARAKTER_TABS = [
   {
@@ -34,7 +35,7 @@ export const CHARAKTER_TABS = [
 ]
 export function Charakter() {
   let { user } = useAuth(),
-    { available, loaded, character, level, stats, updateCharacter } = useGame(),
+    { available, loaded, character, level, stats, physique, updateCharacter } = useGame(),
     navigate = useNavigate(),
     [searchParams, setSearchParams] = useSearchParams(),
     tab = CHARAKTER_TABS.find((tabItem) => tabItem.key === searchParams.get('tab'))?.key ?? 'challenges',
@@ -201,6 +202,7 @@ export function Charakter() {
           </div>
         </div>
       </div>
+      <PhysiqueCard physique={physique} />
       <div
         className="enter card !p-4"
         style={{
