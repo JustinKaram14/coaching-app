@@ -360,10 +360,11 @@ export const HAND_REST = {
 // Ruhehand: der Arm hängt gerade nach unten (Länge Oberarm plus Unterarm), egal wie breit die Schulter ist
 // Armlänge wächst mit der Hebung, damit die Pose kräftig und nicht klumpig wirkt
 export const armLength = (lift = 0) => UPPER_ARM + 10 * lift
-export const restHand = (shoulderPoint, lift = 0) => {
-  // lift 0: Arm hängt gerade nach unten; lift 1: Front-Double-Biceps (Oberarm seitlich, Unterarm nach oben)
+export const restHand = (shoulderPoint, lift = 0, flare = 0) => {
+  // lift 0: Arm hängt nach unten, mit flare etwas nach außen; lift 1: Front-Double-Biceps (Oberarm seitlich, Unterarm nach oben)
   let length = armLength(lift),
-    hang = { x: shoulderPoint.x + 2, y: shoulderPoint.y + 2 * length - 1 },
+    dx = 2 + flare,
+    hang = { x: shoulderPoint.x + dx, y: shoulderPoint.y + Math.sqrt(Math.max(0, (2 * length - 1.5) ** 2 - dx * dx)) },
     raised = { x: shoulderPoint.x + 39, y: shoulderPoint.y - 38 }
   return { x: hang.x + (raised.x - hang.x) * lift, y: hang.y + (raised.y - hang.y) * lift }
 }
@@ -615,8 +616,10 @@ export function physiqueShape(level) {
     neckWidth: 24 + 6 * t,
     faceScale: 1.02 - 0.04 * t,
     chest: Math.min(1, Math.max(0, (t - 0.15) * 1.3)),
-    // Arme gehen ab Stufe 3 langsam nach oben, auf der höchsten Stufe steht die Pose
-    lift: ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 2.5) / 3.5))),
+    // Die Arme gehen erst auf den letzten Stufen nach oben, auf der höchsten Stufe steht die Pose
+    lift: ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 4.5) / 1))),
+    // Arme hängen mit wachsender Stufe etwas weiter vom Körper weg
+    flare: 14 * ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 2) / 2.5))),
   }
 }
 export const Avatar = forwardRef<any, any>(function (
@@ -637,7 +640,8 @@ export const Avatar = forwardRef<any, any>(function (
   let game = useContext(GameContext),
     shape = physiqueShape(physique ?? game.physique?.level ?? NEUTRAL_PHYSIQUE),
     lift = holdBottle ? 0 : shape.lift,
-    restPoint = restHand(shape.shoulder, lift),
+    flare = holdBottle ? 0 : shape.flare,
+    restPoint = restHand(shape.shoulder, lift, flare),
     armLen = armLength(lift),
     restElbow = elbowPoint(shape.shoulder, restPoint, armLen, armLen),
     cfg = config,
@@ -654,9 +658,9 @@ export const Avatar = forwardRef<any, any>(function (
             h: 150,
           }
         : {
-            x: -34 * lift,
+            x: -34 * Math.max(lift, (flare / 14) * 0.4),
             y: 0,
-            w: 200 + 68 * lift,
+            w: 200 + 68 * Math.max(lift, (flare / 14) * 0.4),
             h: 250,
           },
     clothes = clothesColors(items.kleidung, cfg.shirt, cfg.skin),
@@ -675,6 +679,7 @@ export const Avatar = forwardRef<any, any>(function (
       scale,
       shoulder: shape.shoulder,
       lift,
+      flare,
       armLen,
       armWidth: shape.upperArm,
     })
@@ -683,6 +688,7 @@ export const Avatar = forwardRef<any, any>(function (
     scale,
     shoulder: shape.shoulder,
     lift,
+    flare,
     armLen,
     armWidth: shape.upperArm,
   }),
@@ -743,7 +749,7 @@ export const Avatar = forwardRef<any, any>(function (
     }, []),
     resetPose = useCallback(() => {
       let holding = stateRef.current.holdBottle,
-        handSpot = holding ? HAND_HOLD : restHand(stateRef.current.shoulder, stateRef.current.lift)
+        handSpot = holding ? HAND_HOLD : restHand(stateRef.current.shoulder, stateRef.current.lift, stateRef.current.flare)
       ;(applyPose({
         hx: handSpot.x,
         hy: handSpot.y,
@@ -759,7 +765,7 @@ export const Avatar = forwardRef<any, any>(function (
     }, [applyPose])
   useLayoutEffect(() => {
     resetPose()
-  }, [resetPose, holdBottle, bottleMl, shape.shoulder.x, shape.shoulder.y, lift])
+  }, [resetPose, holdBottle, bottleMl, shape.shoulder.x, shape.shoulder.y, lift, flare])
   let animate = useCallback(
     (durationMs, onFrame) =>
       new Promise((done) => {
@@ -846,7 +852,7 @@ export const Avatar = forwardRef<any, any>(function (
     cheer = useCallback(async () => {
       let runCheer = async () => {
         if (reducedMotion.current) return
-        let handPoint = stateRef.current.holdBottle ? HAND_HOLD : restHand(stateRef.current.shoulder, stateRef.current.lift)
+        let handPoint = stateRef.current.holdBottle ? HAND_HOLD : restHand(stateRef.current.shoulder, stateRef.current.lift, stateRef.current.flare)
         ;(await animate(900, (progress) => {
           let hopHeight = Math.abs(Math.sin(progress * Math.PI * 2)) * 10 * (1 - progress),
             sparkValue = Math.sin(progress * Math.PI)
