@@ -213,6 +213,8 @@ export function Dashboard() {
   const [showBanner, setShowBanner] = useState(false)
   const [showAnamnese, setShowAnamnese] = useState(false)
   const [anamneseDone, setAnamneseDone] = useState(false)
+  // Tageswechsel: bleibt die App über Mitternacht offen, werden Ringe und Plan neu geladen
+  const [dayKey, setDayKey] = useState(todayISO())
   const game = useGame()
   // Neue Klienten starten mit dem Kennenlernen und der Figur (inkl. Anamnese), sonst nur mit der Anamnese.
   // Die Entscheidung fällt einmal, sobald klar ist, ob es die Figur schon gibt.
@@ -225,6 +227,18 @@ export function Dashboard() {
     const timer = window.setTimeout(() => setGameWaitedOut(true), 3500)
     return () => window.clearTimeout(timer)
   }, [showAnamnese, game.loaded])
+
+  useEffect(() => {
+    const checkDay = () => setDayKey(prev => (todayISO() === prev ? prev : todayISO()))
+    const timer = window.setInterval(checkDay, 30_000)
+    document.addEventListener('visibilitychange', checkDay)
+    window.addEventListener('focus', checkDay)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', checkDay)
+      window.removeEventListener('focus', checkDay)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -287,8 +301,9 @@ export function Dashboard() {
       const weekDays = Array.from({ length: 7 }, (_, i) => toLocalISO(addDays(monday, i)))
       const weekMinutes = weekDays.map(d =>
         trainings.filter(t => t.datum === d).reduce((a, t) => a + (t.dauer_min ?? 0), 0))
+      // Schlaf zählt nur für den Tag des Aufwachens: mit dem neuen Tag ist der Ring wieder leer
       const lastSleep = schlaf.filter(x => x.einschlafzeit && x.aufwachzeit).at(-1)
-      const sleepIsRecent = lastSleep && lastSleep.datum >= toLocalISO(subDays(new Date(), 1))
+      const sleepIsRecent = lastSleep && lastSleep.datum === todayStr
       const activeDates = new Set<string>([
         ...weights.map(w => w.datum), ...trainings.map(t => t.datum),
         ...schlaf.map(x => x.datum), ...food.map(f => f.datum),
@@ -321,7 +336,7 @@ export function Dashboard() {
       setLoading(false)
     }
     load()
-  }, [user])
+  }, [user, dayKey])
 
   const greeting = () => {
     const h = new Date().getHours()
