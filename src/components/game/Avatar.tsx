@@ -357,6 +357,32 @@ export const HAND_REST = {
   x: 172,
   y: 262,
 }
+// Ruhehand: der Arm hängt gerade nach unten (Länge Oberarm plus Unterarm), egal wie breit die Schulter ist
+// Armlänge wächst mit der Hebung, damit die Pose kräftig und nicht klumpig wirkt
+export const armLength = (lift = 0) => UPPER_ARM + 10 * lift
+export const restHand = (shoulderPoint, lift = 0) => {
+  // lift 0: Arm hängt gerade nach unten; lift 1: Front-Double-Biceps (Oberarm seitlich, Unterarm nach oben)
+  let length = armLength(lift),
+    hang = { x: shoulderPoint.x + 2, y: shoulderPoint.y + 2 * length - 1 },
+    raised = { x: shoulderPoint.x + 39, y: shoulderPoint.y - 38 }
+  return { x: hang.x + (raised.x - hang.x) * lift, y: hang.y + (raised.y - hang.y) * lift }
+}
+export function bicepSpot(shoulderPoint, elbowPoint2, armWidth) {
+  let dx = elbowPoint2.x - shoulderPoint.x,
+    dy = elbowPoint2.y - shoulderPoint.y,
+    length = Math.hypot(dx, dy) || 1,
+    nx = dy / length,
+    ny = -dx / length
+  if (ny > 0) {
+    nx = -nx
+    ny = -ny
+  }
+  return {
+    x: (shoulderPoint.x + elbowPoint2.x) / 2 + nx * armWidth * 0.3,
+    y: (shoulderPoint.y + elbowPoint2.y) / 2 + ny * armWidth * 0.3,
+    r: armWidth * 0.46,
+  }
+}
 export const SIP_START_ANGLE = -62
 export const SIP_END_ANGLE = -97
 export const BOTTLE_PATH =
@@ -374,15 +400,15 @@ export const easeOutCubic = (phase) => 1 - (1 - phase) ** 3
 export const easeInCubic = (phase) => phase * phase * phase
 export const easeInOutCubic = (phase) => (phase < 0.5 ? 4 * phase * phase * phase : 1 - (-2 * phase + 2) ** 3 / 2)
 export const segment = (position, lower, upper) => clamp01((position - lower) / (upper - lower))
-export function elbowPoint(shoulder, hand) {
+export function elbowPoint(shoulder, hand, upperLength = UPPER_ARM, foreLength = FOREARM) {
   let dx = hand.x - shoulder.x,
     dy = hand.y - shoulder.y,
-    distance = Math.min(Math.max(Math.hypot(dx, dy), Math.abs(UPPER_ARM - FOREARM) + 0.01), 71.99),
+    distance = Math.min(Math.max(Math.hypot(dx, dy), Math.abs(upperLength - foreLength) + 0.01), upperLength + foreLength - 0.01),
     vecLength = Math.hypot(dx, dy) || 1,
     ux = dx / vecLength,
     uy = dy / vecLength,
-    along = (UPPER_ARM * UPPER_ARM - FOREARM * FOREARM + distance * distance) / (2 * distance),
-    bulge = Math.sqrt(Math.max(0, UPPER_ARM * UPPER_ARM - along * along)),
+    along = (upperLength * upperLength - foreLength * foreLength + distance * distance) / (2 * distance),
+    bulge = Math.sqrt(Math.max(0, upperLength * upperLength - along * along)),
     midX = shoulder.x + ux * along,
     midY = shoulder.y + uy * along,
     elbowA = {
@@ -567,15 +593,30 @@ export function Beard({ style: beardStyle, color: beardColor, skin: skinColor })
 // Körperentwicklung: level 0 (Einsteiger) bis 6 (durchtrainiert). Ohne Angabe (z. B. Coach-Ansicht) ein mittlerer Wert.
 export const NEUTRAL_PHYSIQUE = 1.5
 export function physiqueShape(level) {
-  let t = Math.min(1, Math.max(0, level / 6))
+  let t = Math.min(1, Math.max(0, level / 6)),
+    armWidth = 19 + 15 * t,
+    shoulder = { x: 156 + 14 * t, y: 180 + armWidth / 2 },
+    reach = shoulder.x - 100,
+    chestX = 58 + 10 * t,
+    waistX = 64 - 30 * t,
+    topY = 182,
+    p = (dx, y, side) => `${100 + side * dx} ${y}`,
+    half = (side) =>
+      `Q ${p(reach * 0.6, 175 - 4 * t, side)} ${p(reach - 6, topY, side)} C ${p(reach - 2, 196, side)} ${p(chestX + 2, 204, side)} ${p(chestX, 218, side)} C ${p(chestX - 1, 232, side)} ${p(waistX + 5, 244, side)} ${p(waistX, 253, side)}`,
+    back = (side) =>
+      `C ${p(waistX + 5, 244, side)} ${p(chestX - 1, 232, side)} ${p(chestX, 218, side)} C ${p(chestX + 2, 204, side)} ${p(reach - 2, 196, side)} ${p(reach - 6, topY, side)} Q ${p(reach * 0.6, 175 - 4 * t, side)} ${p(16, 176, side)}`
   return {
     t,
-    torsoScale: 0.9 + 0.14 * t,
-    neckWidth: 22 + 14 * t,
-    upperArm: 17 + 9 * t,
-    foreArm: 12 + 5 * t,
-    faceScale: 1.05 - 0.1 * t,
-    chest: Math.max(0, t - 0.3) * 0.6,
+    shoulder,
+    // Silhouette des Oberkörpers: breite Schultern, volle Brust, nach unten schmaler werdende Taille (V-Form)
+    torso: `M ${p(16, 176, -1)} ${half(-1)} L ${p(waistX, 253, 1)} ${back(1)} Z`,
+    upperArm: armWidth,
+    foreArm: 14 + 11 * t,
+    neckWidth: 24 + 6 * t,
+    faceScale: 1.02 - 0.04 * t,
+    chest: Math.min(1, Math.max(0, (t - 0.15) * 1.3)),
+    // Arme gehen ab Stufe 3 langsam nach oben, auf der höchsten Stufe steht die Pose
+    lift: ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 2.5) / 3.5))),
   }
 }
 export const Avatar = forwardRef<any, any>(function (
@@ -595,6 +636,10 @@ export const Avatar = forwardRef<any, any>(function (
 ) {
   let game = useContext(GameContext),
     shape = physiqueShape(physique ?? game.physique?.level ?? NEUTRAL_PHYSIQUE),
+    lift = holdBottle ? 0 : shape.lift,
+    restPoint = restHand(shape.shoulder, lift),
+    armLen = armLength(lift),
+    restElbow = elbowPoint(shape.shoulder, restPoint, armLen, armLen),
     cfg = config,
     uid = useId().replace(/:/g, ''),
     scale = bottleScale(bottleMl),
@@ -609,9 +654,9 @@ export const Avatar = forwardRef<any, any>(function (
             h: 150,
           }
         : {
-            x: 0,
+            x: -34 * lift,
             y: 0,
-            w: 200,
+            w: 200 + 68 * lift,
             h: 250,
           },
     clothes = clothesColors(items.kleidung, cfg.shirt, cfg.skin),
@@ -628,10 +673,18 @@ export const Avatar = forwardRef<any, any>(function (
     stateRef = useRef({
       holdBottle,
       scale,
+      shoulder: shape.shoulder,
+      lift,
+      armLen,
+      armWidth: shape.upperArm,
     })
   ;((stateRef.current = {
     holdBottle,
     scale,
+    shoulder: shape.shoulder,
+    lift,
+    armLen,
+    armWidth: shape.upperArm,
   }),
     useEffect(() => {
       let motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -649,12 +702,18 @@ export const Avatar = forwardRef<any, any>(function (
   let setPart = (partKey, attribute, attrValue) => parts.current[partKey]?.setAttribute(attribute, String(attrValue)),
     applyPose = useCallback((pose) => {
       let bottleSizeNow = stateRef.current.scale,
-        elbow = elbowPoint(SHOULDER, {
-          x: pose.hx,
-          y: pose.hy,
-        })
-      ;(setPart('upper', 'x1', SHOULDER.x),
-        setPart('upper', 'y1', SHOULDER.y),
+        shoulderNow = stateRef.current.shoulder,
+        elbow = elbowPoint(
+          shoulderNow,
+          {
+            x: pose.hx,
+            y: pose.hy,
+          },
+          stateRef.current.armLen,
+          stateRef.current.armLen,
+        )
+      ;(setPart('upper', 'x1', shoulderNow.x),
+        setPart('upper', 'y1', shoulderNow.y),
         setPart('upper', 'x2', elbow.x),
         setPart('upper', 'y2', elbow.y),
         setPart('fore', 'x1', elbow.x),
@@ -663,6 +722,12 @@ export const Avatar = forwardRef<any, any>(function (
         setPart('fore', 'y2', pose.hy),
         setPart('hand', 'cx', pose.hx),
         setPart('hand', 'cy', pose.hy),
+        ((bicep) => {
+          setPart('bicep', 'cx', bicep.x)
+          setPart('bicep', 'cy', bicep.y)
+          setPart('bicep', 'r', bicep.r)
+          setPart('bicep', 'opacity', stateRef.current.lift)
+        })(bicepSpot(shoulderNow, elbow, stateRef.current.armWidth)),
         setPart('bottle', 'transform', `translate(${pose.hx} ${pose.hy}) rotate(${pose.phi}) scale(${bottleSizeNow})`),
         setPart('waterRot', 'transform', `rotate(${-pose.phi})`),
         setPart('water', 'y', waterLevel(pose.phi, pose.fill)),
@@ -678,7 +743,7 @@ export const Avatar = forwardRef<any, any>(function (
     }, []),
     resetPose = useCallback(() => {
       let holding = stateRef.current.holdBottle,
-        handSpot = holding ? HAND_HOLD : HAND_REST
+        handSpot = holding ? HAND_HOLD : restHand(stateRef.current.shoulder, stateRef.current.lift)
       ;(applyPose({
         hx: handSpot.x,
         hy: handSpot.y,
@@ -694,7 +759,7 @@ export const Avatar = forwardRef<any, any>(function (
     }, [applyPose])
   useLayoutEffect(() => {
     resetPose()
-  }, [resetPose, holdBottle, bottleMl])
+  }, [resetPose, holdBottle, bottleMl, shape.shoulder.x, shape.shoulder.y, lift])
   let animate = useCallback(
     (durationMs, onFrame) =>
       new Promise((done) => {
@@ -781,7 +846,7 @@ export const Avatar = forwardRef<any, any>(function (
     cheer = useCallback(async () => {
       let runCheer = async () => {
         if (reducedMotion.current) return
-        let handPoint = stateRef.current.holdBottle ? HAND_HOLD : HAND_REST
+        let handPoint = stateRef.current.holdBottle ? HAND_HOLD : restHand(stateRef.current.shoulder, stateRef.current.lift)
         ;(await animate(900, (progress) => {
           let hopHeight = Math.abs(Math.sin(progress * Math.PI * 2)) * 10 * (1 - progress),
             sparkValue = Math.sin(progress * Math.PI)
@@ -823,36 +888,73 @@ export const Avatar = forwardRef<any, any>(function (
           <clipPath id={`${uid}-bottle`}>
             <path d={BOTTLE_PATH} />
           </clipPath>
+          <clipPath id={`${uid}-torso`}>
+            <path d={shape.torso} />
+          </clipPath>
         </defs>
         <g className={idle ? 'avatar-bob' : undefined}>
           <g ref={partRef('body')}>
-            <g transform={`translate(100 0) scale(${shape.torsoScale} 1) translate(-100 0)`}>
-              <HoodieCollarBack clothes={items.kleidung} shirt={cfg.shirt} />
-            </g>
+            <HoodieCollarBack clothes={items.kleidung} shirt={cfg.shirt} />
             <HairBack c={cfg} />
-            <g transform={`translate(100 0) scale(${shape.torsoScale} 1) translate(-100 0)`}>
+            <g clipPath={`url(#${uid}-torso)`}>
               {items.kleidung ? (
                 <Clothes clothes={items.kleidung} shirt={cfg.shirt} skin={cfg.skin} />
               ) : (
                 <path d={DEFAULT_SHIRT_PATH} fill={cfg.shirt} />
               )}
-              <path d="M44 190 C30 204 24 228 26 250 L56 250 C54 228 56 208 62 194 Z" fill={clothes.leftSleeve} />
               {!items.kleidung && (
                 <path d="M104 196 L92 212 L100 212 L96 226 L110 208 L102 208 Z" fill="#fff" opacity="0.85" />
               )}
               {shape.chest > 0 && (
-                <path
-                  d="M68 208 Q84 222 100 214 Q116 222 132 208"
-                  fill="none"
-                  stroke={shade(clothes.body, 0.3)}
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  opacity={shape.chest}
-                />
+                <g>
+                  <ellipse cx="82" cy="212" rx="22" ry="13" fill="#fff" opacity={0.1 * shape.chest} />
+                  <ellipse cx="118" cy="212" rx="22" ry="13" fill="#fff" opacity={0.1 * shape.chest} />
+                  <path
+                    d="M62 210 Q82 236 100 224 Q118 236 138 210"
+                    fill="none"
+                    stroke={shade(clothes.body, 0.32)}
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    opacity={0.75 * shape.chest}
+                  />
+                </g>
               )}
-              <rect x={100 - shape.neckWidth / 2} y="136" width={shape.neckWidth} height="46" rx="10" fill={skinShade} />
-              <path d="M84 178 Q100 198 116 178 Q100 184 84 178 Z" fill={skinShade} />
             </g>
+            <line
+              x1={200 - shape.shoulder.x}
+              y1={shape.shoulder.y}
+              x2={200 - restElbow.x}
+              y2={restElbow.y}
+              stroke={clothes.leftSleeve}
+              strokeWidth={shape.upperArm}
+              strokeLinecap="round"
+            />
+            <line
+              x1={200 - restElbow.x}
+              y1={restElbow.y}
+              x2={200 - restPoint.x}
+              y2={restPoint.y}
+              stroke={foreColor === cfg.skin ? shade(cfg.skin, 0.1) : clothes.leftSleeve}
+              strokeWidth={foreColor === cfg.skin ? shape.foreArm : shape.foreArm + 5}
+              strokeLinecap="round"
+            />
+            <circle cx={200 - restPoint.x} cy={restPoint.y} r={9 + 4 * lift} fill={shade(cfg.skin, 0.1)} />
+            {lift > 0 && (
+              <circle
+                cx={200 - bicepSpot(shape.shoulder, restElbow, shape.upperArm).x}
+                cy={bicepSpot(shape.shoulder, restElbow, shape.upperArm).y}
+                r={bicepSpot(shape.shoulder, restElbow, shape.upperArm).r}
+                fill={clothes.leftSleeve}
+                opacity={lift}
+              />
+            )}
+            {shape.chest > 0 && (
+              <g fill="none" stroke={shade(clothes.leftSleeve, 0.3)} strokeWidth="2.2" strokeLinecap="round" opacity={0.6 * shape.chest}>
+                <path d={`M${200 - shape.shoulder.x - shape.upperArm / 2 + 4} ${shape.shoulder.y + 12} Q${200 - shape.shoulder.x} ${shape.shoulder.y + 20} ${200 - shape.shoulder.x + shape.upperArm / 2 - 4} ${shape.shoulder.y + 12}`} />
+              </g>
+            )}
+            <rect x={100 - shape.neckWidth / 2} y="136" width={shape.neckWidth} height="46" rx="10" fill={skinShade} />
+            <path d="M84 178 Q100 198 116 178 Q100 184 84 178 Z" fill={skinShade} />
             <Neckwear item={items.hals} />
             <Pet item={items.tier} />
             <g ref={partRef('head')}>
@@ -910,6 +1012,14 @@ export const Avatar = forwardRef<any, any>(function (
               strokeWidth={shape.upperArm}
               strokeLinecap="round"
             />
+            <circle
+              ref={partRef('bicep')}
+              cx="0"
+              cy="0"
+              r="0"
+              fill={sleeveColor}
+              opacity="0"
+            />
             <line
               ref={partRef('fore')}
               x1="175"
@@ -920,6 +1030,16 @@ export const Avatar = forwardRef<any, any>(function (
               strokeWidth={foreColor === cfg.skin ? shape.foreArm : shape.foreArm + 5}
               strokeLinecap="round"
             />
+            {shape.chest > 0 && (
+              <path
+                d={`M${shape.shoulder.x - shape.upperArm / 2 + 4} ${shape.shoulder.y + 12} Q${shape.shoulder.x} ${shape.shoulder.y + 20} ${shape.shoulder.x + shape.upperArm / 2 - 4} ${shape.shoulder.y + 12}`}
+                fill="none"
+                stroke={shade(sleeveColor, 0.3)}
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                opacity={0.6 * shape.chest}
+              />
+            )}
             <g ref={partRef('bottle')} transform={`translate(${HAND_HOLD.x} ${HAND_HOLD.y}) scale(${scale})`}>
               <path d={BOTTLE_PATH} fill="#dcecf6" fillOpacity="0.55" />
               <g clipPath={`url(#${uid}-bottle)`}>
@@ -940,7 +1060,7 @@ export const Avatar = forwardRef<any, any>(function (
               <rect x="-6.5" y="-44" width="13" height="8" rx="2.5" fill="#075640" />
               <path d="M-8 -20 L-8 14" stroke="#fff" strokeOpacity="0.55" strokeWidth="2.2" strokeLinecap="round" />
             </g>
-            <circle ref={partRef('hand')} cx={HAND_HOLD.x} cy={HAND_HOLD.y} r="9" fill={cfg.skin} />
+            <circle ref={partRef('hand')} cx={HAND_HOLD.x} cy={HAND_HOLD.y} r={9 + 4 * lift} fill={cfg.skin} />
           </g>
         </g>
       </svg>
