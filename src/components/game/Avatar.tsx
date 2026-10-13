@@ -368,7 +368,7 @@ export const restHand = (shoulderPoint, lift = 0, flare = 0) => {
     raised = { x: shoulderPoint.x + 39, y: shoulderPoint.y - 38 }
   return { x: hang.x + (raised.x - hang.x) * lift, y: hang.y + (raised.y - hang.y) * lift }
 }
-export function bicepSpot(shoulderPoint, elbowPoint2, armWidth) {
+export function bicepSpot(shoulderPoint, elbowPoint2, armWidth, peak = 0) {
   let dx = elbowPoint2.x - shoulderPoint.x,
     dy = elbowPoint2.y - shoulderPoint.y,
     length = Math.hypot(dx, dy) || 1,
@@ -379,9 +379,9 @@ export function bicepSpot(shoulderPoint, elbowPoint2, armWidth) {
     ny = -ny
   }
   return {
-    x: (shoulderPoint.x + elbowPoint2.x) / 2 + nx * armWidth * 0.3,
-    y: (shoulderPoint.y + elbowPoint2.y) / 2 + ny * armWidth * 0.3,
-    r: armWidth * 0.46,
+    x: (shoulderPoint.x + elbowPoint2.x) / 2 + nx * armWidth * (0.3 + 0.1 * peak),
+    y: (shoulderPoint.y + elbowPoint2.y) / 2 + ny * armWidth * (0.3 + 0.1 * peak),
+    r: armWidth * (0.42 + 0.14 * peak),
   }
 }
 export const SIP_START_ANGLE = -62
@@ -611,13 +611,15 @@ export function physiqueShape(level) {
     shoulder,
     // Silhouette des Oberkörpers: breite Schultern, volle Brust, nach unten schmaler werdende Taille (V-Form)
     torso: `M ${p(16, 176, -1)} ${half(-1)} L ${p(waistX, 253, 1)} ${back(1)} Z`,
-    upperArm: armWidth,
+    upperArm: armWidth + 4 * Math.min(1, Math.max(0, (level - 4.5) / 1.5)),
     foreArm: 14 + 11 * t,
     neckWidth: 24 + 6 * t,
     faceScale: 1.02 - 0.04 * t,
     chest: Math.min(1, Math.max(0, (t - 0.15) * 1.3)),
-    // Die Arme gehen erst auf den letzten Stufen nach oben, auf der höchsten Stufe steht die Pose
-    lift: ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 4.5) / 1))),
+    // Ab Stufe 4,5 steht die Pose (Front-Double-Biceps), danach wird sie nur noch größer
+    lift: ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 4.35) / 0.15))),
+    // ab Stufe 4,5 wachsen nur noch Arme, Schultern und Brustdetails
+    peak: Math.min(1, Math.max(0, (level - 4.5) / 1.5)),
     // Arme hängen mit wachsender Stufe etwas weiter vom Körper weg
     flare: 14 * ((x) => x * x * (3 - 2 * x))(Math.min(1, Math.max(0, (level - 2) / 2.5))),
   }
@@ -682,6 +684,7 @@ export const Avatar = forwardRef<any, any>(function (
       flare,
       armLen,
       armWidth: shape.upperArm,
+      peak: shape.peak,
     })
   ;((stateRef.current = {
     holdBottle,
@@ -691,6 +694,7 @@ export const Avatar = forwardRef<any, any>(function (
     flare,
     armLen,
     armWidth: shape.upperArm,
+    peak: shape.peak,
   }),
     useEffect(() => {
       let motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -733,7 +737,7 @@ export const Avatar = forwardRef<any, any>(function (
           setPart('bicep', 'cy', bicep.y)
           setPart('bicep', 'r', bicep.r)
           setPart('bicep', 'opacity', stateRef.current.lift)
-        })(bicepSpot(shoulderNow, elbow, stateRef.current.armWidth)),
+        })(bicepSpot(shoulderNow, elbow, stateRef.current.armWidth, stateRef.current.peak)),
         setPart('bottle', 'transform', `translate(${pose.hx} ${pose.hy}) rotate(${pose.phi}) scale(${bottleSizeNow})`),
         setPart('waterRot', 'transform', `rotate(${-pose.phi})`),
         setPart('water', 'y', waterLevel(pose.phi, pose.fill)),
@@ -913,8 +917,10 @@ export const Avatar = forwardRef<any, any>(function (
               )}
               {shape.chest > 0 && (
                 <g>
-                  <ellipse cx="82" cy="212" rx="22" ry="13" fill="#fff" opacity={0.1 * shape.chest} />
-                  <ellipse cx="118" cy="212" rx="22" ry="13" fill="#fff" opacity={0.1 * shape.chest} />
+                  <ellipse cx="82" cy="212" rx="22" ry="13" fill="#fff" opacity={0.1 * shape.chest + 0.08 * shape.peak} />
+                  <ellipse cx="118" cy="212" rx="22" ry="13" fill="#fff" opacity={0.1 * shape.chest + 0.08 * shape.peak} />
+                  <path d="M100 204 L100 226" stroke={shade(clothes.body, 0.32)} strokeWidth="2.4" strokeLinecap="round" fill="none" opacity={0.8 * shape.peak} />
+                  <path d="M70 222 Q84 230 96 226 M130 222 Q116 230 104 226" stroke={shade(clothes.body, 0.32)} strokeWidth="2" strokeLinecap="round" fill="none" opacity={0.6 * shape.peak} />
                   <path
                     d="M62 210 Q82 236 100 224 Q118 236 138 210"
                     fill="none"
@@ -947,9 +953,9 @@ export const Avatar = forwardRef<any, any>(function (
             <circle cx={200 - restPoint.x} cy={restPoint.y} r={9 + 4 * lift} fill={shade(cfg.skin, 0.1)} />
             {lift > 0 && (
               <circle
-                cx={200 - bicepSpot(shape.shoulder, restElbow, shape.upperArm).x}
-                cy={bicepSpot(shape.shoulder, restElbow, shape.upperArm).y}
-                r={bicepSpot(shape.shoulder, restElbow, shape.upperArm).r}
+                cx={200 - bicepSpot(shape.shoulder, restElbow, shape.upperArm, shape.peak).x}
+                cy={bicepSpot(shape.shoulder, restElbow, shape.upperArm, shape.peak).y}
+                r={bicepSpot(shape.shoulder, restElbow, shape.upperArm, shape.peak).r}
                 fill={clothes.leftSleeve}
                 opacity={lift}
               />
