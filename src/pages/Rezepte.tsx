@@ -3,12 +3,13 @@ import {
   BookOpen, Plus, Trash2, ChefHat, CalendarDays, Sparkles,
   ChevronLeft, ChevronRight, X, Check, Info, UtensilsCrossed,
   ShoppingCart, Copy, Share2, Send, MessageCircle, Wallet,
-  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus,
+  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus, Play, ArrowLeft, ArrowRight,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Spinner } from '../components/ui/Spinner'
 import { toLocalISO, todayISO as localTodayISO } from '../lib/utils'
+import { parseIngredients, parseSteps, scaleIngredient } from '../lib/recipe'
 import type { Rezept, ClientSettings, MealPlanEntry } from '../types/database'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -158,7 +159,7 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-text-primary truncate">{r.name}</div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-xs text-text-muted">{r.kalorien} kcal · {r.portionen} Port.</span>
+            <span className="text-xs text-text-muted">{r.kalorien} kcal/Port. · {r.portionen} Port.</span>
             <MacroRow label="P" value={r.protein_g} color="text-info" />
             <MacroRow label="K" value={r.kohlenhydrate_g} color="text-warning" />
             <MacroRow label="F" value={r.fett_g} color="text-success" />
@@ -183,6 +184,89 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
   )
 }
 
+// ─── Koch-Modus: ein Schritt pro Seite, Bildschirm bleibt an ─────────────────
+
+function CookMode({ title, steps, ingredients, onClose }: {
+  title: string; steps: string[]; ingredients: string[]; onClose: () => void
+}) {
+  const [step, setStep] = useState(0)
+  const [showIngredients, setShowIngredients] = useState(false)
+  const last = steps.length - 1
+
+  useEffect(() => {
+    let lock: { release: () => Promise<void> } | null = null
+    const nav = navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> } }
+    const request = () => { nav.wakeLock?.request('screen').then(l => { lock = l }).catch(() => {}) }
+    request()
+    const onVisible = () => { if (document.visibilityState === 'visible') request() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { document.removeEventListener('visibilitychange', onVisible); lock?.release().catch(() => {}) }
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setStep(s => Math.min(last, s + 1))
+      else if (e.key === 'ArrowLeft') setStep(s => Math.max(0, s - 1))
+      else if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [last, onClose])
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-bg flex flex-col" role="dialog" aria-label={`Kochmodus: ${title}`}>
+      <div className="flex items-center gap-3 p-4 border-b border-border shrink-0">
+        <button onClick={onClose} className="p-2 rounded-lg hover:bg-bg-elevated text-text-muted" aria-label="Kochmodus beenden">
+          <X size={20} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-text-primary truncate">{title}</div>
+          <div className="text-xs text-text-muted">Schritt {step + 1} von {steps.length}</div>
+        </div>
+        {ingredients.length > 0 && (
+          <button onClick={() => setShowIngredients(v => !v)}
+            className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1.5 transition-colors ${showIngredients ? 'border-brand bg-brand/10 text-brand' : 'border-border text-text-secondary'}`}>
+            <ShoppingCart size={14} /> Zutaten
+          </button>
+        )}
+      </div>
+      <div className="h-1 bg-border shrink-0" aria-hidden="true">
+        <div className="h-full bg-brand transition-all" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col justify-center max-w-2xl w-full mx-auto">
+        {showIngredients ? (
+          <ul className="space-y-2.5 text-lg text-text-primary">
+            {ingredients.map((ing, i) => <li key={i} className="flex gap-3"><span className="text-brand">•</span><span>{ing}</span></li>)}
+          </ul>
+        ) : (
+          <>
+            <div className="text-sm font-semibold text-brand mb-3">Schritt {step + 1}</div>
+            <p className="text-2xl leading-relaxed text-text-primary font-medium">{steps[step]}</p>
+          </>
+        )}
+      </div>
+
+      <div className="p-4 border-t border-border flex gap-3 shrink-0 max-w-2xl w-full mx-auto">
+        <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}
+          className="btn-secondary flex-1 flex items-center justify-center gap-2 py-4 text-base disabled:opacity-40">
+          <ArrowLeft size={18} /> Zurück
+        </button>
+        {step < last ? (
+          <button onClick={() => setStep(s => Math.min(last, s + 1))}
+            className="btn-primary flex-1 flex items-center justify-center gap-2 py-4 text-base">
+            Weiter <ArrowRight size={18} />
+          </button>
+        ) : (
+          <button onClick={onClose} className="btn-primary flex-1 flex items-center justify-center gap-2 py-4 text-base">
+            <Check size={18} /> Fertig, guten Appetit!
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onInstructionsGenerated }: {
   r: Rezept; userId: string; onClose: () => void; onDelete: () => void
   onImageGenerated: (id: string, url: string) => void
@@ -199,11 +283,38 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
   const [adding, setAdding] = useState(false)
   const [added, setAdded] = useState(false)
 
+  // Nährwerte sind pro Portion hinterlegt; „Portionen“ rechnet nur die Zutatenmengen um
+  const [eatPortionen, setEatPortionen] = useState(1)
+  const [cooking, setCooking] = useState(false)
+  const checkedKey = `rezept_einkauf_${r.id}`
+  const [checked, setChecked] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem(checkedKey) ?? '[]') } catch { return [] }
+  })
+  function toggleChecked(i: number) {
+    setChecked(prev => {
+      const next = prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
+      try { localStorage.setItem(checkedKey, JSON.stringify(next)) } catch { /* ohne Speicher weiter */ }
+      return next
+    })
+  }
+
   const scale = portionen / basePort
-  const scaledKal = Math.round(r.kalorien * scale)
-  const scaledProt = r.protein_g != null ? parseFloat((r.protein_g * scale).toFixed(1)) : null
-  const scaledKarbs = r.kohlenhydrate_g != null ? parseFloat((r.kohlenhydrate_g * scale).toFixed(1)) : null
-  const scaledFett = r.fett_g != null ? parseFloat((r.fett_g * scale).toFixed(1)) : null
+  const kochanleitungText = localKochanleitung ?? r.kochanleitung
+  const ingredientLines = parseIngredients(r.zutaten_text).map(line => scaleIngredient(line, scale))
+  const steps = parseSteps(kochanleitungText)
+  const eatKal = Math.round(r.kalorien * eatPortionen)
+  const eatProt = r.protein_g != null ? parseFloat((r.protein_g * eatPortionen).toFixed(1)) : null
+  const eatKarbs = r.kohlenhydrate_g != null ? parseFloat((r.kohlenhydrate_g * eatPortionen).toFixed(1)) : null
+  const eatFett = r.fett_g != null ? parseFloat((r.fett_g * eatPortionen).toFixed(1)) : null
+
+  async function shareShoppingList() {
+    const open = ingredientLines.filter((_, i) => !checked.includes(i))
+    const text = `🛒 ${r.name} (${portionen % 1 === 0 ? portionen : portionen.toFixed(1)} Port.)\n${open.map(l => `• ${l}`).join('\n')}`
+    try {
+      if (navigator.share) await navigator.share({ title: `Einkaufsliste ${r.name}`, text })
+      else await navigator.clipboard.writeText(text)
+    } catch { /* abgebrochen */ }
+  }
 
   async function generateImage() {
     setGeneratingImg(true)
@@ -245,9 +356,9 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
     setAdding(true)
     await supabase.from('meal_plans').insert({
       user_id: userId, datum: planDatum, mahlzeit: planSlot,
-      rezept_id: r.id, rezept_name: r.name, portionen,
-      kalorien: scaledKal, protein_g: scaledProt,
-      kohlenhydrate_g: scaledKarbs, fett_g: scaledFett,
+      rezept_id: r.id, rezept_name: r.name, portionen: eatPortionen,
+      kalorien: eatKal, protein_g: eatProt,
+      kohlenhydrate_g: eatKarbs, fett_g: eatFett,
     })
     setAdding(false)
     setAdded(true)
@@ -282,11 +393,12 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-text-primary text-base">{r.name}</div>
             <div className="text-sm text-text-muted mt-0.5">
-              {scaledKal} kcal
-              {scaledProt != null && <span className="text-info"> · P {scaledProt}g</span>}
-              {scaledKarbs != null && <span className="text-warning"> · K {scaledKarbs}g</span>}
-              {scaledFett != null && <span className="text-success"> · F {scaledFett}g</span>}
+              {r.kalorien} kcal
+              {r.protein_g != null && <span className="text-info"> · P {Math.round(r.protein_g)}g</span>}
+              {r.kohlenhydrate_g != null && <span className="text-warning"> · K {Math.round(r.kohlenhydrate_g)}g</span>}
+              {r.fett_g != null && <span className="text-success"> · F {Math.round(r.fett_g)}g</span>}
             </div>
+            <div className="text-[11px] text-text-muted">pro Portion · geschätzt</div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted shrink-0">
             <X size={18} />
@@ -298,13 +410,13 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
 
           {/* Portion adjuster */}
           <div className="flex items-center gap-3 p-3 bg-bg-elevated rounded-xl border border-border">
-            <span className="text-sm text-text-secondary flex-1">Portionen</span>
+            <span className="text-sm text-text-secondary flex-1">Zutaten für</span>
             <button onClick={() => setPortionen(p => Math.max(0.5, parseFloat((p - 0.5).toFixed(1))))}
               className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-brand/50 transition-colors">
               <Minus size={14} className="text-text-secondary" />
             </button>
-            <span className="w-14 text-center font-semibold text-text-primary">
-              {portionen % 1 === 0 ? portionen : portionen.toFixed(1)}
+            <span className="w-20 text-center font-semibold text-text-primary">
+              {portionen % 1 === 0 ? portionen : portionen.toFixed(1)} Port.
             </span>
             <button onClick={() => setPortionen(p => parseFloat((p + 0.5).toFixed(1)))}
               className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center hover:border-brand/50 transition-colors">
@@ -312,31 +424,44 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
             </button>
           </div>
 
-          {/* Zutaten */}
-          {r.zutaten_text && (
+          {/* Zutaten = Einkaufsliste */}
+          {ingredientLines.length > 0 && (
             <div>
               <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <ShoppingCart size={12} /> Zutaten
+                <ShoppingCart size={12} /> Einkaufsliste · Zutaten
                 {scale !== 1 && (
                   <span className="text-brand font-medium normal-case tracking-normal ml-1">
-                    (×{scale % 1 === 0 ? scale : scale.toFixed(1)} für {portionen} Port.)
+                    (für {portionen % 1 === 0 ? portionen : portionen.toFixed(1)} Port.)
                   </span>
                 )}
+                <button onClick={shareShoppingList} className="ml-auto text-brand font-medium normal-case tracking-normal flex items-center gap-1 hover:underline">
+                  <Share2 size={12} /> Teilen
+                </button>
               </div>
-              <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed bg-bg-elevated rounded-xl p-3 border border-border">
-                {r.zutaten_text}
-              </div>
-              {scale !== 1 && (
-                <div className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
-                  <Info size={11} className="shrink-0" />
-                  Angaben für {basePort} Portion(en) — alle Mengen mit ×{scale % 1 === 0 ? scale : scale.toFixed(1)} multiplizieren
-                </div>
+              <ul className="bg-bg-elevated rounded-xl border border-border divide-y divide-border">
+                {ingredientLines.map((line, i) => {
+                  const done = checked.includes(i)
+                  return (
+                    <li key={i}>
+                      <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={done} onChange={() => toggleChecked(i)} className="w-4 h-4 accent-[rgb(var(--c-brand))] shrink-0" />
+                        <span className={`text-sm ${done ? 'line-through text-text-muted' : 'text-text-primary'}`}>{line}</span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+              {checked.length > 0 && (
+                <button onClick={() => { setChecked([]); try { localStorage.removeItem(checkedKey) } catch { /* egal */ } }}
+                  className="text-xs text-text-muted mt-1.5 hover:text-text-primary">
+                  Haken zurücksetzen
+                </button>
               )}
             </div>
           )}
 
           {/* Kochanleitung */}
-          {(r.kochanleitung || localKochanleitung || generatingInstr) && (
+          {(steps.length > 0 || generatingInstr) && (
             <div>
               <div className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <ChefHat size={12} /> Kochanleitung
@@ -347,9 +472,19 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
                   KI erstellt Kochanleitung…
                 </div>
               ) : (
-                <div className="text-sm text-text-secondary whitespace-pre-line leading-relaxed bg-bg-elevated rounded-xl p-3 border border-border">
-                  {localKochanleitung ?? r.kochanleitung}
-                </div>
+                <>
+                  <ol className="space-y-2.5 bg-bg-elevated rounded-xl p-3 border border-border">
+                    {steps.map((step, i) => (
+                      <li key={i} className="flex gap-3 text-sm text-text-secondary leading-relaxed">
+                        <span className="w-6 h-6 rounded-full bg-brand/15 text-brand text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <button onClick={() => setCooking(true)} className="btn-primary w-full mt-3 flex items-center justify-center gap-2">
+                    <Play size={16} /> Kochmodus starten
+                  </button>
+                </>
               )}
             </div>
           )}
@@ -377,6 +512,15 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
           ) : (
             <div className="space-y-3">
               <div className="text-sm font-medium text-text-primary">Zum Wochenplan hinzufügen</div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-text-secondary flex-1">Ich esse</span>
+                <button onClick={() => setEatPortionen(p => Math.max(0.5, parseFloat((p - 0.5).toFixed(1))))}
+                  className="w-7 h-7 rounded-lg bg-bg-elevated border border-border flex items-center justify-center"><Minus size={12} /></button>
+                <span className="w-16 text-center font-semibold text-text-primary">{eatPortionen % 1 === 0 ? eatPortionen : eatPortionen.toFixed(1)} Port.</span>
+                <button onClick={() => setEatPortionen(p => parseFloat((p + 0.5).toFixed(1)))}
+                  className="w-7 h-7 rounded-lg bg-bg-elevated border border-border flex items-center justify-center"><Plus size={12} /></button>
+                <span className="text-text-muted w-20 text-right">{eatKal} kcal</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs text-text-muted mb-1 block">Tag</label>
@@ -410,6 +554,9 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
           )}
         </div>
       </div>
+      {cooking && steps.length > 0 && (
+        <CookMode title={r.name} steps={steps} ingredients={ingredientLines} onClose={() => setCooking(false)} />
+      )}
     </div>
   )
 }
@@ -428,8 +575,11 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
   userId: string; onSaved: (r: Rezept) => void; onCancel: () => void
 }) {
   const [importUrl, setImportUrl] = useState('')
+  const [importText, setImportText] = useState('')
+  const [showTextImport, setShowTextImport] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState('')
+  const [importHints, setImportHints] = useState<string[]>([])
   const [form, setForm] = useState<NewRezeptState>(emptyRezept)
   const [generateImage, setGenerateImage] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -440,15 +590,23 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
 
   async function importFromUrl() {
     const url = importUrl.trim()
-    if (!url) return
+    const text = importText.trim()
+    if (!url && !text) return
     setImporting(true)
     setImportError('')
+    setImportHints([])
     const { data, error: fnErr } = await supabase.functions.invoke('extract-recipe-url', {
-      body: { url },
+      body: { url: url || undefined, text: text || undefined },
     })
     setImporting(false)
-    if (fnErr || data?.error) {
-      setImportError(data?.error ?? fnErr?.message ?? 'Fehler beim Importieren')
+    if (fnErr || data?.error || !data?.recipe) {
+      // Bei Fehlern liefert die Funktion die Meldung im Antwort-Body (nicht in fnErr.message)
+      let message: string | undefined = data?.error
+      if (!message && fnErr && 'context' in fnErr && fnErr.context instanceof Response) {
+        message = (await fnErr.context.json().catch(() => null))?.error
+      }
+      setImportError(message ?? 'Der Import hat nicht funktioniert. Bitte versuche es noch einmal.')
+      if (!text) setShowTextImport(true)
       return
     }
     const r = data.recipe
@@ -462,6 +620,10 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
       zutaten_text: r.zutaten_text ?? '',
       kochanleitung: r.kochanleitung ?? '',
     })
+    const hints: string[] = []
+    if (r.naehrwerte_geschaetzt) hints.push('Nährwerte wurden pro Portion geschätzt – bitte kurz prüfen.')
+    if (r.anleitung_rekonstruiert) hints.push('Die Anleitung war im Beitrag nicht vollständig und wurde sinnvoll ergänzt.')
+    setImportHints(hints)
   }
 
   async function save() {
@@ -500,18 +662,27 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
 
       {/* URL Import */}
       <div className="space-y-2">
-        <label className="label flex items-center gap-1.5"><Link size={13} /> Von Instagram / TikTok importieren</label>
+        <label className="label flex items-center gap-1.5"><Link size={13} /> Von Instagram, TikTok oder YouTube importieren</label>
         <div className="flex gap-2">
-          <input className="input flex-1 text-sm" placeholder="https://www.instagram.com/p/... oder tiktok.com/..."
+          <input className="input flex-1 text-sm" placeholder="Link zum Video oder Beitrag einfügen"
             value={importUrl} onChange={e => setImportUrl(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && importFromUrl()} />
-          <button onClick={importFromUrl} disabled={importing || !importUrl.trim()}
+          <button onClick={importFromUrl} disabled={importing || (!importUrl.trim() && !importText.trim())}
             className="btn-primary px-3 flex items-center gap-1.5 text-sm shrink-0 disabled:opacity-50">
             {importing ? <Spinner size={14} /> : <Wand2 size={14} />}
             {importing ? 'Lädt…' : 'Extrahieren'}
           </button>
         </div>
+        <button type="button" onClick={() => setShowTextImport(v => !v)} className="text-xs text-brand hover:underline">
+          {showTextImport ? 'Rezepttext ausblenden' : 'Oder Rezepttext einfügen'}
+        </button>
+        {showTextImport && (
+          <textarea className="input resize-none text-sm" rows={4}
+            placeholder="Beschreibung oder Rezepttext aus dem Beitrag hier einfügen (z. B. wenn der Link privat ist)"
+            value={importText} onChange={e => setImportText(e.target.value)} />
+        )}
         {importError && <div className="text-xs text-danger">{importError}</div>}
+        {importHints.map(h => <div key={h} className="text-xs text-warning flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" />{h}</div>)}
       </div>
 
       <div className="border-t border-border" />
@@ -521,14 +692,15 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
       <input className="input" placeholder="Rezeptname *" value={form.name} onChange={set('name')} />
 
       <div className="grid grid-cols-2 gap-2">
-        <input className="input" type="number" placeholder="Kalorien *" value={form.kalorien} onChange={set('kalorien')} />
-        <input className="input" type="number" placeholder="Portionen" value={form.portionen} onChange={set('portionen')} />
-        <input className="input" type="number" placeholder="Protein (g)" value={form.protein_g} onChange={set('protein_g')} />
-        <input className="input" type="number" placeholder="Kohlenhydrate (g)" value={form.kohlenhydrate_g} onChange={set('kohlenhydrate_g')} />
-        <input className="input" type="number" placeholder="Fett (g)" value={form.fett_g} onChange={set('fett_g')} />
+        <input className="input" type="number" placeholder="Kalorien pro Portion *" value={form.kalorien} onChange={set('kalorien')} />
+        <input className="input" type="number" placeholder="Anzahl Portionen" value={form.portionen} onChange={set('portionen')} />
+        <input className="input" type="number" placeholder="Protein pro Port. (g)" value={form.protein_g} onChange={set('protein_g')} />
+        <input className="input" type="number" placeholder="Kohlenhydrate pro Port. (g)" value={form.kohlenhydrate_g} onChange={set('kohlenhydrate_g')} />
+        <input className="input" type="number" placeholder="Fett pro Port. (g)" value={form.fett_g} onChange={set('fett_g')} />
       </div>
+      <div className="text-[11px] text-text-muted -mt-2">Nährwerte immer pro Portion, die Zutatenmengen gelten für die Anzahl Portionen.</div>
 
-      <textarea className="input resize-none text-sm" rows={2} placeholder="Zutaten (optional)"
+      <textarea className="input resize-none text-sm" rows={4} placeholder="Zutaten, eine pro Zeile (z. B. 200 g Hähnchenbrust)"
         value={form.zutaten_text} onChange={set('zutaten_text')} />
 
       <textarea className="input resize-none text-sm" rows={4}
@@ -602,7 +774,7 @@ function RecipePickerModal({ rezepte, slot, datum, userId, onAdded, onClose }: {
                 selected?.id === r.id ? 'border-brand bg-brand/10' : 'border-border hover:border-border-light bg-bg-elevated'
               }`}>
               <div className="font-medium text-sm text-text-primary">{r.name}</div>
-              <div className="text-xs text-text-muted mt-0.5">{r.kalorien} kcal · {r.portionen} Port.</div>
+              <div className="text-xs text-text-muted mt-0.5">{r.kalorien} kcal pro Portion</div>
             </button>
           ))}
         </div>

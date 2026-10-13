@@ -27,6 +27,7 @@ import { useTheme } from '../../hooks/useTheme'
 import { useNavigate } from 'react-router-dom'
 import { formatDate, todayISO } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
+import { fromInputs, setsOfExercise, toInputs, volumeOfSets } from '../../lib/sets'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -1036,12 +1037,34 @@ export function ExerciseRows({ entries: rowList, onChange: onChangeRows }) {
       ...rowList,
       {
         uebungsname: '',
-        saetze: '',
-        wdh: '',
-        gewicht_kg: '',
+        sets: [
+          { wdh: '', kg: '' },
+          { wdh: '', kg: '' },
+          { wdh: '', kg: '' },
+        ],
         notizen: '',
       },
     ])
+  }
+  function updateSet(rowIndex, setIndex, field, newValue) {
+    let copy = [...rowList]
+    copy[rowIndex] = {
+      ...copy[rowIndex],
+      sets: copy[rowIndex].sets.map((setItem, index) => (index === setIndex ? { ...setItem, [field]: newValue } : setItem)),
+    }
+    onChangeRows(copy)
+  }
+  function addSet(rowIndex) {
+    let copy = [...rowList],
+      lastSet = copy[rowIndex].sets[copy[rowIndex].sets.length - 1]
+    // Neuer Satz startet mit den Werten des letzten – nur die Abweichung muss geändert werden
+    copy[rowIndex] = { ...copy[rowIndex], sets: [...copy[rowIndex].sets, { wdh: lastSet?.wdh ?? '', kg: lastSet?.kg ?? '' }] }
+    onChangeRows(copy)
+  }
+  function removeSet(rowIndex, setIndex) {
+    let copy = [...rowList]
+    copy[rowIndex] = { ...copy[rowIndex], sets: copy[rowIndex].sets.filter((setItem, index) => index !== setIndex) }
+    onChangeRows(copy)
   }
   function removeRow(rowIndex) {
     onChangeRows(rowList.filter((row, index) => index !== rowIndex))
@@ -1075,38 +1098,55 @@ export function ExerciseRows({ entries: rowList, onChange: onChangeRows }) {
               <Trash2 size={14} />
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">Sätze</label>
-              <input
-                type="number"
-                className="input text-sm py-2"
-                placeholder="3"
-                value={row.saetze}
-                onChange={(event) => updateRow(rowIndex, 'saetze', event.target.value)}
-              />
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-[28px_1fr_1fr_32px] gap-2 px-1 text-[11px] text-text-muted font-semibold uppercase tracking-wide">
+              <span className="text-center">Satz</span>
+              <span className="text-center">Gewicht (kg)</span>
+              <span className="text-center">Wdh.</span>
+              <span />
             </div>
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">Wdh.</label>
-              <input
-                type="number"
-                className="input text-sm py-2"
-                placeholder="10"
-                value={row.wdh}
-                onChange={(event) => updateRow(rowIndex, 'wdh', event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">Gewicht (kg)</label>
-              <input
-                type="number"
-                step="0.5"
-                className="input text-sm py-2"
-                placeholder="80"
-                value={row.gewicht_kg}
-                onChange={(event) => updateRow(rowIndex, 'gewicht_kg', event.target.value)}
-              />
-            </div>
+            {row.sets.map((setItem, setIndex) => (
+              <div className="grid grid-cols-[28px_1fr_1fr_32px] gap-2 items-center" key={setIndex}>
+                <span className="w-7 h-7 rounded-lg bg-bg-card flex items-center justify-center text-xs font-bold text-text-muted">
+                  {setIndex + 1}
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.5"
+                  className="input text-sm py-2 text-center"
+                  placeholder="80"
+                  aria-label={`Gewicht Satz ${setIndex + 1}`}
+                  value={setItem.kg}
+                  onChange={(event) => updateSet(rowIndex, setIndex, 'kg', event.target.value)}
+                />
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  className="input text-sm py-2 text-center"
+                  placeholder="10"
+                  aria-label={`Wiederholungen Satz ${setIndex + 1}`}
+                  value={setItem.wdh}
+                  onChange={(event) => updateSet(rowIndex, setIndex, 'wdh', event.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSet(rowIndex, setIndex)}
+                  disabled={row.sets.length <= 1}
+                  aria-label={`Satz ${setIndex + 1} entfernen`}
+                  className="p-1.5 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-muted"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => addSet(rowIndex)}
+              className="w-full py-2 rounded-lg bg-bg-card text-xs text-text-muted hover:text-text-primary transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Plus size={12} /> Satz hinzufügen
+            </button>
           </div>
           <div>
             <label className="text-xs text-text-muted mb-1 block">Notiz (optional)</label>
@@ -1388,6 +1428,30 @@ export function WorkoutRunner({ workout: runningWorkout, onFinish: finishWorkout
             >
               <Plus size={14} /> Satz hinzufügen (2:00)
             </button>
+            {(() => {
+              let currentVolume = volumeOfSets(fromInputs(exerciseItem.sets)),
+                previousVolume = volumeOfSets(exerciseItem.prevSets ?? []),
+                volumeDiff = currentVolume - previousVolume
+              if (!currentVolume && !previousVolume) return null
+              return (
+                <p className="mt-3 text-xs text-text-muted flex flex-wrap items-center gap-x-2">
+                  <span>
+                    Volumen: <strong className="text-text-primary">{Math.round(currentVolume).toLocaleString('de-DE')} kg</strong>
+                  </span>
+                  {previousVolume > 0 && (
+                    <span>
+                      · Letztes Mal {Math.round(previousVolume).toLocaleString('de-DE')} kg
+                      {currentVolume > 0 && volumeDiff !== 0 && (
+                        <strong className={volumeDiff > 0 ? 'ml-1.5 text-success' : 'ml-1.5 text-warning'}>
+                          {volumeDiff > 0 ? '+' : '−'}
+                          {Math.abs(Math.round(volumeDiff)).toLocaleString('de-DE')} kg
+                        </strong>
+                      )}
+                    </span>
+                  )}
+                </p>
+              )
+            })()}
             {exerciseItem.prevNote && !(noteOpen[exerciseIndex] ?? !!exerciseItem.note) && (
               <p className="mt-3 text-xs text-text-muted flex items-start gap-1.5">
                 <StickyNote size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -1517,6 +1581,15 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
       })),
     ),
       setTemplatesLoaded(true))
+  }
+  async function deleteTemplate(template) {
+    if (!confirm(`Vorlage „${template.name}“ wirklich löschen? Bereits absolvierte Einheiten bleiben erhalten.`)) return
+    let { error } = await supabase.from('training_vorlagen').delete().eq('id', template.id)
+    if (error) {
+      alert('Die Vorlage konnte nicht gelöscht werden. Bitte versuche es noch einmal.')
+      return
+    }
+    setTemplates((list) => list.filter((item) => item.id !== template.id))
   }
   async function startFromTemplate(template) {
     if (!authUser) return
@@ -1691,9 +1764,7 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
       setFormExercises(
         sessionToEdit.uebungen?.map((exerciseEntry) => ({
           uebungsname: exerciseEntry.uebungsname,
-          saetze: exerciseEntry.saetze ? String(exerciseEntry.saetze) : '',
-          wdh: exerciseEntry.wdh ? String(exerciseEntry.wdh) : '',
-          gewicht_kg: exerciseEntry.gewicht_kg ? String(exerciseEntry.gewicht_kg) : '',
+          sets: toInputs(setsOfExercise(exerciseEntry)),
           notizen: exerciseEntry.notizen ?? '',
         })) ?? [],
       ),
@@ -1748,15 +1819,19 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
     }
     ;(formExercises.filter((row) => row.uebungsname).length > 0 &&
       (await supabase.from('uebungen').insert(
-        formExercises.filter((row) => row.uebungsname).map((row) => ({
-          user_id: authUser.id,
-          training_id: sessionId,
-          uebungsname: row.uebungsname,
-          saetze: row.saetze ? parseInt(row.saetze) : null,
-          wdh: row.wdh ? parseInt(row.wdh) : null,
-          gewicht_kg: row.gewicht_kg ? parseFloat(row.gewicht_kg) : null,
-          notizen: row.notizen || null,
-        })),
+        formExercises.filter((row) => row.uebungsname).map((row) => {
+          let setList = fromInputs(row.sets)
+          return {
+            user_id: authUser.id,
+            training_id: sessionId,
+            uebungsname: row.uebungsname,
+            saetze: setList.length || null,
+            wdh: setList[0]?.wdh ?? null,
+            gewicht_kg: setList[0]?.kg ?? null,
+            saetze_log: setList.length ? setList : null,
+            notizen: row.notizen || null,
+          }
+        }),
       )),
       await loadSessions(),
       closeModal(),
@@ -1860,12 +1935,21 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
                     {templateItem.trainingstyp ?? 'Kraft'} · {(templateItem.uebungen ?? []).length} Übungen
                   </div>
                 </div>
-                <button
-                  onClick={() => startFromTemplate(templateItem)}
-                  className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5 shrink-0"
-                >
-                  <Play size={14} /> Starten
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => deleteTemplate(templateItem)}
+                    className="p-2 rounded-lg hover:bg-danger/10 hover:text-danger text-text-muted transition-colors"
+                    aria-label={`Vorlage ${templateItem.name} löschen`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => startFromTemplate(templateItem)}
+                    className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5"
+                  >
+                    <Play size={14} /> Starten
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -2007,12 +2091,17 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
                             </p>
                           )}
                           {setLog && setLog.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               {setLog.map((setEntry, setPosition) => (
                                 <span className="text-[11px] bg-bg px-2 py-0.5 rounded text-text-secondary" key={setPosition}>
                                   S{setPosition + 1}: {setEntry.wdh ?? '?'}×{setEntry.kg ?? '?'}kg
                                 </span>
                               ))}
+                              {volumeOfSets(setLog) > 0 && (
+                                <span className="text-[11px] text-text-muted">
+                                  Volumen {Math.round(volumeOfSets(setLog)).toLocaleString('de-DE')} kg
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
