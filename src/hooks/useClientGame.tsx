@@ -1,7 +1,8 @@
 // @ts-nocheck
 // Übernommen aus dem Redesign-Paket. Typen und lokale Namen werden schrittweise verbessert.
 import { DEFAULT_CHARACTER } from '../lib/game'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { usePhysique } from './usePhysique'
 import { supabase } from '../lib/supabase'
 import { isMissingTable } from '../lib/dbErrors'
 
@@ -16,7 +17,9 @@ export const EMPTY_CLIENT_GAME = {
   punkte: 0,
 }
 export function useClientGame(userId) {
-  let [game, setGame] = useState(EMPTY_CLIENT_GAME)
+  let [game, setGame] = useState(EMPTY_CLIENT_GAME),
+    physique = usePhysique(userId),
+    result = useMemo(() => ({ ...game, physique }), [game, physique])
   return (
     useEffect(() => {
       if (!userId) return
@@ -56,6 +59,6 @@ export function useClientGame(userId) {
         }
       )
     }, [userId]),
-    game
+    result
   )
 }

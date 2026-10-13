@@ -83,6 +83,7 @@ export function CoachFigurePanel({ clientId, clientName, game }) {
               <Avatar
                 config={game.config}
                 equipped={game.equipped}
+                physique={game.physique?.level}
                 size={120}
                 idle
                 label={`${game.name}, Level ${levelData.level}`}

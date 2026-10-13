@@ -576,7 +576,7 @@ export function ClientDetail() {
               aria-label={`${game.name}, Level ${levelInfo(game.xp).level}. Figur ansehen`}
               className="relative shrink-0 rounded-2xl bg-brand/10 border border-brand/30 transition-transform active:scale-95"
             >
-              <Avatar view="head" config={game.config} equipped={game.equipped} size={64} label="" />
+              <Avatar view="head" config={game.config} equipped={game.equipped} physique={game.physique?.level} size={64} label="" />
               <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-full bg-primary text-white text-[10px] font-extrabold ring-2 ring-bg-card tabular-nums">
                 Level {levelInfo(game.xp).level}
               </span>

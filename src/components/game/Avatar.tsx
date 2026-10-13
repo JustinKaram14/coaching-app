@@ -1,7 +1,8 @@
 // @ts-nocheck
 // Übernommen aus dem Redesign-Paket. Typen und lokale Namen werden schrittweise verbessert.
 import { DEFAULT_CHARACTER, shade } from '../../lib/game'
-import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { forwardRef, useCallback, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import { GameContext } from '../../hooks/useGame'
 
 export const INK = '#1d1b1a'
 export const GOLD = '#e0a526'
@@ -563,6 +564,20 @@ export function Beard({ style: beardStyle, color: beardColor, skin: skinColor })
     </g>
   )
 }
+// Körperentwicklung: level 0 (Einsteiger) bis 6 (durchtrainiert). Ohne Angabe (z. B. Coach-Ansicht) ein mittlerer Wert.
+export const NEUTRAL_PHYSIQUE = 1.5
+export function physiqueShape(level) {
+  let t = Math.min(1, Math.max(0, level / 6))
+  return {
+    t,
+    torsoScale: 0.9 + 0.14 * t,
+    neckWidth: 22 + 14 * t,
+    upperArm: 17 + 9 * t,
+    foreArm: 12 + 5 * t,
+    faceScale: 1.05 - 0.1 * t,
+    chest: Math.max(0, t - 0.3) * 0.6,
+  }
+}
 export const Avatar = forwardRef<any, any>(function (
   {
     config = DEFAULT_CHARACTER,
@@ -571,13 +586,16 @@ export const Avatar = forwardRef<any, any>(function (
     holdBottle = false,
     bottleMl = 500,
     equipped,
+    physique,
     idle = false,
     className,
     label = 'Deine Figur',
   },
   ref,
 ) {
-  let cfg = config,
+  let game = useContext(GameContext),
+    shape = physiqueShape(physique ?? game.physique?.level ?? NEUTRAL_PHYSIQUE),
+    cfg = config,
     uid = useId().replace(/:/g, ''),
     scale = bottleScale(bottleMl),
     skinShade = shade(cfg.skin, 0.13),
@@ -808,35 +826,51 @@ export const Avatar = forwardRef<any, any>(function (
         </defs>
         <g className={idle ? 'avatar-bob' : undefined}>
           <g ref={partRef('body')}>
-            <HoodieCollarBack clothes={items.kleidung} shirt={cfg.shirt} />
+            <g transform={`translate(100 0) scale(${shape.torsoScale} 1) translate(-100 0)`}>
+              <HoodieCollarBack clothes={items.kleidung} shirt={cfg.shirt} />
+            </g>
             <HairBack c={cfg} />
-            {items.kleidung ? (
-              <Clothes clothes={items.kleidung} shirt={cfg.shirt} skin={cfg.skin} />
-            ) : (
-              <path d={DEFAULT_SHIRT_PATH} fill={cfg.shirt} />
-            )}
-            <path d="M44 190 C30 204 24 228 26 250 L56 250 C54 228 56 208 62 194 Z" fill={clothes.leftSleeve} />
-            {!items.kleidung && (
-              <path d="M104 196 L92 212 L100 212 L96 226 L110 208 L102 208 Z" fill="#fff" opacity="0.85" />
-            )}
-            <rect x="87" y="136" width="26" height="46" rx="10" fill={skinShade} />
-            <path d="M84 178 Q100 198 116 178 Q100 184 84 178 Z" fill={skinShade} />
+            <g transform={`translate(100 0) scale(${shape.torsoScale} 1) translate(-100 0)`}>
+              {items.kleidung ? (
+                <Clothes clothes={items.kleidung} shirt={cfg.shirt} skin={cfg.skin} />
+              ) : (
+                <path d={DEFAULT_SHIRT_PATH} fill={cfg.shirt} />
+              )}
+              <path d="M44 190 C30 204 24 228 26 250 L56 250 C54 228 56 208 62 194 Z" fill={clothes.leftSleeve} />
+              {!items.kleidung && (
+                <path d="M104 196 L92 212 L100 212 L96 226 L110 208 L102 208 Z" fill="#fff" opacity="0.85" />
+              )}
+              {shape.chest > 0 && (
+                <path
+                  d="M68 208 Q84 222 100 214 Q116 222 132 208"
+                  fill="none"
+                  stroke={shade(clothes.body, 0.3)}
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  opacity={shape.chest}
+                />
+              )}
+              <rect x={100 - shape.neckWidth / 2} y="136" width={shape.neckWidth} height="46" rx="10" fill={skinShade} />
+              <path d="M84 178 Q100 198 116 178 Q100 184 84 178 Z" fill={skinShade} />
+            </g>
             <Neckwear item={items.hals} />
             <Pet item={items.tier} />
             <g ref={partRef('head')}>
-              <circle cx="53" cy="98" r="9" fill={cfg.skin} />
-              <circle cx="147" cy="98" r="9" fill={cfg.skin} />
-              <FaceShape shape={cfg.face} fill={cfg.skin} />
-              <ellipse cx="72" cy="113" rx="9" ry="5.5" fill="#ff7a8a" opacity="0.18" />
-              <ellipse cx="128" cy="113" rx="9" ry="5.5" fill="#ff7a8a" opacity="0.18" />
-              <path
-                d="M98 104 Q95 112 100 114"
-                fill="none"
-                stroke={skinShade}
-                strokeWidth="2.6"
-                strokeLinecap="round"
-              />
-              <Beard style={cfg.beard} color={cfg.hairColor} skin={cfg.skin} />
+              <g transform={`translate(100 0) scale(${shape.faceScale} 1) translate(-100 0)`}>
+                <circle cx="53" cy="98" r="9" fill={cfg.skin} />
+                <circle cx="147" cy="98" r="9" fill={cfg.skin} />
+                <FaceShape shape={cfg.face} fill={cfg.skin} />
+                <ellipse cx="72" cy="113" rx="9" ry="5.5" fill="#ff7a8a" opacity="0.18" />
+                <ellipse cx="128" cy="113" rx="9" ry="5.5" fill="#ff7a8a" opacity="0.18" />
+                <path
+                  d="M98 104 Q95 112 100 114"
+                  fill="none"
+                  stroke={skinShade}
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                />
+                <Beard style={cfg.beard} color={cfg.hairColor} skin={cfg.skin} />
+              </g>
               <g ref={partRef('mouth')}>
                 <Mouth style={cfg.mouth} />
               </g>
@@ -873,7 +907,7 @@ export const Avatar = forwardRef<any, any>(function (
               x2="175"
               y2="214"
               stroke={sleeveColor}
-              strokeWidth="21"
+              strokeWidth={shape.upperArm}
               strokeLinecap="round"
             />
             <line
@@ -883,7 +917,7 @@ export const Avatar = forwardRef<any, any>(function (
               x2="140"
               y2="208"
               stroke={foreColor}
-              strokeWidth={foreColor === cfg.skin ? 14 : 19}
+              strokeWidth={foreColor === cfg.skin ? shape.foreArm : shape.foreArm + 5}
               strokeLinecap="round"
             />
             <g ref={partRef('bottle')} transform={`translate(${HAND_HOLD.x} ${HAND_HOLD.y}) scale(${scale})`}>
