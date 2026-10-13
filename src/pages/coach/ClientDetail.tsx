@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Scale, Dumbbell, Moon, Apple, Pill, Target, FileText, Upload, CheckCircle, X, Download, Sparkles, RefreshCw, ChevronDown, ChevronUp, Home } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { maxKgOfSets, setsOfExercise, volumeOfSets } from '../../lib/sets'
 import { useAuth } from '../../hooks/useAuth'
 import { formatDate, calcSleepHours } from '../../lib/utils'
 import { Spinner } from '../../components/ui/Spinner'
@@ -821,14 +822,13 @@ export function ClientDetail() {
           (t.datum ?? '').includes(trainingFilter)
         )
         // Build exercise progression map: uebungsname → [{datum, maxKg, sets}]
-        const progression: Record<string, { datum: string; maxKg: number | null; totalSaetze: number }[]> = {}
+        const progression: Record<string, { datum: string; maxKg: number | null; totalSaetze: number; volume: number }[]> = {}
         for (const t of trainings) {
           for (const u of (uebungenMap[t.id] ?? [])) {
             if (!progression[u.uebungsname]) progression[u.uebungsname] = []
-            const maxKg = u.saetze_log?.length
-              ? Math.max(...u.saetze_log.map(s => s.kg ?? 0))
-              : u.gewicht_kg ?? null
-            progression[u.uebungsname].push({ datum: t.datum, maxKg, totalSaetze: u.saetze ?? 1 })
+            const sets = setsOfExercise(u)
+            const maxKg = maxKgOfSets(sets)
+            progression[u.uebungsname].push({ datum: t.datum, maxKg, totalSaetze: u.saetze ?? 1, volume: volumeOfSets(sets) })
           }
         }
         const selectedT = selectedTrainingId ? trainings.find(t => t.id === selectedTrainingId) : null
@@ -864,8 +864,10 @@ export function ClientDetail() {
                       const hist = (progression[u.uebungsname] ?? []).sort((a, b) => a.datum.localeCompare(b.datum))
                       const idx = hist.findIndex(h => h.datum === selectedT.datum)
                       const prev = idx > 0 ? hist[idx - 1] : null
-                      const currKg = u.saetze_log?.length ? Math.max(...u.saetze_log.map(s => s.kg ?? 0)) : u.gewicht_kg ?? null
+                      const currKg = maxKgOfSets(setsOfExercise(u))
                       const delta = currKg && prev?.maxKg ? currKg - prev.maxKg : null
+                      const currVolume = volumeOfSets(setsOfExercise(u))
+                      const volumeDelta = currVolume && prev?.volume ? Math.round(currVolume - prev.volume) : null
                       return (
                         <div key={u.id} className="p-3 rounded-xl bg-bg-elevated">
                           <div className="flex items-start justify-between gap-2">
@@ -890,6 +892,12 @@ export function ClientDetail() {
                           {prev && (
                             <div className="text-[11px] text-text-muted mt-1.5">
                               Vorher ({formatDate(prev.datum)}): {prev.maxKg ?? '?'} kg max
+                              {prev.volume > 0 && <> · Volumen {Math.round(prev.volume).toLocaleString('de-DE')} kg</>}
+                              {volumeDelta !== null && volumeDelta !== 0 && (
+                                <span className={`ml-1.5 font-bold ${volumeDelta > 0 ? 'text-success' : 'text-danger'}`}>
+                                  ({volumeDelta > 0 ? '+' : ''}{volumeDelta.toLocaleString('de-DE')} kg)
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
