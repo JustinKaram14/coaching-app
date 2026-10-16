@@ -174,7 +174,8 @@ export function EntdeckenTab() {
     darm: basis.treffer.filter(t => {
       const g = t.r.gesundheit
       return darmTab === 'alle' ? g.darmfreundlich || g.leichtVerdaulich
-        : darmTab === 'praebiotisch' ? g.praebiotisch : darmTab === 'probiotisch' ? g.probiotisch : g.leichtVerdaulich
+        : darmTab === 'praebiotisch' ? g.praebiotisch : darmTab === 'probiotisch' ? g.probiotisch
+          : darmTab === 'fermentiert' ? g.fermentiert : g.leichtVerdaulich
     }),
     pflanzen: basis.treffer.filter(t => t.r.pflanzen.length >= SCHWELLEN.pflanzenReich).sort((a, b) => b.r.pflanzen.length - a.r.pflanzen.length),
     omega3: basis.treffer.filter(t => t.r.gesundheit.entzuendungshemmend).sort((a, b) => b.r.pro.omega3 - a.r.pro.omega3),
@@ -301,6 +302,34 @@ export function EntdeckenTab() {
                 </button>
               )
             })}
+          </section>
+
+          <section aria-label="Darmfreundlich" className="card space-y-3" data-testid="darm-karte">
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="font-bold text-text-primary"><span aria-hidden="true">🫶 </span>Darmfreundlich</h3>
+              <button onClick={() => setFilter(f => ({ ...f, gesundheit: ['darm'] }))} className="text-sm text-brand font-medium flex items-center gap-0.5 hover:underline">Alle <ChevronRight size={14} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: 'probiotisch', emoji: '🥛', text: 'Joghurt, Kefir, Sauerkraut …', zaehlt: (g: Treffer['r']['gesundheit']) => g.probiotisch },
+                { id: 'praebiotisch', emoji: '🧅', text: 'Zwiebel, Lauch, Hafer, Topinambur …', zaehlt: (g: Treffer['r']['gesundheit']) => g.praebiotisch },
+                { id: 'fermentiert', emoji: '🥬', text: 'Kimchi, Miso, Tempeh, Kefir …', zaehlt: (g: Treffer['r']['gesundheit']) => g.fermentiert },
+                { id: 'leicht', emoji: '🍚', text: 'Mild, wenig Fett', zaehlt: (g: Treffer['r']['gesundheit']) => g.leichtVerdaulich },
+              ] as const).map(k => {
+                const anzahl = basis.treffer.filter(t => k.zaehlt(t.r.gesundheit)).length
+                const label = DARM_ARTEN.find(d => d.id === k.id)!.label
+                return (
+                  <button key={k.id} onClick={() => setFilter(f => ({ ...f, gesundheit: ['darm'], darmArt: k.id }))}
+                    className="text-left rounded-2xl border border-border bg-bg-elevated p-3 hover:border-brand/50 transition-colors">
+                    <div className="text-xl" aria-hidden="true">{k.emoji}</div>
+                    <div className="font-semibold text-sm text-text-primary">{label}</div>
+                    <div className="text-[11px] text-text-muted leading-snug">{k.text}</div>
+                    <div className="text-xs text-brand mt-1">{anzahl} Rezepte</div>
+                  </button>
+                )
+              })}
+            </div>
+            <Hinweis />
           </section>
 
           <section aria-label="Kalorien" className="space-y-2">

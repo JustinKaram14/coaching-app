@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { Heart, Info, Printer, Share2, X } from 'lucide-react'
 import type { Mahlzeit, Rezept } from '../../../lib/entdecken/types'
-import { HINWEIS_LANG, KEINE_AERZTLICHE_EMPFEHLUNG } from '../../../lib/entdecken/katalog'
+import { KEINE_AERZTLICHE_EMPFEHLUNG } from '../../../lib/entdecken/katalog'
 
 /** Bodenblech bzw. Dialog. Wird in <body> gerendert, weil die Seiten-Einblendung (.page > * > *) sonst „fixed“ aushebelt. */
 export function Sheet({ titel, untertitel, onClose, children, footer, z = 80 }: {
@@ -54,20 +55,17 @@ export function RezeptBild({ r, className = '' }: { r: Rezept; className?: strin
   )
 }
 
-/** Deutlicher Hinweis bei allen Gesundheits-Tags und Nährwert-Scores */
+/** Kleiner, aber lesbarer Hinweis bei Gesundheits-Tags und Nährwert-Scores; der ausführliche Text steht im Reiter „Gesundheitshinweis“ */
 export function Hinweis({ lang = false, className = '' }: { lang?: boolean; className?: string }) {
-  if (lang) {
-    return (
-      <div role="note" className={`flex items-start gap-2 rounded-2xl border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-text-primary ${className}`}>
-        <Info size={14} className="shrink-0 mt-0.5 text-warning" aria-hidden="true" />
-        <span><strong>{KEINE_AERZTLICHE_EMPFEHLUNG}.</strong> {HINWEIS_LANG.replace(`${KEINE_AERZTLICHE_EMPFEHLUNG}. `, '')}</span>
-      </div>
-    )
-  }
   return (
-    <span role="note" className={`inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[11px] font-semibold text-text-primary ${className}`}>
-      <Info size={11} className="text-warning" aria-hidden="true" /> {KEINE_AERZTLICHE_EMPFEHLUNG}
-    </span>
+    <p role="note" className={`flex items-start gap-1.5 text-[11px] leading-snug text-text-muted ${className}`}>
+      <Info size={12} className="shrink-0 mt-px" aria-hidden="true" />
+      <span>
+        <strong className="font-semibold text-text-secondary">{KEINE_AERZTLICHE_EMPFEHLUNG}.</strong>
+        {lang && ' Tags und Scores sind Schätzungen aus Durchschnittswerten der Zutaten.'}{' '}
+        <Link to="/legal?tab=gesundheit" className="text-brand hover:underline whitespace-nowrap">Mehr dazu</Link>
+      </span>
+    </p>
   )
 }
 
@@ -92,6 +90,7 @@ export function gesundheitsTags(r: Rezept): Tag[] {
   if (g.antioxidantien > 0) tags.push({ text: 'Antioxidantien (Schätzung)', ton: 'accent', punkte: g.antioxidantien })
   if (g.praebiotisch) tags.push({ text: 'Präbiotisch', ton: 'brand' })
   if (g.probiotisch) tags.push({ text: 'Probiotisch', ton: 'brand' })
+  if (g.fermentiert) tags.push({ text: 'Fermentiert', ton: 'brand' })
   if (g.leichtVerdaulich) tags.push({ text: 'Leicht verdaulich', ton: 'info' })
   if (g.omega3Reich) tags.push({ text: 'Omega-3-reich', ton: 'info' })
   if (g.entzuendungshemmend) tags.push({ text: 'Entzündungshemmend', ton: 'info' })

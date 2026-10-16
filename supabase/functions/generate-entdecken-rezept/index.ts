@@ -106,6 +106,7 @@ Antworte NUR mit JSON in genau dieser Form:
   } catch {
     return json({ error: 'Die KI ist gerade nicht erreichbar.' }, 502)
   }
+  if (res.status === 429) return json({ error: 'Das KI-Kontingent ist gerade aufgebraucht (Limit des Google-Projekts erreicht). Bitte versuche es später noch einmal.', kontingent: true }, 429)
   if (!res.ok) return json({ error: `Die KI hat nicht geantwortet (HTTP ${res.status}).` }, 502)
 
   let rezept: Record<string, unknown>

@@ -60,6 +60,7 @@ export function KiDialog({ ausschluesse, anamnese, onFertig, onClose, speichern 
       })
       if (error || data?.error || !data?.rezept) {
         letzterGrund = (await fehlerText(data, error)) || 'Die KI hat gerade nicht geantwortet.'
+        if (/Kontingent/.test(letzterGrund)) break // Wiederholen hilft nicht, solange das Limit erreicht ist
         continue
       }
       const def = bereinigeDef({ ...data.rezept, mahlzeiten: data.rezept.mahlzeiten?.length ? data.rezept.mahlzeiten : [mahlzeit] }, crypto.randomUUID())
@@ -73,7 +74,7 @@ export function KiDialog({ ausschluesse, anamnese, onFertig, onClose, speichern 
       rezept = berechnet
       definition = def
     }
-    if (!rezept || !definition) { setFehler(`${letzterGrund} Bitte versuche es noch einmal.`); setPhase('form'); return }
+    if (!rezept || !definition) { setFehler(/Kontingent/.test(letzterGrund) ? letzterGrund : `${letzterGrund} Bitte versuche es noch einmal.`); setPhase('form'); return }
 
     setPhase('bild')
     let bildUrl: string | null = null

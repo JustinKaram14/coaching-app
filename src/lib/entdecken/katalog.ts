@@ -5,8 +5,6 @@ import type { Ernaehrungsart, Mahlzeit } from './types'
 import { SCHWELLEN } from './engine'
 
 export const KEINE_AERZTLICHE_EMPFEHLUNG = 'Keine ärztliche Empfehlung'
-export const HINWEIS_LANG =
-  'Keine ärztliche Empfehlung. Tags und Scores sind grobe Schätzungen aus Durchschnittswerten der Zutaten und ersetzen keine Beratung durch Ärztinnen, Ärzte oder Ernährungsfachkräfte.'
 
 export const KATEGORIEN: { id: Mahlzeit; emoji: string; text: string }[] = [
   { id: 'Frühstück', emoji: '🌅', text: 'Gut in den Tag' },
@@ -63,7 +61,7 @@ export const GESUNDHEIT_REIHEN = {
   },
   darm: {
     label: 'Darmfreundlich', emoji: '🫶',
-    info: 'Präbiotisch (z. B. Zwiebel, Knoblauch, Hafer, Hülsenfrüchte), probiotisch (z. B. Joghurt, Kefir, Sauerkraut, Miso) oder leicht verdaulich (wenig Fett, keine größere Menge blähender Zutaten).',
+    info: 'Präbiotisch (Ballaststoffe als Futter für Darmbakterien, z. B. Zwiebel, Knoblauch, Lauch, Topinambur, Hafer), probiotisch (enthält Joghurt, Kefir, Buttermilch, Sauerkraut, Kimchi oder Miso, ungekocht), fermentiert (vergorene Lebensmittel wie Kimchi, Sauerkraut, Miso, Tempeh, Kefir) oder leicht verdaulich (wenig Fett, keine größere Menge blähender Zutaten). Ob lebende Kulturen enthalten sind, hängt vom Produkt ab; Erhitzen zerstört sie.',
   },
   pflanzen: {
     label: 'Pflanzenvielfalt', emoji: '🌱',
@@ -79,6 +77,7 @@ export type GesundheitsFilter = keyof typeof GESUNDHEIT_REIHEN
 export const DARM_ARTEN = [
   { id: 'praebiotisch', label: 'Präbiotisch' },
   { id: 'probiotisch', label: 'Probiotisch' },
+  { id: 'fermentiert', label: 'Fermentiert' },
   { id: 'leicht', label: 'Leicht verdaulich' },
 ] as const
 export type DarmArt = typeof DARM_ARTEN[number]['id']

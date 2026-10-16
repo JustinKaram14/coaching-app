@@ -214,6 +214,7 @@ export function passtZuFilter(r: Rezept, f: FilterZustand, favoriten?: ReadonlyS
   }
   if (f.darmArt === 'praebiotisch' && !r.gesundheit.praebiotisch) return false
   if (f.darmArt === 'probiotisch' && !r.gesundheit.probiotisch) return false
+  if (f.darmArt === 'fermentiert' && !r.gesundheit.fermentiert) return false
   if (f.darmArt === 'leicht' && !r.gesundheit.leichtVerdaulich) return false
   if (f.maxZeit && r.zeitMin > f.maxZeit) return false
   if (f.nurLeicht && r.schwierigkeit > 1) return false

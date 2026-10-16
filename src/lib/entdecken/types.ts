@@ -42,6 +42,8 @@ export interface Zutat {
   pre: number
   /** Mindestmenge in g pro Portion, ab der die Zutat als Probiotikum zählt, 0 = nein */
   pro: number
+  /** Mindestmenge in g pro Portion, ab der die Zutat als fermentiertes Lebensmittel zählt, 0 = nein */
+  ferm: number
   /** viele FODMAPs / blähend */
   fodmap: boolean
   /** Verhältnis Gewicht gekocht zu roh (Reis ×2,5 …) */
@@ -107,6 +109,7 @@ export interface Gesundheit {
   antioxidantien: 0 | 1 | 2 | 3
   praebiotisch: boolean
   probiotisch: boolean
+  fermentiert: boolean
   leichtVerdaulich: boolean
   darmfreundlich: boolean
   omega3Reich: boolean

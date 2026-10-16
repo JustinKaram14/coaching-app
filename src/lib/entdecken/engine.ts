@@ -83,6 +83,7 @@ export function berechneRezept(def: RezeptDef): Rezept {
   let aoxPunkte = 0
   let prePunkte = 0
   let probiotisch = false
+  let fermentiert = false
   let fodmapStark = false
   let zutatenAnzahl = 0
   const suchwoerter: string[] = [def.name.toLowerCase()]
@@ -115,6 +116,7 @@ export function berechneRezept(def: RezeptDef): Rezept {
     if (z.aox > 0) aoxPunkte += z.aox * Math.min(1, gPort / 40)
     if (z.pre > 0) prePunkte += gPort * z.pre
     if (z.pro > 0 && gPort >= z.pro) probiotisch = true
+    if (z.ferm > 0 && gPort >= z.ferm) fermentiert = true
     if (z.fodmap && gPort >= SCHWELLEN.leichtFodmapG) fodmapStark = true
     if (!z.basis && !NEBENZUTATEN.has(z.id)) zutatenAnzahl++
 
@@ -155,8 +157,9 @@ export function berechneRezept(def: RezeptDef): Rezept {
     antioxidantien,
     praebiotisch,
     probiotisch,
+    fermentiert,
     leichtVerdaulich,
-    darmfreundlich: praebiotisch || probiotisch,
+    darmfreundlich: praebiotisch || probiotisch || fermentiert,
     omega3Reich,
     entzuendungshemmend: omega3Reich || (pro.omega3 >= 400 && antioxidantien >= 2),
   }

@@ -36,7 +36,7 @@ const BEREICHE = [
 const NACH_ID: Record<string, (typeof BEREICHE)[number]> = {}
 const zuordnen = (bereich: (typeof BEREICHE)[number], ids: string[]) => ids.forEach(i => { NACH_ID[i] = bereich })
 zuordnen('Brot, Getreide & Nudeln', ['haferflocken', 'vollkornbrot', 'vollkorn_nudeln', 'nudeln', 'vollkornreis', 'basmatireis', 'quinoa', 'couscous', 'bulgur', 'hirse', 'buchweizen', 'reisnudeln', 'wrap', 'polenta', 'vollkornmehl'])
-zuordnen('Hülsenfrüchte & Soja', ['kichererbsen', 'linsen_rot', 'linsen_braun', 'kidneybohnen', 'weisse_bohnen', 'tofu', 'raeuchertofu', 'edamame', 'sojadrink', 'miso'])
+zuordnen('Hülsenfrüchte & Soja', ['kichererbsen', 'linsen_rot', 'linsen_braun', 'kidneybohnen', 'weisse_bohnen', 'tofu', 'raeuchertofu', 'edamame', 'sojadrink', 'miso', 'tempeh'])
 zuordnen('Nüsse, Samen & Trockenfrüchte', ['mandeln', 'walnuesse', 'cashews', 'haselnuesse', 'mandelmus', 'erdnussmus', 'sonnenblumenkerne', 'kuerbiskerne', 'chiasamen', 'leinsamen', 'sesam', 'tahini', 'datteln'])
 zuordnen('Konserven & Vorrat', ['tomaten_stueckig', 'tomatenmark', 'oliven', 'kokosmilch', 'sojasauce', 'senf', 'balsamico', 'gemuesebruehe', 'honig', 'ahornsirup', 'kakao'])
 

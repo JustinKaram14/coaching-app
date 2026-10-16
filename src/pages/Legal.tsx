@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Shield, FileText } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Shield, FileText, HeartPulse } from 'lucide-react'
 
 const BETREIBER_NAME = '[Name]'
 const BETREIBER_ADRESSE = '[Straße, Hausnr.]'
@@ -32,28 +32,39 @@ function Ul({ items }: { items: string[] }) {
 }
 
 export function Legal() {
-  const [tab, setTab] = useState<'impressum' | 'datenschutz'>('impressum')
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const [tab, setTab] = useState<'impressum' | 'datenschutz' | 'gesundheit'>(
+    params.get('tab') === 'gesundheit' ? 'gesundheit' : params.get('tab') === 'datenschutz' ? 'datenschutz' : 'impressum',
+  )
 
   return (
     <div className="min-h-screen bg-bg p-4">
       <div className="max-w-2xl mx-auto">
-        <Link to="/login" className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary mb-6 transition-colors">
+        <button onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/login'))}
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary mb-6 transition-colors">
           <ArrowLeft size={16} /> Zurück
-        </Link>
+        </button>
 
         <div className="card mb-6">
           <div className="flex gap-1 p-1 bg-bg-elevated rounded-xl border border-border">
             <button
               onClick={() => setTab('impressum')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'impressum' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${tab === 'impressum' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
             >
               <FileText size={14} /> Impressum
             </button>
             <button
               onClick={() => setTab('datenschutz')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'datenschutz' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${tab === 'datenschutz' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
             >
               <Shield size={14} /> Datenschutz
+            </button>
+            <button
+              onClick={() => setTab('gesundheit')}
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${tab === 'gesundheit' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'}`}
+            >
+              <HeartPulse size={14} /> Gesundheit
             </button>
           </div>
         </div>
@@ -214,6 +225,62 @@ export function Legal() {
             </Section>
 
             <p className="text-xs text-text-muted pt-4 border-t border-border">Stand: {STAND_DATUM} | Erstellt unter Berücksichtigung der DSGVO (EU 2016/679), TMG und TTDSG</p>
+          </div>
+        )}
+
+        {tab === 'gesundheit' && (
+          <div className="card space-y-6" data-testid="gesundheitshinweis">
+            <div>
+              <h1 className="text-2xl font-bold text-text-primary mb-1">Gesundheitshinweis</h1>
+              <p className="text-xs text-text-muted">Zu Rezepten, Nährwerten und Ernährungs-Tags in der App | Stand: {STAND_DATUM}</p>
+            </div>
+
+            <Section id="keine-beratung" title="Keine ärztliche Empfehlung">
+              <P>
+                Alle Inhalte zu Ernährung und Gesundheit in dieser App dienen der allgemeinen Information und Motivation. Das betrifft Rezepte,
+                Nährwerte, Tags wie „Ballaststoffreich“, „Darmfreundlich“, „Probiotisch“, „Präbiotisch“, „Fermentiert“ oder „Entzündungshemmend / Omega-3“,
+                den Antioxidantien-Score, den Pflanzenzähler sowie Tagesziele und Vorschläge.
+              </P>
+              <P>
+                Sie sind <strong className="text-text-primary">keine ärztliche, therapeutische oder ernährungsmedizinische Beratung</strong>, stellen keine Diagnose und ersetzen keine Behandlung.
+                Bei Erkrankungen, Schwangerschaft, Stillzeit, Medikamenteneinnahme, Essstörungen oder anderen gesundheitlichen Fragen sprich bitte mit deiner Ärztin, deinem Arzt oder einer qualifizierten Ernährungsfachkraft, bevor du deine Ernährung änderst.
+              </P>
+            </Section>
+
+            <Section id="schaetzwerte" title="Wie die Werte entstehen">
+              <P>
+                Nährwerte und Tags werden aus Durchschnittswerten der Zutaten berechnet und sind <strong className="text-text-primary">Schätzungen</strong>.
+                Abweichungen entstehen durch Produkt, Zubereitung, Garverluste und Portionsgröße. Die Schwellenwerte für jedes Tag stehen in der App im Rezept unter „So wird gerechnet“.
+              </P>
+              <P>Der Antioxidantien-Score (1 bis 3 Punkte) ist ein einfacher Richtwert aus Zutaten und Mengen und keine Laboranalyse.</P>
+            </Section>
+
+            <Section id="allergien" title="Allergien und Unverträglichkeiten">
+              <P>
+                Die Filter, die Anamnese-Auswertung und die Ausschlussliste helfen beim Aussortieren, ersetzen aber nicht die eigene Prüfung. Spuren, Kreuzkontamination und Zutaten in Fertigprodukten sind nicht erfasst.
+                Texte aus der Anamnese werden automatisch gelesen und können falsch oder unvollständig erkannt werden. <strong className="text-text-primary">Bei Allergien prüfe bitte immer die Zutatenliste selbst.</strong>
+              </P>
+            </Section>
+
+            <Section id="darm" title="Probiotische, präbiotische und fermentierte Lebensmittel">
+              <P>
+                Ob ein Lebensmittel lebende Kulturen enthält, hängt vom Produkt ab; Erhitzen zerstört sie. Eine bestimmte Wirkung auf Verdauung oder Gesundheit wird nicht zugesagt.
+                Ballaststoffreiche und präbiotische Zutaten (z. B. Zwiebel, Lauch, Topinambur, Hülsenfrüchte) können bei empfindlichem Darm Blähungen verursachen. Bei Reizdarm, Histaminintoleranz, geschwächtem Immunsystem oder Unsicherheit halte bitte Rücksprache mit einer Ärztin oder einem Arzt.
+              </P>
+            </Section>
+
+            <Section id="ki" title="KI-Rezepte und KI-Fotos">
+              <P>
+                Rezepte, die per KI erzeugt werden, können Fehler enthalten. Die App rechnet Nährwerte und Ernährungsart nach und verwirft offensichtlich unpassende Vorschläge, eine Garantie gibt es nicht.
+                Fotos in der App sind KI-generierte Bilder und zeigen das Gericht nur beispielhaft.
+              </P>
+            </Section>
+
+            <Section id="coach" title="Empfehlungen deines Coaches">
+              <P>Rezept-Empfehlungen deines Coaches sind Ernährungs- und Trainingstipps im Rahmen des Coachings und ersetzen keine ärztliche Beratung.</P>
+            </Section>
+
+            <p className="text-xs text-text-muted pt-4 border-t border-border">Stand: {STAND_DATUM}</p>
           </div>
         )}
       </div>

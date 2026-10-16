@@ -43,7 +43,7 @@ export function BilderAdmin() {
           if (!text && ctx instanceof Response) text = (await ctx.json().catch(() => null))?.error ?? ''
           setLetzterFehler(text || 'Unbekannter Fehler')
           setFehlerAnzahl(n => n + 1)
-          if (++hintereinander >= 3) stopp.current = true
+          if (++hintereinander >= 3 || /Kontingent/.test(text)) stopp.current = true
         } else {
           hintereinander = 0
           setFertig(n => n + 1)

@@ -30,7 +30,7 @@ export const PFLANZEN: Pflanze[] = [
     ['suesskartoffel', 'Süßkartoffel', ['suesskartoffel']], ['kartoffel', 'Kartoffel', ['kartoffel']], ['kuerbis', 'Kürbis', ['kuerbis']],
     ['lauch', 'Lauch', ['lauch']], ['champignons', 'Champignons', ['champignons']], ['rucola', 'Rucola', ['rucola']],
     ['blattsalat', 'Blattsalat', ['blattsalat']], ['rote_bete', 'Rote Bete', ['rote_bete']], ['spargel', 'Spargel', ['spargel']],
-    ['fenchel', 'Fenchel', ['fenchel']], ['mais', 'Mais', ['mais', 'polenta']], ['erbsen', 'Erbsen', ['erbsen']],
+    ['fenchel', 'Fenchel', ['fenchel']], ['topinambur', 'Topinambur', ['topinambur']], ['chicoree', 'Chicorée', ['chicoree']], ['mais', 'Mais', ['mais', 'polenta']], ['erbsen', 'Erbsen', ['erbsen']],
     ['gruene_bohnen', 'Grüne Bohnen', ['gruene_bohnen']],
   ]),
   ...g('Obst', [
@@ -47,7 +47,7 @@ export const PFLANZEN: Pflanze[] = [
   ...g('Hülsenfrüchte & Soja', [
     ['kichererbse', 'Kichererbse', ['kichererbsen']], ['linse', 'Linse', ['linsen_rot', 'linsen_braun']],
     ['kidneybohne', 'Kidneybohne', ['kidneybohnen']], ['weisse_bohne', 'Weiße Bohne', ['weisse_bohnen']],
-    ['soja', 'Soja', ['tofu', 'raeuchertofu', 'edamame', 'sojadrink', 'miso']],
+    ['soja', 'Soja', ['tofu', 'raeuchertofu', 'edamame', 'sojadrink', 'miso', 'tempeh']],
   ]),
   ...g('Nüsse & Samen', [
     ['mandel', 'Mandel', ['mandeln', 'mandelmus']], ['walnuss', 'Walnuss', ['walnuesse']], ['cashew', 'Cashew', ['cashews']],

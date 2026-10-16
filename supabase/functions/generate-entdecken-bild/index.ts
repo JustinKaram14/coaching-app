@@ -54,6 +54,7 @@ async function erzeugeBild(apiKey: string, prompt: string): Promise<{ bytes: Uin
           generationConfig: { responseModalities: ['IMAGE'] },
         }),
       })
+      if (res.status === 429) return { fehler: 'KONTINGENT' }
       if (!res.ok) { letzter = `${modell}: HTTP ${res.status}`; continue }
       const json = await res.json()
       for (const part of json?.candidates?.[0]?.content?.parts ?? []) {
@@ -128,6 +129,7 @@ serve(async (req) => {
     'shot from a 45-degree angle, fresh and healthy look, 4:3 composition. No text, no logos, no watermark, no people, no hands.'
 
   const bild = await erzeugeBild(apiKey, prompt)
+  if ('fehler' in bild && bild.fehler === 'KONTINGENT') return json({ error: 'Das KI-Kontingent ist gerade aufgebraucht (Limit des Google-Projekts erreicht). Bitte versuche es später noch einmal.', kontingent: true }, 429)
   if ('fehler' in bild) return json({ error: `Das Foto konnte nicht erstellt werden (${bild.fehler}).` }, 502)
 
   const { error: uploadFehler } = await admin.storage.from(BUCKET).upload(pfad, bild.bytes, { contentType: bild.mime, upsert: true })

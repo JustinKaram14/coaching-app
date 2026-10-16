@@ -18,6 +18,8 @@ interface Opt {
   pre?: number
   /** Probiotikum ab g pro Portion */
   pro?: number
+  /** Fermentiert ab g pro Portion */
+  fe?: number
   /** FODMAP-reich */
   fod?: boolean
   /** Gewicht gekocht / roh */
@@ -43,6 +45,7 @@ function z(id: string, name: string, typ: Herkunft, d: Zahlen, o: Opt = {}): Zut
     aox: o.aox ?? 0,
     pre: o.pre ?? 0,
     pro: o.pro ?? 0,
+    ferm: o.fe ?? 0,
     fodmap: o.fod ?? false,
     quellung: o.q ?? 1,
     einheit: o.u ? { n: o.u[0], p: o.u[1], g: o.u[2], stueck: o.u[3] } : undefined,
@@ -83,6 +86,8 @@ const LISTE: Zutat[] = [
   z('blattsalat', 'Blattsalat', P, [15, 1.4, 2.9, 1.3, 0.8, 0.2, 0.03, 0, 0.1, 0, 28, 194, 40], { aox: 1, al: ['salat', 'feldsalat'] }),
   z('avocado', 'Avocado', P, [160, 2, 8.5, 6.7, 0.7, 14.7, 2.1, 9.8, 1.8, 0, 7, 485, 110], { aox: 1, u: ['Avocado', 'Avocados', 150, true] }),
   z('rote_bete', 'Rote Bete', P, [43, 1.6, 9.6, 2.8, 6.8, 0.2, 0.03, 0.03, 0.06, 0, 78, 325, 0], { aox: 2, fod: true }),
+  z('topinambur', 'Topinambur', P, [73, 2, 17.4, 1.6, 9.6, 0, 0, 0, 0, 0, 4, 429, 0], { aox: 1, pre: 3, fod: true }),
+  z('chicoree', 'Chicorée', P, [17, 0.9, 4, 3.1, 0.7, 0.1, 0, 0, 0, 0, 22, 211, 0], { aox: 1, pre: 2, fod: true }),
   z('spargel', 'Grüner Spargel', P, [20, 2.2, 3.9, 2.1, 1.9, 0.1, 0.04, 0, 0.05, 0, 2, 202, 10], { aox: 1, pre: 1 }),
   z('fenchel', 'Fenchel', P, [31, 1.2, 7.3, 3.1, 3.9, 0.2, 0.05, 0.01, 0.1, 0, 52, 414, 0], { aox: 1, fod: true }),
   z('mais', 'Mais', P, [86, 3.3, 19, 2, 6.3, 1.4, 0.2, 0.4, 0.6, 0, 15, 270, 20], { fod: true }),
@@ -93,8 +98,8 @@ const LISTE: Zutat[] = [
   z('basilikum', 'Basilikum', P, [23, 3.2, 2.7, 1.6, 0.3, 0.6, 0.04, 0.09, 0.39, 0, 4, 295, 320], { aox: 2 }),
   z('schnittlauch', 'Schnittlauch', P, [30, 3.3, 4.4, 2.5, 1.9, 0.7, 0.15, 0.04, 0.2, 0, 3, 296, 70], { aox: 2, pre: 1 }),
   z('minze', 'Minze', P, [70, 3.8, 15, 8, 0, 0.9, 0.2, 0.01, 0.4, 0, 31, 569, 100], { aox: 3 }),
-  z('kimchi', 'Kimchi', P, [15, 1.1, 2.4, 1.6, 1, 0.5, 0.1, 0.03, 0.2, 0, 498, 151, 20], { aox: 1, pro: 30, fod: true }),
-  z('sauerkraut', 'Sauerkraut', P, [19, 0.9, 4.3, 2.9, 1.8, 0.1, 0.02, 0, 0.03, 0, 661, 170, 10], { aox: 1, pro: 30, fod: true, al: ['kohl'] }),
+  z('kimchi', 'Kimchi', P, [15, 1.1, 2.4, 1.6, 1, 0.5, 0.1, 0.03, 0.2, 0, 498, 151, 20], { aox: 1, pro: 30, fe: 30, fod: true }),
+  z('sauerkraut', 'Sauerkraut', P, [19, 0.9, 4.3, 2.9, 1.8, 0.1, 0.02, 0, 0.03, 0, 661, 170, 10], { aox: 1, pro: 30, fe: 30, fod: true, al: ['kohl'] }),
   z('zitronensaft', 'Zitronensaft', P, [22, 0.4, 6.9, 0.3, 2.5, 0.2, 0.04, 0.01, 0.05, 0, 1, 103, 0], { aox: 1, al: ['zitrone'] }),
   z('oliven', 'Oliven', P, [145, 1, 3.8, 3.3, 0, 15.3, 2, 11, 1.3, 0, 1556, 42, 70], { aox: 1 }),
 
@@ -138,8 +143,9 @@ const LISTE: Zutat[] = [
   z('tofu', 'Tofu', P, [76, 8, 1.9, 0.3, 0.6, 4.8, 0.7, 1.1, 2.7, 0, 7, 121, 580], { a: ['soja'], al: ['soja'] }),
   z('raeuchertofu', 'Räuchertofu', P, [140, 15, 2, 1, 0.5, 8, 1.2, 1.8, 4.5, 0, 600, 150, 800], { a: ['soja'], al: ['soja', 'tofu'] }),
   z('edamame', 'Edamame', P, [121, 12, 9, 5.2, 2.2, 5.2, 0.6, 0.9, 2.4, 0, 6, 482, 280], { a: ['soja'], aox: 1, al: ['soja'] }),
+  z('tempeh', 'Tempeh', P, [192, 20.3, 7.6, 5, 0, 10.8, 2.5, 2.4, 5.4, 0, 9, 412, 100], { a: ['soja'], pro: 0, fe: 50, aox: 1, al: ['soja', 'fermentiert'] }),
   z('sojadrink', 'Sojadrink (ungesüßt)', P, [33, 2.9, 1.7, 0.4, 0.6, 1.8, 0.2, 0.4, 1, 0, 12, 118, 100], { a: ['soja'], al: ['soja', 'pflanzenmilch'] }),
-  z('miso', 'Miso-Paste', P, [199, 12, 26, 5.4, 6.2, 6, 1, 1.2, 2.9, 0, 3728, 210, 0], { a: ['soja'], pro: 10, al: ['soja'], u: ['EL', 'EL', 17, false] }),
+  z('miso', 'Miso-Paste', P, [199, 12, 26, 5.4, 6.2, 6, 1, 1.2, 2.9, 0, 3728, 210, 0], { a: ['soja'], pro: 10, fe: 8, al: ['soja'], u: ['EL', 'EL', 17, false] }),
   z('sojasauce', 'Sojasauce', P, [53, 8, 4.9, 0.8, 0.4, 0.6, 0.1, 0.1, 0.3, 0, 5493, 435, 0], { a: ['soja', 'gluten'], al: ['soja'], u: ['EL', 'EL', 15, false] }),
 
   // ── Nüsse, Samen, Öle ──────────────────────────────────────────────────
@@ -162,8 +168,8 @@ const LISTE: Zutat[] = [
 
   // ── Eier, Milchprodukte ────────────────────────────────────────────────
   z('ei', 'Ei', 'eimilch', [143, 12.6, 0.7, 0, 0.4, 9.5, 3.1, 3.7, 1.4, 372, 142, 138, 100], { a: ['ei'], al: ['eier'], u: ['Ei', 'Eier', 55, true] }),
-  z('joghurt', 'Naturjoghurt (3,5 %)', 'eimilch', [62, 3.5, 4.7, 0, 4.7, 3.3, 2.1, 0.9, 0.1, 13, 46, 155, 10], { a: ['milch'], lak: true, pro: 50, al: ['milch', 'joghurt', 'jogurt'] }),
-  z('skyr', 'Skyr', 'eimilch', [63, 11, 4, 0, 4, 0.2, 0.1, 0.05, 0.02, 5, 40, 150, 0], { a: ['milch'], lak: true, pro: 50, al: ['milch', 'quark'] }),
+  z('joghurt', 'Naturjoghurt (3,5 %)', 'eimilch', [62, 3.5, 4.7, 0, 4.7, 3.3, 2.1, 0.9, 0.1, 13, 46, 155, 10], { a: ['milch'], lak: true, pro: 50, fe: 50, al: ['milch', 'joghurt', 'jogurt'] }),
+  z('skyr', 'Skyr', 'eimilch', [63, 11, 4, 0, 4, 0.2, 0.1, 0.05, 0.02, 5, 40, 150, 0], { a: ['milch'], lak: true, pro: 50, fe: 50, al: ['milch', 'quark'] }),
   z('magerquark', 'Magerquark', 'eimilch', [67, 12, 4, 0, 4, 0.3, 0.2, 0.1, 0.01, 3, 41, 150, 0], { a: ['milch'], lak: true, al: ['milch', 'quark'] }),
   z('huettenkaese', 'Hüttenkäse', 'eimilch', [98, 11, 3.4, 0, 2.7, 4.3, 1.7, 0.8, 0.1, 17, 364, 104, 0], { a: ['milch'], lak: true, al: ['milch', 'käse', 'frischkäse'] }),
   z('frischkaese', 'Frischkäse (light)', 'eimilch', [110, 8, 4, 0, 4, 7, 4.5, 2, 0.2, 25, 330, 120, 0], { a: ['milch'], lak: true, al: ['milch', 'käse'] }),
@@ -172,7 +178,8 @@ const LISTE: Zutat[] = [
   z('parmesan', 'Parmesan', 'eimilch', [392, 36, 0, 0, 0, 26, 17, 7.5, 0.8, 68, 1529, 100, 0], { a: ['milch'], al: ['milch', 'käse', 'hartkäse'] }),
   z('gouda', 'Gouda', 'eimilch', [356, 25, 2.2, 0, 2.2, 27.4, 17.6, 7.7, 0.7, 114, 819, 121, 0], { a: ['milch'], al: ['milch', 'käse', 'hartkäse'] }),
   z('milch', 'Milch (1,5 %)', 'eimilch', [47, 3.4, 4.8, 0, 4.8, 1.5, 1, 0.4, 0.05, 6, 43, 150, 5], { a: ['milch'], lak: true, al: ['kuhmilch'] }),
-  z('kefir', 'Kefir', 'eimilch', [52, 3.5, 4.5, 0, 4.5, 2, 1.3, 0.5, 0.1, 10, 40, 150, 5], { a: ['milch'], lak: true, pro: 50, al: ['milch'] }),
+  z('kefir', 'Kefir', 'eimilch', [52, 3.5, 4.5, 0, 4.5, 2, 1.3, 0.5, 0.1, 10, 40, 150, 5], { a: ['milch'], lak: true, pro: 50, fe: 50, al: ['milch'] }),
+  z('buttermilch', 'Buttermilch', 'eimilch', [37, 3.4, 4, 0, 4, 0.9, 0.6, 0.25, 0.03, 4, 105, 150, 0], { a: ['milch'], lak: true, pro: 50, fe: 50, al: ['milch'] }),
   z('sahne', 'Sahne', 'eimilch', [292, 2.4, 3, 0, 3, 30, 19, 8, 1, 109, 34, 100, 50], { a: ['milch'], lak: true, al: ['milch'] }),
   z('butter', 'Butter', 'eimilch', [717, 0.9, 0.1, 0, 0.1, 81, 51, 21, 3, 215, 11, 24, 300], { a: ['milch'], basis: true, al: ['milch'], u: ['TL', 'TL', 5, false] }),
 
