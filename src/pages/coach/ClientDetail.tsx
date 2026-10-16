@@ -8,6 +8,7 @@ import { formatDate, calcSleepHours } from '../../lib/utils'
 import { Spinner } from '../../components/ui/Spinner'
 import type { Profile, GewichtEntry, TrainingEntry, SchlafEntry, ErnaehrungEntry, ClientSettings, CoachPlan } from '../../types/database'
 import { HaushaltTab } from './HaushaltTab'
+import { RezeptEmpfehlenTab } from './RezeptEmpfehlenTab'
 import { CoachFigurePanel } from '../../components/game/CoachFigurePanel'
 import { Avatar } from '../../components/game/Avatar'
 import { useClientGame } from '../../hooks/useClientGame'
@@ -468,6 +469,7 @@ export function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>()
   const { colors } = useTheme()
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [client, setClient] = useState<Profile | null>(null)
   const [settings, setSettings] = useState<ClientSettings | null>(null)
   const [weights, setWeights] = useState<GewichtEntry[]>([])
@@ -476,7 +478,7 @@ export function ClientDetail() {
   const [foodLog, setFoodLog] = useState<{ id: string; datum: string; name: string; kalorien: number | null; protein_g: number | null; kohlenhydrate_g: number | null; fett_g: number | null }[]>([])
   const [uebungenMap, setUebungenMap] = useState<Record<string, { id: string; uebungsname: string; saetze: number | null; wdh: number | null; gewicht_kg: number | null; saetze_log: { wdh: number | null; kg: number | null }[] | null }[]>>({})
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'anamnese' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt' | 'figur'>('overview')
+  const [tab, setTab] = useState<'overview' | 'anamnese' | 'weight' | 'training' | 'sleep' | 'nutrition' | 'masterplan' | 'haushalt' | 'rezepte' | 'figur'>('overview')
   const [notizen, setNotizen] = useState('')
   const [notizenSaving, setNotizenSaving] = useState(false)
   const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(null)
@@ -558,6 +560,7 @@ export function ClientDetail() {
     { id: 'nutrition', label: 'Ernährung' },
     { id: 'masterplan', label: 'Masterplan' },
     { id: 'haushalt', label: 'Haushalt' },
+    { id: 'rezepte', label: 'Rezepte' },
     { id: 'figur', label: 'Figur & Challenges' },
   ] as const
 
@@ -1067,6 +1070,10 @@ export function ClientDetail() {
 
       {tab === 'haushalt' && clientId && (
         <HaushaltTab clientId={clientId} clientName={client?.name ?? 'Klient'} />
+      )}
+
+      {tab === 'rezepte' && clientId && (
+        <RezeptEmpfehlenTab clientId={clientId} clientName={client?.name?.split(' ')[0] ?? 'Klient'} coachName={profile?.name?.split(' ')[0] ?? 'Dein Coach'} settings={settings} />
       )}
 
       {tab === 'figur' && clientId && (

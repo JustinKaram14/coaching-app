@@ -123,10 +123,16 @@ export function More() {
           Impressum
         </Link>
         <Link
-          to="/legal"
+          to="/legal?tab=datenschutz"
           className="hit text-xs text-text-muted hover:text-text-secondary underline underline-offset-2"
         >
           Datenschutz
+        </Link>
+        <Link
+          to="/legal?tab=gesundheit"
+          className="hit text-xs text-text-muted hover:text-text-secondary underline underline-offset-2"
+        >
+          Gesundheitshinweis
         </Link>
       </div>
     </div>
