@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import { BookPlus, ChefHat, Clock, Flame, Minus, Plus, Trash2, Users, AlertTriangle } from 'lucide-react'
+import { useCallback, useContext, useState } from 'react'
+import { BookPlus, ChefHat, Clock, Flame, Minus, Plus, ShoppingCart, Trash2, Users, AlertTriangle } from 'lucide-react'
 import type { Treffer } from '../../../lib/entdecken/filter'
 import { ARTEN, GESUNDHEIT_REIHEN, REIHEN, SCHWIERIGKEIT } from '../../../lib/entdecken/katalog'
 import { SCHWELLEN } from '../../../lib/entdecken/engine'
 import { ZUTATEN, zutatZeile } from '../../../lib/entdecken/zutaten'
-import { FavoritHerz, Sheet, Hinweis, RezeptBild, TagChip, gesundheitsTags, zahl } from './gemeinsam'
+import { EinkaufKontext, FavoritHerz, Sheet, Hinweis, RezeptBild, TagChip, TeilenDruckenLeiste, gesundheitsTags, teilenMeldung, zahl } from './gemeinsam'
+import { DruckAnsicht, RezeptDruck } from './Druck'
+import { rezeptText, teile } from '../../../lib/entdecken/teilen'
 import { TagebuchDialog } from './TagebuchDialog'
 
 function NaehrZeile({ label, wert, einheit, stellen = 1, einzug = false, fett = false }: {
@@ -34,6 +36,20 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
   const [tagebuch, setTagebuch] = useState(false)
   const [wunschPortionen, setWunschPortionen] = useState(r.portionen)
   const faktor = wunschPortionen / r.portionen
+  const einkauf = useContext(EinkaufKontext)
+  const aufListe = einkauf.portionenAufListe(r.id)
+  const [listeStatus, setListeStatus] = useState('')
+  const [drucken, setDrucken] = useState(false)
+  const [teilenStatus, setTeilenStatus] = useState('')
+  const druckFertig = useCallback(() => setDrucken(false), [])
+
+  async function aufDieListe() {
+    setListeStatus('')
+    setListeStatus((await einkauf.hinzufuegen(r, wunschPortionen)) ? 'ok' : 'fehler')
+  }
+  async function teilen() {
+    setTeilenStatus(teilenMeldung(await teile(r.name, rezeptText(r, wunschPortionen))))
+  }
   const tags = gesundheitsTags(r)
   const arten = ARTEN.filter(a => r.arten.includes(a.id))
   const reihen = REIHEN.filter(x => r.alleReihen.includes(x.id))
@@ -72,6 +88,8 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
             </div>
           ))}
         </div>
+
+        <TeilenDruckenLeiste onTeilen={teilen} onDrucken={() => setDrucken(true)} status={teilenStatus} />
 
         {(t.weich.length > 0 || t.warnungen.length > 0) && (
           <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm space-y-1" role="note">
@@ -152,6 +170,17 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
               return zt ? <li key={i} className="px-3 py-2 text-sm text-text-primary">{zutatZeile(zt, z.g * faktor)}</li> : null
             })}
           </ul>
+          <button onClick={aufDieListe} className="btn-secondary w-full flex items-center justify-center gap-2 text-sm">
+            <ShoppingCart size={15} />
+            {aufListe === null ? 'Auf die Einkaufsliste' : aufListe === wunschPortionen ? 'Schon auf der Einkaufsliste' : `Einkaufsliste auf ${portionenText(wunschPortionen)} Port. ändern`}
+          </button>
+          {listeStatus === 'ok' && (
+            <div className="text-xs text-success flex items-center justify-between" role="status">
+              <span>Auf der Einkaufsliste für {portionenText(wunschPortionen)} {wunschPortionen === 1 ? 'Portion' : 'Portionen'}.</span>
+              <button onClick={einkauf.oeffneListe} className="text-brand hover:underline">Liste ansehen</button>
+            </div>
+          )}
+          {listeStatus === 'fehler' && <div className="text-xs text-danger" role="alert">Das hat nicht geklappt. Bitte versuche es noch einmal.</div>}
         </section>
 
         {/* Anleitung */}
@@ -192,6 +221,7 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
           <p className="text-[11px] text-text-muted">Geschätzt aus Durchschnittswerten der Zutaten (rohes Gewicht, ohne Garverluste). Kohlenhydrate inklusive Ballaststoffe.</p>
         </section>
       </div>
+      {drucken && <DruckAnsicht onFertig={druckFertig}><RezeptDruck r={r} portionen={wunschPortionen} /></DruckAnsicht>}
       {tagebuch && <TagebuchDialog r={r} userId={userId} onClose={() => setTagebuch(false)} />}
     </Sheet>
   )

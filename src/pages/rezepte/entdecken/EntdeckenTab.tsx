@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ChevronRight, Clock, Flame, Search, ShieldCheck, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
+import { ChevronRight, Clock, Flame, Search, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { DATA_CHANGED_EVENT } from '../../../lib/supabase'
 import {
-  STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useFavoriten, useKiRezepte, usePersoenlich,
+  STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useEinkauf, useFavoriten, useKiRezepte, usePersoenlich,
 } from '../../../lib/entdecken/daten'
 import {
   LEERER_FILTER, filterAktiv, filterAnzahl, leseAnamnese, naechsteMahlzeit, rezeptDesTages, tagesVorschlaege, wendeAn,
@@ -14,7 +14,7 @@ import {
 } from '../../../lib/entdecken/katalog'
 import { SCHWELLEN } from '../../../lib/entdecken/engine'
 import type { Mahlzeit } from '../../../lib/entdecken/types'
-import { FavoritHerz, FavoritenKontext, Hinweis, RezeptBild, zahl } from './gemeinsam'
+import { EinkaufKontext, FavoritHerz, FavoritenKontext, Hinweis, RezeptBild, zahl } from './gemeinsam'
 import { toLocalISO } from '../../../lib/utils'
 import { RezeptKarte } from './RezeptKarte'
 import { RezeptDetail } from './RezeptDetail'
@@ -22,6 +22,8 @@ import { FilterSheet, Chip } from './FilterSheet'
 import { PersoenlichSheet } from './PersoenlichSheet'
 import { KiDialog } from './KiDialog'
 import { BilderAdmin } from './BilderAdmin'
+import { EinkaufslisteSheet } from './EinkaufslisteSheet'
+import { baueEinkaufsListe } from '../../../lib/entdecken/einkauf'
 
 function Reihe({ titel, emoji, items, onAlle, onOeffnen, gesundheit = false, leer, extra }: {
   titel: string; emoji: string; items: Treffer[]; onAlle?: () => void; onOeffnen: (t: Treffer) => void
@@ -95,6 +97,8 @@ export function EntdeckenTab() {
   const anamneseTexte = useAnamneseTexte(userId)
   const ki = useKiRezepte(userId)
   const fav = useFavoriten(userId)
+  const einkauf = useEinkauf(userId)
+  const [einkaufOffen, setEinkaufOffen] = useState(false)
 
   const [filter, setFilter] = useState<FilterZustand>(LEERER_FILTER)
   const [filterOffen, setFilterOffen] = useState(false)
@@ -127,6 +131,15 @@ export function EntdeckenTab() {
     ? (basis.treffer.find(t => t.r.id === offen!.id) ?? { r: offenesRezept, weich: [], warnungen: [] })
     : undefined
   const oeffnen = (t: Treffer) => setOffen({ id: t.r.id })
+  const einkaufsListe = useMemo(
+    () => baueEinkaufsListe(einkauf.eintraege, new Map(alle.map(r => [r.id, r]))),
+    [einkauf.eintraege, alle],
+  )
+  const einkaufKontext = useMemo(() => ({
+    hinzufuegen: einkauf.hinzufuegen,
+    portionenAufListe: (id: string) => einkauf.eintraege.find(e => e.rezeptId === id)?.portionen ?? null,
+    oeffneListe: () => setEinkaufOffen(true),
+  }), [einkauf.hinzufuegen, einkauf.eintraege])
   const tagesRezept = useMemo(() => rezeptDesTages(basis.treffer, userId, toLocalISO(new Date())), [basis, userId])
   const favoritenTreffer = useMemo(() => basis.treffer.filter(t => fav.favoriten.has(t.r.id)), [basis, fav.favoriten])
 
@@ -154,6 +167,7 @@ export function EntdeckenTab() {
 
   return (
     <FavoritenKontext.Provider value={{ favoriten: fav.favoriten, umschalten: id => void fav.umschalten(id) }}>
+    <EinkaufKontext.Provider value={einkaufKontext}>
     <div className="space-y-6">
       {/* Suche und Filter */}
       <div className="flex gap-2">
@@ -165,6 +179,10 @@ export function EntdeckenTab() {
         <button onClick={() => setFilterOffen(true)} aria-label="Filter" className="relative btn-secondary px-3.5 flex items-center">
           <SlidersHorizontal size={18} />
           {anzahlFilter > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center px-1">{anzahlFilter}</span>}
+        </button>
+        <button onClick={() => setEinkaufOffen(true)} aria-label={`Einkaufsliste${einkauf.eintraege.length ? `, ${einkauf.eintraege.length} Rezepte` : ''}`} className="relative btn-secondary px-3.5 flex items-center">
+          <ShoppingCart size={18} className={einkauf.eintraege.length ? 'text-brand' : ''} />
+          {einkauf.eintraege.length > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center px-1">{einkauf.eintraege.length}</span>}
         </button>
         <button onClick={() => setPersoenlichOffen(true)} aria-label="Meine Einschränkungen" className="relative btn-secondary px-3.5 flex items-center">
           <ShieldCheck size={18} className={persoenlichAktiv ? 'text-brand' : ''} />
@@ -335,6 +353,11 @@ export function EntdeckenTab() {
         </>
       )}
 
+      {einkaufOffen && (
+        <EinkaufslisteSheet liste={einkaufsListe} eintraege={einkauf.eintraege} haken={einkauf.haken} nurLokal={einkauf.nurLokal}
+          onHaken={einkauf.hakenUmschalten} onEntfernen={id => void einkauf.entfernen(id)} onLeeren={() => void einkauf.leeren()}
+          onHakenLoeschen={einkauf.hakenLoeschen} onClose={() => setEinkaufOffen(false)} />
+      )}
       {filterOffen && <FilterSheet filter={filter} onChange={setFilter} anzahl={ergebnis.treffer.length} onClose={() => setFilterOffen(false)} />}
       {persoenlichOffen && <PersoenlichSheet einstellungen={einstellungen} anamnese={anamneseTexte} profil={profil ?? (anamneseTexte ? leseAnamnese(anamneseTexte.allergien, anamneseTexte.erkrankungen) : null)} onClose={() => setPersoenlichOffen(false)} />}
       {kiOffen && (
@@ -346,6 +369,7 @@ export function EntdeckenTab() {
           onLoeschen={offenerTreffer.r.quelle === 'ki' ? () => void ki.loeschen(offenerTreffer.r.id) : undefined} />
       )}
     </div>
+    </EinkaufKontext.Provider>
     </FavoritenKontext.Provider>
   )
 }

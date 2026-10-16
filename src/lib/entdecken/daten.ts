@@ -8,6 +8,7 @@ import type { Ausschluss, AusschlussArt, Mahlzeit, Rezept, RezeptDef } from './t
 import { START_REZEPTE } from './startbibliothek'
 import { ZUTATEN } from './zutaten'
 import { toLocalISO } from '../utils'
+import type { EinkaufsEintrag } from './einkauf'
 
 function istTabelleFehlt(err: { code?: string; message?: string } | null): boolean {
   if (!err) return false
@@ -130,6 +131,73 @@ export function useFavoriten(userId: string) {
   }, [ids, userId, key])
 
   return { favoriten: ids, umschalten, nurLokal }
+}
+
+// ─── Einkaufsliste ───────────────────────────────────────────────────────────
+
+export function useEinkauf(userId: string) {
+  const key = `entdecken_einkauf_${userId}`
+  const keyHaken = `entdecken_einkauf_haken_${userId}`
+  const [eintraege, setEintraege] = useState<EinkaufsEintrag[]>(() => lokal.lesen(key, []))
+  const [haken, setHaken] = useState<Set<string>>(() => new Set(lokal.lesen<string[]>(keyHaken, [])))
+  const [nurLokal, setNurLokal] = useState(false)
+
+  useEffect(() => {
+    let aktiv = true
+    supabase.from('rezept_einkauf').select('id,rezept_id,rezept_name,portionen').eq('user_id', userId).order('created_at').then(({ data, error }) => {
+      if (!aktiv) return
+      if (istTabelleFehlt(error)) { setNurLokal(true); return }
+      if (data) {
+        const liste = (data as { id: string; rezept_id: string; rezept_name: string; portionen: number }[])
+          .map(z => ({ id: z.id, rezeptId: z.rezept_id, rezeptName: z.rezept_name, portionen: Number(z.portionen) }))
+        setEintraege(liste)
+        lokal.schreiben(key, liste)
+      }
+    })
+    return () => { aktiv = false }
+  }, [userId, key])
+
+  const speichereLokal = useCallback((liste: EinkaufsEintrag[]) => { setEintraege(liste); lokal.schreiben(key, liste) }, [key])
+
+  /** Setzt das Rezept auf die Liste; steht es schon darauf, wird nur die Portionszahl geändert */
+  const hinzufuegen = useCallback(async (r: Rezept, portionen: number): Promise<boolean> => {
+    const bekannt = eintraege.find(e => e.rezeptId === r.id)
+    const lokalId = bekannt?.id ?? `lokal-${Date.now()}`
+    const neu: EinkaufsEintrag = { id: lokalId, rezeptId: r.id, rezeptName: r.name, portionen }
+    speichereLokal(bekannt ? eintraege.map(e => (e.rezeptId === r.id ? neu : e)) : [...eintraege, neu])
+    const { data, error } = await supabase.from('rezept_einkauf')
+      .upsert({ user_id: userId, rezept_id: r.id, rezept_name: r.name, portionen }, { onConflict: 'user_id,rezept_id' })
+      .select('id').maybeSingle()
+    if (istTabelleFehlt(error)) { setNurLokal(true); return true }
+    if (error) { speichereLokal(eintraege); return false }
+    const dbId = (data as { id: string } | null)?.id
+    if (dbId && dbId !== lokalId) setEintraege(prev => { const next = prev.map(e => (e.rezeptId === r.id ? { ...e, id: dbId } : e)); lokal.schreiben(key, next); return next })
+    return true
+  }, [eintraege, userId, key, speichereLokal])
+
+  const entfernen = useCallback(async (id: string) => {
+    speichereLokal(eintraege.filter(e => e.id !== id))
+    if (!id.startsWith('lokal-')) await supabase.from('rezept_einkauf').delete().eq('id', id)
+  }, [eintraege, speichereLokal])
+
+  const leeren = useCallback(async () => {
+    speichereLokal([])
+    setHaken(new Set()); lokal.schreiben(keyHaken, [])
+    await supabase.from('rezept_einkauf').delete().eq('user_id', userId)
+  }, [userId, keyHaken, speichereLokal])
+
+  const hakenUmschalten = useCallback((zutatId: string) => {
+    setHaken(prev => {
+      const next = new Set(prev)
+      if (next.has(zutatId)) next.delete(zutatId); else next.add(zutatId)
+      lokal.schreiben(keyHaken, [...next])
+      return next
+    })
+  }, [keyHaken])
+
+  const hakenLoeschen = useCallback(() => { setHaken(new Set()); lokal.schreiben(keyHaken, []) }, [keyHaken])
+
+  return { eintraege, haken, hinzufuegen, entfernen, leeren, hakenUmschalten, hakenLoeschen, nurLokal }
 }
 
 // ─── Anamnese-Texte (Allergien, Erkrankungen) ────────────────────────────────

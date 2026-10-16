@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Heart, Info, X } from 'lucide-react'
+import { Heart, Info, Printer, Share2, X } from 'lucide-react'
 import type { Mahlzeit, Rezept } from '../../../lib/entdecken/types'
 import { HINWEIS_LANG, KEINE_AERZTLICHE_EMPFEHLUNG } from '../../../lib/entdecken/katalog'
 
@@ -139,3 +139,30 @@ export function FavoritHerz({ r, className = '', beschriftung = false }: { r: Re
     </button>
   )
 }
+
+// ─── Teilen und Drucken ──────────────────────────────────────────────────────
+
+export function TeilenDruckenLeiste({ onTeilen, onDrucken, status, className = '' }: {
+  onTeilen: () => void; onDrucken: () => void; status?: string; className?: string
+}) {
+  return (
+    <div className={`flex items-center gap-2 ${className}`}>
+      <button onClick={onTeilen} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm"><Share2 size={15} /> Teilen</button>
+      <button onClick={onDrucken} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm"><Printer size={15} /> Drucken</button>
+      {status && <span className="text-xs text-text-muted w-full" role="status">{status}</span>}
+    </div>
+  )
+}
+
+/** Meldung nach dem Teilen */
+export function teilenMeldung(e: 'geteilt' | 'kopiert' | 'abgebrochen' | 'fehler'): string {
+  return e === 'kopiert' ? 'In die Zwischenablage kopiert.' : e === 'fehler' ? 'Teilen hat nicht geklappt.' : ''
+}
+
+// ─── Einkaufsliste (Kontext) ─────────────────────────────────────────────────
+
+export const EinkaufKontext = createContext<{
+  hinzufuegen: (r: Rezept, portionen: number) => Promise<boolean>
+  portionenAufListe: (rezeptId: string) => number | null
+  oeffneListe: () => void
+}>({ hinzufuegen: async () => false, portionenAufListe: () => null, oeffneListe: () => {} })
