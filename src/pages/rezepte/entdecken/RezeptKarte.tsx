@@ -18,9 +18,10 @@ export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false, zusa
             <Sparkles size={10} aria-hidden="true" /> KI
           </span>
         )}
-        {(t.weich.length > 0 || t.warnungen.length > 0) && (
+        {((t.konflikte?.length ?? 0) > 0 || t.weich.length > 0 || t.warnungen.length > 0) && (
           <span className="absolute bottom-2 left-2 right-2 rounded-lg bg-black/70 text-white text-[10px] leading-tight px-2 py-1">
-            {t.weich.length > 0 ? `Auf deiner „Schmeckt mir nicht“-Liste: ${t.weich.join(', ')}` : t.warnungen[0].text}
+            {(t.konflikte?.length ?? 0) > 0 ? `⚠ Passt nicht zu deinen Einschränkungen: ${t.konflikte!.join(', ')}`
+              : t.weich.length > 0 ? `Auf deiner „Schmeckt mir nicht“-Liste: ${t.weich.join(', ')}` : t.warnungen[0].text}
           </span>
         )}
       </div>

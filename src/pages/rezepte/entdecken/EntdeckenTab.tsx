@@ -6,7 +6,7 @@ import {
   STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useEinkauf, useFavoriten, useKiRezepte, usePersoenlich,
 } from '../../../lib/entdecken/daten'
 import {
-  LEERER_FILTER, filterAktiv, filterAnzahl, leseAnamnese, naechsteMahlzeit, rezeptDesTages, tagesVorschlaege, wendeAn,
+  LEERER_FILTER, bewerte, filterAktiv, filterAnzahl, leseAnamnese, naechsteMahlzeit, rezeptDesTages, tagesVorschlaege, wendeAn,
   type FilterZustand, type Treffer, type TagesStand,
 } from '../../../lib/entdecken/filter'
 import {
@@ -23,6 +23,8 @@ import { PersoenlichSheet } from './PersoenlichSheet'
 import { KiDialog } from './KiDialog'
 import { BilderAdmin } from './BilderAdmin'
 import { EinkaufslisteSheet } from './EinkaufslisteSheet'
+import { CoachEmpfehlungen } from './CoachEmpfehlungen'
+import { istAktuell, useEmpfehlungen, type Empfehlung } from '../../../lib/entdecken/empfehlungen'
 import { FortschrittsBalken, PflanzenSheet } from './PflanzenSheet'
 import { PFLANZEN_ZIEL, wochenStart } from '../../../lib/entdecken/pflanzen'
 import { usePflanzen } from '../../../lib/entdecken/pflanzenDaten'
@@ -101,6 +103,7 @@ export function EntdeckenTab() {
   const ki = useKiRezepte(userId)
   const fav = useFavoriten(userId)
   const einkauf = useEinkauf(userId)
+  const empfehlungen = useEmpfehlungen(userId)
   const [einkaufOffen, setEinkaufOffen] = useState(false)
   const [pflanzenOffen, setPflanzenOffen] = useState(false)
   const diesewoche = wochenStart(toLocalISO(new Date()))
@@ -134,9 +137,17 @@ export function EntdeckenTab() {
 
   const offenesRezept = offen ? alle.find(r => r.id === offen.id) : undefined
   const offenerTreffer: Treffer | undefined = offenesRezept
-    ? (basis.treffer.find(t => t.r.id === offen!.id) ?? { r: offenesRezept, weich: [], warnungen: [] })
+    ? (basis.treffer.find(t => t.r.id === offen!.id) ?? bewerte(offenesRezept, persoenlich))
     : undefined
   const oeffnen = (t: Treffer) => setOffen({ id: t.r.id })
+  const empfehlungsKarten = useMemo(() => {
+    const byId = new Map(alle.map(r => [r.id, r]))
+    return empfehlungen.liste.filter(e => istAktuell(e)).slice(0, 10).flatMap(e => {
+      const r = byId.get(e.rezeptId)
+      return r ? [{ e, t: bewerte(r, persoenlich) }] : []
+    })
+  }, [empfehlungen.liste, alle, persoenlich])
+  const empfehlungOeffnen = (e: Empfehlung, t: Treffer) => { void empfehlungen.alsGesehenMarkieren(e.id); oeffnen(t) }
   const einkaufsListe = useMemo(
     () => baueEinkaufsListe(einkauf.eintraege, new Map(alle.map(r => [r.id, r]))),
     [einkauf.eintraege, alle],
@@ -235,6 +246,8 @@ export function EntdeckenTab() {
       ) : (
         /* ── Übersicht ── */
         <>
+          <CoachEmpfehlungen eintraege={empfehlungsKarten} onOeffnen={empfehlungOeffnen} />
+
           {tagesRezept && (
             <section aria-label="Rezept des Tages" className="relative rounded-3xl overflow-hidden border border-border bg-bg-card" data-testid="rezept-des-tages">
               <button onClick={() => oeffnen(tagesRezept)} className="block w-full text-left">

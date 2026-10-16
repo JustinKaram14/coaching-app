@@ -92,6 +92,13 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
 
         <TeilenDruckenLeiste onTeilen={teilen} onDrucken={() => setDrucken(true)} status={teilenStatus} />
 
+        {(t.konflikte?.length ?? 0) > 0 && (
+          <div className="rounded-2xl border border-danger/40 bg-danger/10 p-3 text-sm flex items-start gap-2" role="alert" data-testid="konflikt-hinweis">
+            <AlertTriangle size={14} className="text-danger shrink-0 mt-0.5" aria-hidden="true" />
+            <span><strong>Passt nicht zu deinen Einschränkungen:</strong> {t.konflikte!.join(', ')}. Bitte prüfe die Zutaten, bevor du es kochst.</span>
+          </div>
+        )}
+
         {(t.weich.length > 0 || t.warnungen.length > 0) && (
           <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm space-y-1" role="note">
             {t.weich.length > 0 && (

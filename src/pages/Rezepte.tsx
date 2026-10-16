@@ -12,6 +12,7 @@ import { toLocalISO, todayISO as localTodayISO } from '../lib/utils'
 import { parseIngredients, parseSteps, scaleIngredient } from '../lib/recipe'
 import type { Rezept, ClientSettings, MealPlanEntry } from '../types/database'
 import { EntdeckenTab } from './rezepte/entdecken/EntdeckenTab'
+import { useUngeseheneEmpfehlungen } from '../lib/entdecken/empfehlungen'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1506,6 +1507,7 @@ export function Rezepte() {
   const [settings, setSettings] = useState<Partial<ClientSettings>>({})
   const [detailRezept, setDetailRezept] = useState<Rezept | null>(null)
   const [bulkGenerating, setBulkGenerating] = useState(false)
+  const neueEmpfehlungen = useUngeseheneEmpfehlungen(user?.id)
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
 
   useEffect(() => {
@@ -1591,11 +1593,11 @@ export function Rezepte() {
 
       <div className="flex gap-1 p-1 bg-bg-elevated rounded-xl border border-border">
         {tabs.map(({ id, icon: Icon, label }) => (
-          <button key={id} onClick={() => setTab(id)} aria-label={label} aria-pressed={tab === id}
+          <button key={id} onClick={() => setTab(id)} aria-label={id === 'entdecken' && neueEmpfehlungen > 0 ? `${label}, ${neueEmpfehlungen} neue Empfehlung${neueEmpfehlungen > 1 ? 'en' : ''} von deinem Coach` : label} aria-pressed={tab === id}
             className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               tab === id ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
             }`}>
-            <Icon size={15} /><span className="hidden sm:inline">{label}</span>
+            <span className="relative inline-flex"><Icon size={15} />{id === 'entdecken' && neueEmpfehlungen > 0 && <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-0.5" aria-hidden="true">{neueEmpfehlungen}</span>}</span><span className="hidden sm:inline">{label}</span>
           </button>
         ))}
       </div>

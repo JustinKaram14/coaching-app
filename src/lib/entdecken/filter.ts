@@ -188,6 +188,8 @@ export interface Treffer {
   weich: string[]
   /** Hinweise zu Diagnosen aus der Anamnese */
   warnungen: DiagnoseWarnung[]
+  /** Harte Ausschlüsse, die trotzdem zutreffen (nur bei Empfehlungen sichtbar, sonst ist das Rezept ausgeblendet) */
+  konflikte?: string[]
 }
 
 export function passtZuFilter(r: Rezept, f: FilterZustand, favoriten?: ReadonlySet<string>): boolean {
@@ -328,4 +330,27 @@ export function rezeptDesTages(treffer: Treffer[], userId: string, datum: string
   // nach ID sortieren, damit neue KI-Rezepte die Auswahl eines Tages nicht verschieben
   const sortiert = [...kandidaten].sort((a, b) => a.r.id.localeCompare(b.r.id))
   return sortiert[hash(`${userId}|${datum}`) % sortiert.length]
+}
+
+// ─── Bewertung einzelner Rezepte (z. B. Coach-Empfehlungen) ──────────────────
+
+/** Welche harten Ausschlüsse (Ausschlussliste, Anamnese) treffen auf das Rezept zu? */
+export function harteKonflikte(r: Rezept, p: Persoenlich): string[] {
+  const treffer = new Set<string>()
+  for (const a of p.ausschluesse) if (a.art === 'hart' && ausschlussTrifft(r, a.begriff)) treffer.add(a.begriff)
+  for (const h of p.anamnese?.harte ?? []) {
+    const regel = REGELN.find(x => x.id === h.regelId)
+    if (regel?.trifft(r)) treffer.add(h.label)
+  }
+  return [...treffer]
+}
+
+/** Bewertet ein Rezept ohne es auszublenden: alle Konflikte, Abneigungen und Hinweise werden mitgegeben */
+export function bewerte(r: Rezept, p: Persoenlich): Treffer {
+  return {
+    r,
+    weich: p.ausschluesse.filter(a => a.art === 'weich' && ausschlussTrifft(r, a.begriff)).map(a => a.begriff),
+    warnungen: diagnoseWarnungen(r, p.anamnese?.diagnosen.map(d => d.code) ?? []),
+    konflikte: harteKonflikte(r, p),
+  }
 }
