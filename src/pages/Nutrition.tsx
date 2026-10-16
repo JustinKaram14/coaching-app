@@ -1037,6 +1037,7 @@ function MealSection({ meal, items, onAdd, onDelete }: {
                   {item.kalorien} kcal
                   {item.menge_g ? ` · ${item.menge_g}g` : ''}
                   {item.protein_g ? ` · P: ${item.protein_g}g` : ''}
+                  {item.ballaststoffe_g ? ` · B: ${item.ballaststoffe_g}g` : ''}
                 </div>
               </div>
               <button
@@ -1124,11 +1125,12 @@ export function Nutrition() {
     protein_g: Math.round(items.reduce((a, i) => a + (i.protein_g ?? 0), 0) * 10) / 10,
     kohlenhydrate_g: Math.round(items.reduce((a, i) => a + (i.kohlenhydrate_g ?? 0), 0) * 10) / 10,
     fett_g: Math.round(items.reduce((a, i) => a + (i.fett_g ?? 0), 0) * 10) / 10,
+    ballaststoffe_g: Math.round(items.reduce((a, i) => a + (i.ballaststoffe_g ?? 0), 0) * 10) / 10,
   }
 
   async function handleAdd(meal: string, item: FoodItemInput) {
     if (!user) return
-    const { data } = await supabase.from('food_log').insert({
+    const zeile: Record<string, unknown> = {
       user_id: user.id,
       datum: date,
       mahlzeit: meal,
@@ -1139,7 +1141,13 @@ export function Nutrition() {
       kohlenhydrate_g: item.kohlenhydrate_g,
       fett_g: item.fett_g,
       barcode: item.barcode ?? null,
-    }).select().single()
+    }
+    let { data, error } = await supabase.from('food_log')
+      .insert(item.ballaststoffe_g != null ? { ...zeile, ballaststoffe_g: item.ballaststoffe_g } : zeile).select().single()
+    // Fehlt die Spalte in der Datenbank noch, ohne Ballaststoffe speichern
+    if (error && item.ballaststoffe_g != null && /ballaststoffe_g/.test(error.message)) {
+      ;({ data } = await supabase.from('food_log').insert(zeile).select().single())
+    }
     if (data) setItems(prev => [...prev, data as FoodLogItem])
     setAddingToMeal(null)
   }
@@ -1243,6 +1251,11 @@ export function Nutrition() {
                 <MacroBar label="Fett" value={totals.fett_g} goal={goals.fett_ziel} color="success" />
               </div>
             </div>
+            {totals.ballaststoffe_g > 0 && (
+              <div className="mt-3 pt-3 border-t border-border text-xs text-text-secondary">
+                Ballaststoffe heute: <span className="font-semibold text-text-primary">{totals.ballaststoffe_g} g</span> von 30 g
+              </div>
+            )}
           </div>
 
           {/* Meal sections */}

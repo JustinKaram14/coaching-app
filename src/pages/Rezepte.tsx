@@ -1508,7 +1508,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
 
 export function Rezepte() {
   const { user } = useAuth()
-  const [tab, setTab] = useState<Tab>('rezepte')
+  const [tab, setTab] = useState<Tab>('entdecken')
   const [rezepte, setRezepte] = useState<Rezept[]>([])
   const [rezepteLoading, setRezepteLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
