@@ -25,10 +25,14 @@ function text(s: unknown, max: number): string {
   return String(s ?? '').replace(/[\r\n]+/g, ' ').trim().slice(0, max)
 }
 
+// Die Bibliothek wird einmal geladen und von gleichzeitigen Aufrufen geteilt (mehrfaches paralleles import() schlug fehl)
+let bildBibliothek: Promise<typeof import('https://deno.land/x/imagescript@1.3.0/mod.ts')> | null = null
+const ladeBildBibliothek = () => (bildBibliothek ??= import('https://deno.land/x/imagescript@1.3.0/mod.ts'))
+
 /** Verkleinert auf 800 px Breite als JPEG (aus ca. 1,7 MB werden ca. 100 KB). Klappt das nicht, bleibt das Original. */
 async function verkleinere(bytes: Uint8Array, mime: string): Promise<{ bytes: Uint8Array; mime: string }> {
   try {
-    const { Image } = await import('https://deno.land/x/imagescript@1.3.0/mod.ts')
+    const { Image } = await ladeBildBibliothek()
     const img = await Image.decode(bytes)
     const klein = await img.resize(Math.min(800, img.width), Image.RESIZE_AUTO).encodeJPEG(82)
     return { bytes: klein, mime: 'image/jpeg' }
