@@ -3,7 +3,7 @@ import {
   BookOpen, Plus, Trash2, ChefHat, CalendarDays, Sparkles,
   ChevronLeft, ChevronRight, X, Check, Info, UtensilsCrossed,
   ShoppingCart, Copy, Share2, Send, MessageCircle, Wallet,
-  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus, Play, ArrowLeft, ArrowRight,
+  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus, Play, ArrowLeft, ArrowRight, Compass,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -11,10 +11,11 @@ import { Spinner } from '../components/ui/Spinner'
 import { toLocalISO, todayISO as localTodayISO } from '../lib/utils'
 import { parseIngredients, parseSteps, scaleIngredient } from '../lib/recipe'
 import type { Rezept, ClientSettings, MealPlanEntry } from '../types/database'
+import { EntdeckenTab } from './rezepte/entdecken/EntdeckenTab'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Tab = 'rezepte' | 'wochenplan' | 'ki'
+type Tab = 'entdecken' | 'rezepte' | 'wochenplan' | 'ki'
 type KiStep = 'config' | 'loading' | 'review' | 'done'
 type ReviewTab = 'plan' | 'einkauf' | 'kochen'
 
@@ -1569,6 +1570,7 @@ export function Rezepte() {
   const missingCount = rezepte.filter(r => !r.bild_url || !r.kochanleitung).length
 
   const tabs = [
+    { id: 'entdecken' as Tab, icon: Compass, label: 'Entdecken' },
     { id: 'rezepte' as Tab, icon: BookOpen, label: 'Rezepte' },
     { id: 'wochenplan' as Tab, icon: CalendarDays, label: 'Wochenplan' },
     { id: 'ki' as Tab, icon: Sparkles, label: 'KI Planer' },
@@ -1589,7 +1591,7 @@ export function Rezepte() {
 
       <div className="flex gap-1 p-1 bg-bg-elevated rounded-xl border border-border">
         {tabs.map(({ id, icon: Icon, label }) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} onClick={() => setTab(id)} aria-label={label} aria-pressed={tab === id}
             className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               tab === id ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
             }`}>
@@ -1597,6 +1599,8 @@ export function Rezepte() {
           </button>
         ))}
       </div>
+
+      {tab === 'entdecken' && <EntdeckenTab />}
 
       {tab === 'rezepte' && (
         <div className="space-y-4">

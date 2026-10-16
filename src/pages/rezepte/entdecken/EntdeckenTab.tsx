@@ -1,0 +1,345 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ChevronRight, Search, ShieldCheck, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
+import { useAuth } from '../../../hooks/useAuth'
+import { DATA_CHANGED_EVENT } from '../../../lib/supabase'
+import {
+  STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useKiRezepte, usePersoenlich,
+} from '../../../lib/entdecken/daten'
+import {
+  LEERER_FILTER, filterAktiv, filterAnzahl, leseAnamnese, naechsteMahlzeit, tagesVorschlaege, wendeAn,
+  type FilterZustand, type Treffer, type TagesStand,
+} from '../../../lib/entdecken/filter'
+import {
+  ARTEN, DARM_ARTEN, GESUNDHEIT_REIHEN, KATEGORIEN, KCAL_SPANNEN, REIHEN, type DarmArt,
+} from '../../../lib/entdecken/katalog'
+import { SCHWELLEN } from '../../../lib/entdecken/engine'
+import type { Mahlzeit } from '../../../lib/entdecken/types'
+import { Hinweis, zahl } from './gemeinsam'
+import { RezeptKarte } from './RezeptKarte'
+import { RezeptDetail } from './RezeptDetail'
+import { FilterSheet, Chip } from './FilterSheet'
+import { PersoenlichSheet } from './PersoenlichSheet'
+import { KiDialog } from './KiDialog'
+import { BilderAdmin } from './BilderAdmin'
+
+function Reihe({ titel, emoji, items, onAlle, onOeffnen, gesundheit = false, leer, extra }: {
+  titel: string; emoji: string; items: Treffer[]; onAlle?: () => void; onOeffnen: (t: Treffer) => void
+  gesundheit?: boolean; leer?: string; extra?: ReactNode
+}) {
+  if (items.length === 0 && !leer) return null
+  return (
+    <section aria-label={titel} className="space-y-2">
+      <div className="flex items-center gap-2">
+        <h3 className="font-bold text-text-primary flex-1"><span aria-hidden="true">{emoji} </span>{titel}</h3>
+        {onAlle && items.length > 0 && (
+          <button onClick={onAlle} className="text-sm text-brand font-medium flex items-center gap-0.5 hover:underline">Alle <ChevronRight size={14} /></button>
+        )}
+      </div>
+      {extra}
+      {items.length === 0 ? <div className="text-sm text-text-muted">{leer}</div> : (
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x scrollbar-none">
+          {items.slice(0, 12).map(t => (
+            <div key={t.r.id} className="snap-start"><RezeptKarte t={t} onOpen={() => onOeffnen(t)} gesundheit={gesundheit} /></div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function BallaststoffKarte({ stand, ohneAngabe, vorschlaege, mahlzeit, onOeffnen }: {
+  stand: TagesStand; ohneAngabe: number; vorschlaege: ReturnType<typeof tagesVorschlaege>; mahlzeit: Mahlzeit; onOeffnen: (t: Treffer) => void
+}) {
+  const ziel = SCHWELLEN.ballaststoffTagesziel
+  const rest = Math.max(0, ziel - stand.ballast)
+  const anteil = Math.min(1, stand.ballast / ziel)
+  return (
+    <section aria-label="Ballaststoffe heute" className="card space-y-3" data-testid="ballaststoff-karte">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="font-bold text-text-primary">🌾 Ballaststoffe heute</h3>
+        <span className="text-sm text-text-secondary tabular-nums"><strong className="text-text-primary">{zahl(stand.ballast, 1)}</strong> / {ziel} g</span>
+      </div>
+      <div className="h-2.5 rounded-full bg-bg-elevated overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={ziel} aria-valuenow={Math.min(ziel, stand.ballast)} aria-label="Ballaststoffe heute">
+        <div className="h-full rounded-full bg-success transition-all" style={{ width: `${anteil * 100}%` }} />
+      </div>
+      {ohneAngabe > 0 && (
+        <p className="text-xs text-text-muted">{ohneAngabe} {ohneAngabe === 1 ? 'Eintrag' : 'Einträge'} im Tagebuch {ohneAngabe === 1 ? 'hat' : 'haben'} keine Ballaststoff-Angabe und {ohneAngabe === 1 ? 'zählt' : 'zählen'} nicht mit.</p>
+      )}
+      {rest === 0 ? (
+        <p className="text-sm text-success font-medium">Tagesziel erreicht.</p>
+      ) : vorschlaege.length > 0 ? (
+        <>
+          <p className="text-sm text-text-secondary">Noch <strong>{zahl(rest, 0)} g</strong> offen. Das passt zum Rest deines Tages ({mahlzeit}, noch {Math.max(0, stand.kcalZiel - stand.kcal)} kcal):</p>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x scrollbar-none">
+            {vorschlaege.map(v => (
+              <div key={v.t.r.id} className="snap-start shrink-0 w-44">
+                <RezeptKarte t={v.t} onOpen={() => onOeffnen(v.t)} breit gesundheit />
+                <div className="text-[11px] text-success font-medium mt-1 px-1">+{zahl(v.ballast, 1)} g Ballaststoffe</div>
+              </div>
+            ))}
+          </div>
+          <Hinweis />
+        </>
+      ) : (
+        <p className="text-sm text-text-secondary">{stand.kcalZiel - stand.kcal < 60 ? 'Dein Kalorienziel für heute ist fast erreicht, dafür passt kein weiteres Rezept mehr.' : 'Für den Rest deines Tages gibt es gerade keinen passenden Vorschlag.'}</p>
+      )}
+    </section>
+  )
+}
+
+export function EntdeckenTab() {
+  const { user, profile } = useAuth()
+  const userId = user!.id
+  const einstellungen = usePersoenlich(userId)
+  const anamneseTexte = useAnamneseTexte(userId)
+  const ki = useKiRezepte(userId)
+
+  const [filter, setFilter] = useState<FilterZustand>(LEERER_FILTER)
+  const [filterOffen, setFilterOffen] = useState(false)
+  const [persoenlichOffen, setPersoenlichOffen] = useState(false)
+  const [kiOffen, setKiOffen] = useState(false)
+  const [offen, setOffen] = useState<{ id: string } | null>(null)
+  const [darmTab, setDarmTab] = useState<DarmArt | 'alle'>('alle')
+  const [heute, setHeute] = useState<Awaited<ReturnType<typeof ladeHeute>> | null>(null)
+
+  const neuLaden = useCallback(() => { ladeHeute(userId).then(setHeute).catch(() => {}) }, [userId])
+  useEffect(() => {
+    neuLaden()
+    window.addEventListener(DATA_CHANGED_EVENT, neuLaden)
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, neuLaden)
+  }, [neuLaden])
+
+  const profil = useMemo(
+    () => (einstellungen.anamneseFilter && anamneseTexte ? leseAnamnese(anamneseTexte.allergien, anamneseTexte.erkrankungen) : null),
+    [einstellungen.anamneseFilter, anamneseTexte],
+  )
+  const persoenlich = useMemo(() => ({ ausschluesse: einstellungen.ausschluesse, anamnese: profil }), [einstellungen.ausschluesse, profil])
+  const alle = useMemo(() => [...ki.rezepte, ...STARTBIBLIOTHEK], [ki.rezepte])
+
+  const basis = useMemo(() => wendeAn(alle, LEERER_FILTER, persoenlich), [alle, persoenlich])
+  const ergebnis = useMemo(() => wendeAn(alle, filter, persoenlich), [alle, filter, persoenlich])
+  const liste = filterAktiv(filter)
+
+  const offenesRezept = offen ? alle.find(r => r.id === offen.id) : undefined
+  const offenerTreffer: Treffer | undefined = offenesRezept
+    ? (basis.treffer.find(t => t.r.id === offen!.id) ?? { r: offenesRezept, weich: [], warnungen: [] })
+    : undefined
+  const oeffnen = (t: Treffer) => setOffen({ id: t.r.id })
+
+  const stand: TagesStand | null = heute && { ballast: heute.ballast, kcal: heute.kcal, kcalZiel: heute.kcalZiel, belegt: heute.belegt }
+  const vorschlagMahlzeit = stand ? naechsteMahlzeit(stand.belegt, new Date().getHours()) : 'Mittagessen'
+  const vorschlaege = useMemo(
+    () => (stand ? tagesVorschlaege(basis.treffer, stand, vorschlagMahlzeit) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [basis, heute, vorschlagMahlzeit],
+  )
+
+  const gesundheitReihen = {
+    ballast: basis.treffer.filter(t => t.r.gesundheit.ballaststoffreich).sort((a, b) => b.r.pro.ballast - a.r.pro.ballast),
+    aox: basis.treffer.filter(t => t.r.gesundheit.antioxidantien >= 2).sort((a, b) => b.r.gesundheit.antioxidantien - a.r.gesundheit.antioxidantien),
+    darm: basis.treffer.filter(t => {
+      const g = t.r.gesundheit
+      return darmTab === 'alle' ? g.darmfreundlich || g.leichtVerdaulich
+        : darmTab === 'praebiotisch' ? g.praebiotisch : darmTab === 'probiotisch' ? g.probiotisch : g.leichtVerdaulich
+    }),
+    omega3: basis.treffer.filter(t => t.r.gesundheit.entzuendungshemmend).sort((a, b) => b.r.pro.omega3 - a.r.pro.omega3),
+  }
+
+  const persoenlichAktiv = einstellungen.anamneseFilter || einstellungen.ausschluesse.length > 0
+  const anzahlFilter = filterAnzahl(filter)
+
+  return (
+    <div className="space-y-6">
+      {/* Suche und Filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" aria-hidden="true" />
+          <input type="search" className="input pl-10" placeholder="Rezept suchen" aria-label="Entdecken durchsuchen"
+            value={filter.suche} onChange={e => setFilter(f => ({ ...f, suche: e.target.value }))} />
+        </div>
+        <button onClick={() => setFilterOffen(true)} aria-label="Filter" className="relative btn-secondary px-3.5 flex items-center">
+          <SlidersHorizontal size={18} />
+          {anzahlFilter > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center px-1">{anzahlFilter}</span>}
+        </button>
+        <button onClick={() => setPersoenlichOffen(true)} aria-label="Meine Einschränkungen" className="relative btn-secondary px-3.5 flex items-center">
+          <ShieldCheck size={18} className={persoenlichAktiv ? 'text-brand' : ''} />
+          {persoenlichAktiv && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-brand" />}
+        </button>
+      </div>
+
+      {persoenlichAktiv && (
+        <div className="flex items-center gap-2 text-xs text-text-secondary" data-testid="persoenlich-info">
+          <ShieldCheck size={13} className="text-brand shrink-0" aria-hidden="true" />
+          <span>
+            Deine Einschränkungen sind aktiv
+            {basis.ausgeblendet > 0 && <> · <strong>{basis.ausgeblendet}</strong> {basis.ausgeblendet === 1 ? 'Rezept' : 'Rezepte'} ausgeblendet</>}
+          </span>
+          <button onClick={() => setPersoenlichOffen(true)} className="text-brand hover:underline ml-auto shrink-0">Ändern</button>
+        </div>
+      )}
+
+      {liste ? (
+        /* ── Trefferliste ── */
+        <section aria-label="Ergebnisse" className="space-y-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setFilter(LEERER_FILTER)} className="p-2 rounded-xl hover:bg-bg-elevated text-text-secondary" aria-label="Zurück zur Übersicht"><ArrowLeft size={18} /></button>
+            <div className="flex-1 text-sm text-text-secondary" aria-live="polite">
+              <strong className="text-text-primary">{ergebnis.treffer.length}</strong> {ergebnis.treffer.length === 1 ? 'Rezept' : 'Rezepte'}
+              {ergebnis.ausgeblendet > 0 && <span className="text-text-muted"> · {ergebnis.ausgeblendet} wegen deiner Einschränkungen ausgeblendet</span>}
+            </div>
+            <button onClick={() => setFilter(LEERER_FILTER)} className="text-sm text-brand flex items-center gap-1 hover:underline"><X size={14} />Zurücksetzen</button>
+          </div>
+          <FilterChipsZeile filter={filter} onChange={setFilter} />
+          {(filter.gesundheit.length > 0 || filter.darmArt) && <Hinweis lang />}
+          {ergebnis.treffer.length === 0 ? (
+            <div className="text-center py-14 text-sm text-text-muted space-y-3">
+              <div>Keine Rezepte gefunden.</div>
+              <button onClick={() => setFilter(LEERER_FILTER)} className="btn-secondary">Filter zurücksetzen</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {ergebnis.treffer.map(t => <RezeptKarte key={t.r.id} t={t} onOpen={() => oeffnen(t)} breit gesundheit={filter.gesundheit.length > 0 || !!filter.darmArt} />)}
+            </div>
+          )}
+        </section>
+      ) : (
+        /* ── Übersicht ── */
+        <>
+          {stand && heute && (
+            <BallaststoffKarte stand={stand} ohneAngabe={heute.ohneAngabe} vorschlaege={vorschlaege} mahlzeit={vorschlagMahlzeit} onOeffnen={oeffnen} />
+          )}
+
+          <section aria-label="Kategorien" className="grid grid-cols-2 gap-3">
+            {KATEGORIEN.map(k => {
+              const anzahl = basis.treffer.filter(t => t.r.mahlzeiten.includes(k.id)).length
+              return (
+                <button key={k.id} onClick={() => setFilter(f => ({ ...f, mahlzeiten: [k.id] }))}
+                  className="text-left rounded-2xl border border-border bg-bg-card p-4 hover:border-brand/50 transition-colors">
+                  <div className="text-2xl mb-1" aria-hidden="true">{k.emoji}</div>
+                  <div className="font-bold text-text-primary">{k.id}</div>
+                  <div className="text-xs text-text-muted">{anzahl} Rezepte</div>
+                </button>
+              )
+            })}
+          </section>
+
+          <section aria-label="Kalorien" className="space-y-2">
+            <h3 className="font-bold text-text-primary">🔥 Kalorien pro Portion</h3>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
+              {KCAL_SPANNEN.map(s => (
+                <button key={s.id} onClick={() => setFilter(f => ({ ...f, kcal: s.id }))}
+                  className="shrink-0 rounded-2xl border border-border bg-bg-card px-4 py-3 text-sm font-semibold text-text-primary hover:border-brand/50">
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section aria-label="Ernährungsarten" className="space-y-2">
+            <h3 className="font-bold text-text-primary">🥦 Ernährungsart</h3>
+            <div className="flex flex-wrap gap-2">
+              {ARTEN.map(a => (
+                <button key={a.id} onClick={() => setFilter(f => ({ ...f, arten: [a.id] }))} title={a.info}
+                  className="rounded-full border border-border bg-bg-card px-3.5 py-2 text-sm font-medium text-text-primary hover:border-brand/50">
+                  <span aria-hidden="true">{a.emoji} </span>{a.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Gesundheit */}
+          <section aria-label="Gesundheit" className="space-y-4">
+            <div className="space-y-2">
+              <h3 className="font-bold text-text-primary text-lg">💚 Gesundheit</h3>
+              <Hinweis lang />
+            </div>
+            <Reihe titel={GESUNDHEIT_REIHEN.ballast.label} emoji={GESUNDHEIT_REIHEN.ballast.emoji} items={gesundheitReihen.ballast} gesundheit onOeffnen={oeffnen}
+              onAlle={() => setFilter(f => ({ ...f, gesundheit: ['ballast'] }))} />
+            <Reihe titel={GESUNDHEIT_REIHEN.aox.label} emoji={GESUNDHEIT_REIHEN.aox.emoji} items={gesundheitReihen.aox} gesundheit onOeffnen={oeffnen}
+              onAlle={() => setFilter(f => ({ ...f, gesundheit: ['aox'] }))} />
+            <Reihe titel={GESUNDHEIT_REIHEN.darm.label} emoji={GESUNDHEIT_REIHEN.darm.emoji} items={gesundheitReihen.darm} gesundheit onOeffnen={oeffnen}
+              leer="Dazu passt gerade kein Rezept."
+              onAlle={() => setFilter(f => ({ ...f, gesundheit: ['darm'], darmArt: darmTab === 'alle' ? null : darmTab }))}
+              extra={
+                <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4" role="group" aria-label="Darmfreundlich: Art">
+                  <Chip aktiv={darmTab === 'alle'} onClick={() => setDarmTab('alle')}>Alle</Chip>
+                  {DARM_ARTEN.map(d => <Chip key={d.id} aktiv={darmTab === d.id} onClick={() => setDarmTab(d.id)}>{d.label}</Chip>)}
+                </div>
+              } />
+            <Reihe titel={GESUNDHEIT_REIHEN.omega3.label} emoji={GESUNDHEIT_REIHEN.omega3.emoji} items={gesundheitReihen.omega3} gesundheit onOeffnen={oeffnen}
+              onAlle={() => setFilter(f => ({ ...f, gesundheit: ['omega3'] }))} />
+          </section>
+
+          {/* Reihen */}
+          {REIHEN.map(x => (
+            <Reihe key={x.id} titel={x.label} emoji={x.emoji} onOeffnen={oeffnen}
+              items={basis.treffer.filter(t => t.r.alleReihen.includes(x.id))}
+              onAlle={() => setFilter(f => ({ ...f, reihe: x.id }))} />
+          ))}
+
+          {/* KI */}
+          <section aria-label="KI-Rezepte" className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-text-primary flex-1">✨ Meine KI-Rezepte</h3>
+              {ki.rezepte.length > 0 && (
+                <button onClick={() => setFilter(f => ({ ...f, nurEigene: true }))} className="text-sm text-brand font-medium flex items-center gap-0.5 hover:underline">Alle <ChevronRight size={14} /></button>
+              )}
+            </div>
+            {ki.rezepte.length > 0 && (
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x scrollbar-none">
+                {basis.treffer.filter(t => t.r.quelle === 'ki').slice(0, 12).map(t => (
+                  <div key={t.r.id} className="snap-start"><RezeptKarte t={t} onOpen={() => oeffnen(t)} /></div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setKiOffen(true)} className="w-full rounded-2xl border border-dashed border-brand/50 bg-brand/5 hover:bg-brand/10 transition-colors p-4 flex items-center gap-3 text-left">
+              <Sparkles size={20} className="text-brand shrink-0" aria-hidden="true" />
+              <span>
+                <span className="block font-semibold text-text-primary">Neues Rezept per KI erzeugen</span>
+                <span className="block text-xs text-text-secondary">Mit Foto, passend zu Mahlzeit, Ernährungsart und deinen Einschränkungen.</span>
+              </span>
+            </button>
+            {ki.nurLokal && <p className="text-xs text-warning">KI-Rezepte werden gerade nur auf diesem Gerät gespeichert, bis die Datenbank aktualisiert ist.</p>}
+          </section>
+
+          {profile?.role === 'coach' && <BilderAdmin />}
+        </>
+      )}
+
+      {filterOffen && <FilterSheet filter={filter} onChange={setFilter} anzahl={ergebnis.treffer.length} onClose={() => setFilterOffen(false)} />}
+      {persoenlichOffen && <PersoenlichSheet einstellungen={einstellungen} anamnese={anamneseTexte} profil={profil ?? (anamneseTexte ? leseAnamnese(anamneseTexte.allergien, anamneseTexte.erkrankungen) : null)} onClose={() => setPersoenlichOffen(false)} />}
+      {kiOffen && (
+        <KiDialog ausschluesse={einstellungen.ausschluesse} anamnese={profil} speichern={ki.speichern}
+          onFertig={id => setOffen({ id })} onClose={() => setKiOffen(false)} />
+      )}
+      {offenerTreffer && (
+        <RezeptDetail t={offenerTreffer} userId={userId} onClose={() => setOffen(null)}
+          onLoeschen={offenerTreffer.r.quelle === 'ki' ? () => void ki.loeschen(offenerTreffer.r.id) : undefined} />
+      )}
+    </div>
+  )
+}
+
+/** Aktive Filter als entfernbare Chips über der Trefferliste */
+function FilterChipsZeile({ filter, onChange }: { filter: FilterZustand; onChange: (f: FilterZustand) => void }) {
+  const chips: { key: string; text: string; entfernen: () => void }[] = []
+  filter.mahlzeiten.forEach(m => chips.push({ key: `m-${m}`, text: m, entfernen: () => onChange({ ...filter, mahlzeiten: filter.mahlzeiten.filter(x => x !== m) }) }))
+  if (filter.kcal) chips.push({ key: 'kcal', text: KCAL_SPANNEN.find(s => s.id === filter.kcal)?.label ?? '', entfernen: () => onChange({ ...filter, kcal: null }) })
+  filter.arten.forEach(a => chips.push({ key: `a-${a}`, text: ARTEN.find(x => x.id === a)?.label ?? a, entfernen: () => onChange({ ...filter, arten: filter.arten.filter(x => x !== a) }) }))
+  if (filter.reihe) chips.push({ key: 'reihe', text: REIHEN.find(x => x.id === filter.reihe)?.label ?? filter.reihe, entfernen: () => onChange({ ...filter, reihe: null }) })
+  filter.gesundheit.forEach(g => chips.push({ key: `g-${g}`, text: GESUNDHEIT_REIHEN[g].label, entfernen: () => onChange({ ...filter, gesundheit: filter.gesundheit.filter(x => x !== g), darmArt: g === 'darm' ? null : filter.darmArt }) }))
+  if (filter.darmArt) chips.push({ key: 'darm', text: DARM_ARTEN.find(d => d.id === filter.darmArt)?.label ?? '', entfernen: () => onChange({ ...filter, darmArt: null }) })
+  if (filter.maxZeit) chips.push({ key: 'zeit', text: `bis ${filter.maxZeit} Min.`, entfernen: () => onChange({ ...filter, maxZeit: null }) })
+  if (filter.nurLeicht) chips.push({ key: 'leicht', text: 'Nur leichte', entfernen: () => onChange({ ...filter, nurLeicht: false }) })
+  if (filter.nurEigene) chips.push({ key: 'eigene', text: 'Meine KI-Rezepte', entfernen: () => onChange({ ...filter, nurEigene: false }) })
+  if (chips.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-1.5" data-testid="filter-chips">
+      {chips.map(c => (
+        <button key={c.key} onClick={c.entfernen} className="inline-flex items-center gap-1 rounded-full bg-brand/10 border border-brand/30 text-brand text-xs font-medium pl-2.5 pr-1.5 py-1">
+          {c.text}<X size={12} aria-label={`${c.text} entfernen`} />
+        </button>
+      ))}
+    </div>
+  )
+}
