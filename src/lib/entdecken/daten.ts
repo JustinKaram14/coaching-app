@@ -91,6 +91,47 @@ export function usePersoenlich(userId: string) {
   return { ausschluesse, anamneseFilter, setAnamneseFilter, hinzufuegen, entfernen, artAendern, nurLokal, fehler, setFehler }
 }
 
+// ─── Favoriten ───────────────────────────────────────────────────────────────
+
+export function useFavoriten(userId: string) {
+  const key = `entdecken_favoriten_${userId}`
+  const [ids, setIds] = useState<Set<string>>(() => new Set(lokal.lesen<string[]>(key, [])))
+  const [nurLokal, setNurLokal] = useState(false)
+
+  useEffect(() => {
+    let aktiv = true
+    supabase.from('rezept_favoriten').select('rezept_id').eq('user_id', userId).then(({ data, error }) => {
+      if (!aktiv) return
+      if (istTabelleFehlt(error)) { setNurLokal(true); return }
+      if (data) {
+        const neu = new Set((data as { rezept_id: string }[]).map(z => z.rezept_id))
+        setIds(neu)
+        lokal.schreiben(key, [...neu])
+      }
+    })
+    return () => { aktiv = false }
+  }, [userId, key])
+
+  const umschalten = useCallback(async (rezeptId: string) => {
+    const warFavorit = ids.has(rezeptId)
+    const next = new Set(ids)
+    if (warFavorit) next.delete(rezeptId); else next.add(rezeptId)
+    setIds(next)
+    lokal.schreiben(key, [...next])
+    const { error } = warFavorit
+      ? await supabase.from('rezept_favoriten').delete().eq('user_id', userId).eq('rezept_id', rezeptId)
+      : await supabase.from('rezept_favoriten').insert({ user_id: userId, rezept_id: rezeptId })
+    if (istTabelleFehlt(error)) { setNurLokal(true); return }
+    if (error && !(warFavorit === false && error.code === '23505')) {
+      // Speichern fehlgeschlagen: Anzeige zurücksetzen
+      setIds(ids)
+      lokal.schreiben(key, [...ids])
+    }
+  }, [ids, userId, key])
+
+  return { favoriten: ids, umschalten, nurLokal }
+}
+
 // ─── Anamnese-Texte (Allergien, Erkrankungen) ────────────────────────────────
 
 export interface AnamneseTexte { allergien: string; erkrankungen: string; ausgefuellt: boolean }

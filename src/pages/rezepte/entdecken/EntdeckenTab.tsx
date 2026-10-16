@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ChevronRight, Search, ShieldCheck, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
+import { ChevronRight, Clock, Flame, Search, ShieldCheck, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
 import { DATA_CHANGED_EVENT } from '../../../lib/supabase'
 import {
-  STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useKiRezepte, usePersoenlich,
+  STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useFavoriten, useKiRezepte, usePersoenlich,
 } from '../../../lib/entdecken/daten'
 import {
-  LEERER_FILTER, filterAktiv, filterAnzahl, leseAnamnese, naechsteMahlzeit, tagesVorschlaege, wendeAn,
+  LEERER_FILTER, filterAktiv, filterAnzahl, leseAnamnese, naechsteMahlzeit, rezeptDesTages, tagesVorschlaege, wendeAn,
   type FilterZustand, type Treffer, type TagesStand,
 } from '../../../lib/entdecken/filter'
 import {
@@ -14,7 +14,8 @@ import {
 } from '../../../lib/entdecken/katalog'
 import { SCHWELLEN } from '../../../lib/entdecken/engine'
 import type { Mahlzeit } from '../../../lib/entdecken/types'
-import { Hinweis, zahl } from './gemeinsam'
+import { FavoritHerz, FavoritenKontext, Hinweis, RezeptBild, zahl } from './gemeinsam'
+import { toLocalISO } from '../../../lib/utils'
 import { RezeptKarte } from './RezeptKarte'
 import { RezeptDetail } from './RezeptDetail'
 import { FilterSheet, Chip } from './FilterSheet'
@@ -93,6 +94,7 @@ export function EntdeckenTab() {
   const einstellungen = usePersoenlich(userId)
   const anamneseTexte = useAnamneseTexte(userId)
   const ki = useKiRezepte(userId)
+  const fav = useFavoriten(userId)
 
   const [filter, setFilter] = useState<FilterZustand>(LEERER_FILTER)
   const [filterOffen, setFilterOffen] = useState(false)
@@ -113,7 +115,7 @@ export function EntdeckenTab() {
     () => (einstellungen.anamneseFilter && anamneseTexte ? leseAnamnese(anamneseTexte.allergien, anamneseTexte.erkrankungen) : null),
     [einstellungen.anamneseFilter, anamneseTexte],
   )
-  const persoenlich = useMemo(() => ({ ausschluesse: einstellungen.ausschluesse, anamnese: profil }), [einstellungen.ausschluesse, profil])
+  const persoenlich = useMemo(() => ({ ausschluesse: einstellungen.ausschluesse, anamnese: profil, favoriten: fav.favoriten }), [einstellungen.ausschluesse, profil, fav.favoriten])
   const alle = useMemo(() => [...ki.rezepte, ...STARTBIBLIOTHEK], [ki.rezepte])
 
   const basis = useMemo(() => wendeAn(alle, LEERER_FILTER, persoenlich), [alle, persoenlich])
@@ -125,6 +127,8 @@ export function EntdeckenTab() {
     ? (basis.treffer.find(t => t.r.id === offen!.id) ?? { r: offenesRezept, weich: [], warnungen: [] })
     : undefined
   const oeffnen = (t: Treffer) => setOffen({ id: t.r.id })
+  const tagesRezept = useMemo(() => rezeptDesTages(basis.treffer, userId, toLocalISO(new Date())), [basis, userId])
+  const favoritenTreffer = useMemo(() => basis.treffer.filter(t => fav.favoriten.has(t.r.id)), [basis, fav.favoriten])
 
   const stand: TagesStand | null = heute && { ballast: heute.ballast, kcal: heute.kcal, kcalZiel: heute.kcalZiel, belegt: heute.belegt }
   const vorschlagMahlzeit = stand ? naechsteMahlzeit(stand.belegt, new Date().getHours()) : 'Mittagessen'
@@ -149,6 +153,7 @@ export function EntdeckenTab() {
   const anzahlFilter = filterAnzahl(filter)
 
   return (
+    <FavoritenKontext.Provider value={{ favoriten: fav.favoriten, umschalten: id => void fav.umschalten(id) }}>
     <div className="space-y-6">
       {/* Suche und Filter */}
       <div className="flex gap-2">
@@ -205,6 +210,30 @@ export function EntdeckenTab() {
       ) : (
         /* ── Übersicht ── */
         <>
+          {tagesRezept && (
+            <section aria-label="Rezept des Tages" className="relative rounded-3xl overflow-hidden border border-border bg-bg-card" data-testid="rezept-des-tages">
+              <button onClick={() => oeffnen(tagesRezept)} className="block w-full text-left">
+                <RezeptBild r={tagesRezept.r} className="w-full aspect-[16/9]" />
+                <div className="p-4 space-y-1">
+                  <div className="text-xs font-semibold text-brand uppercase tracking-wide">Rezept des Tages</div>
+                  <div className="text-lg font-bold text-text-primary leading-snug">{tagesRezept.r.name}</div>
+                  <div className="flex items-center gap-3 text-sm text-text-muted">
+                    <span className="inline-flex items-center gap-1"><Flame size={14} aria-hidden="true" />{Math.round(tagesRezept.r.pro.kcal)} kcal</span>
+                    <span className="inline-flex items-center gap-1"><Clock size={14} aria-hidden="true" />{tagesRezept.r.zeitMin} Min.</span>
+                    <span>{tagesRezept.r.mahlzeiten[0]}</span>
+                  </div>
+                </div>
+              </button>
+              <FavoritHerz r={tagesRezept.r} className="absolute top-3 left-3 w-9 h-9 rounded-full bg-black/55 text-white hover:bg-black/75" />
+            </section>
+          )}
+
+          {favoritenTreffer.length > 0 && (
+            <Reihe titel="Meine Favoriten" emoji="♥" items={favoritenTreffer} onOeffnen={oeffnen}
+              onAlle={() => setFilter(f => ({ ...f, nurFavoriten: true }))} />
+          )}
+          {fav.nurLokal && favoritenTreffer.length > 0 && <p className="text-xs text-warning -mt-4">Favoriten werden gerade nur auf diesem Gerät gespeichert, bis die Datenbank aktualisiert ist.</p>}
+
           {stand && heute && (
             <BallaststoffKarte stand={stand} ohneAngabe={heute.ohneAngabe} vorschlaege={vorschlaege} mahlzeit={vorschlagMahlzeit} onOeffnen={oeffnen} />
           )}
@@ -317,6 +346,7 @@ export function EntdeckenTab() {
           onLoeschen={offenerTreffer.r.quelle === 'ki' ? () => void ki.loeschen(offenerTreffer.r.id) : undefined} />
       )}
     </div>
+    </FavoritenKontext.Provider>
   )
 }
 
@@ -331,6 +361,7 @@ function FilterChipsZeile({ filter, onChange }: { filter: FilterZustand; onChang
   if (filter.darmArt) chips.push({ key: 'darm', text: DARM_ARTEN.find(d => d.id === filter.darmArt)?.label ?? '', entfernen: () => onChange({ ...filter, darmArt: null }) })
   if (filter.maxZeit) chips.push({ key: 'zeit', text: `bis ${filter.maxZeit} Min.`, entfernen: () => onChange({ ...filter, maxZeit: null }) })
   if (filter.nurLeicht) chips.push({ key: 'leicht', text: 'Nur leichte', entfernen: () => onChange({ ...filter, nurLeicht: false }) })
+  if (filter.nurFavoriten) chips.push({ key: 'fav', text: 'Favoriten', entfernen: () => onChange({ ...filter, nurFavoriten: false }) })
   if (filter.nurEigene) chips.push({ key: 'eigene', text: 'Meine KI-Rezepte', entfernen: () => onChange({ ...filter, nurEigene: false }) })
   if (chips.length === 0) return null
   return (

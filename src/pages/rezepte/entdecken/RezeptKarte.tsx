@@ -1,6 +1,6 @@
 import { Clock, Flame, Sparkles } from 'lucide-react'
 import type { Treffer } from '../../../lib/entdecken/filter'
-import { RezeptBild, TagChip, gesundheitsTags } from './gemeinsam'
+import { FavoritHerz, RezeptBild, TagChip, gesundheitsTags } from './gemeinsam'
 
 /** Karte wie in einer Entdecken-Reihe: Foto, Name, kcal und Zeit */
 export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false }: {
@@ -9,8 +9,8 @@ export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false }: {
   const { r } = t
   const tags = gesundheit ? gesundheitsTags(r).slice(0, 2) : []
   return (
-    <button onClick={onOpen} data-testid="rezept-karte"
-      className={`group text-left rounded-2xl border border-border bg-bg-card overflow-hidden hover:border-brand/50 transition-colors ${breit ? 'w-full' : 'w-44 shrink-0'}`}>
+    <div className={`relative rounded-2xl border border-border bg-bg-card overflow-hidden hover:border-brand/50 transition-colors ${breit ? 'w-full' : 'w-44 shrink-0'}`}>
+    <button onClick={onOpen} data-testid="rezept-karte" className="group text-left block w-full">
       <div className="relative">
         <RezeptBild r={r} className="w-full aspect-[4/3]" />
         {r.quelle === 'ki' && (
@@ -33,5 +33,7 @@ export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false }: {
         {tags.length > 0 && <div className="flex flex-wrap gap-1">{tags.map(tag => <TagChip key={tag.text} tag={tag} />)}</div>}
       </div>
     </button>
+    <FavoritHerz r={r} className="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/55 text-white hover:bg-black/75" />
+    </div>
   )
 }

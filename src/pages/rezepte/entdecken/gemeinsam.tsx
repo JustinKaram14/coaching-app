@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, X } from 'lucide-react'
+import { Heart, Info, X } from 'lucide-react'
 import type { Mahlzeit, Rezept } from '../../../lib/entdecken/types'
 import { HINWEIS_LANG, KEINE_AERZTLICHE_EMPFEHLUNG } from '../../../lib/entdecken/katalog'
 
@@ -117,4 +117,25 @@ export function TagChip({ tag }: { tag: Tag }) {
 
 export function zahl(n: number, stellen = 0): string {
   return n.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen })
+}
+
+// ─── Favoriten ───────────────────────────────────────────────────────────────
+
+export const FavoritenKontext = createContext<{ favoriten: ReadonlySet<string>; umschalten: (id: string) => void }>({
+  favoriten: new Set(), umschalten: () => {},
+})
+
+/** Herz zum Merken eines Rezepts */
+export function FavoritHerz({ r, className = '', beschriftung = false }: { r: Rezept; className?: string; beschriftung?: boolean }) {
+  const { favoriten, umschalten } = useContext(FavoritenKontext)
+  const aktiv = favoriten.has(r.id)
+  const label = aktiv ? `${r.name} aus den Favoriten entfernen` : `${r.name} zu den Favoriten`
+  return (
+    <button type="button" aria-pressed={aktiv} aria-label={beschriftung ? undefined : label} title={aktiv ? 'Aus Favoriten entfernen' : 'Zu Favoriten'}
+      onClick={e => { e.stopPropagation(); umschalten(r.id) }}
+      className={`inline-flex items-center justify-center gap-1.5 transition-colors ${className}`}>
+      <Heart size={beschriftung ? 16 : 15} className={aktiv ? 'fill-danger text-danger' : ''} aria-hidden="true" />
+      {beschriftung && <span className="text-sm font-semibold">{aktiv ? 'Favorit' : 'Merken'}</span>}
+    </button>
+  )
 }

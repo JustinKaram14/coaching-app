@@ -155,21 +155,22 @@ export interface FilterZustand {
   nurLeicht: boolean
   sortierung: Sortierung
   nurEigene: boolean
+  nurFavoriten: boolean
 }
 
 export const LEERER_FILTER: FilterZustand = {
   suche: '', mahlzeiten: [], kcal: null, arten: [], reihe: null, gesundheit: [], darmArt: null,
-  maxZeit: null, nurLeicht: false, sortierung: 'relevanz', nurEigene: false,
+  maxZeit: null, nurLeicht: false, sortierung: 'relevanz', nurEigene: false, nurFavoriten: false,
 }
 
 export function filterAktiv(f: FilterZustand): boolean {
   return !!(f.suche.trim() || f.mahlzeiten.length || f.kcal || f.arten.length || f.reihe || f.gesundheit.length
-    || f.darmArt || f.maxZeit || f.nurLeicht || f.nurEigene || f.sortierung !== 'relevanz')
+    || f.darmArt || f.maxZeit || f.nurLeicht || f.nurEigene || f.nurFavoriten || f.sortierung !== 'relevanz')
 }
 
 export function filterAnzahl(f: FilterZustand): number {
   return f.mahlzeiten.length + (f.kcal ? 1 : 0) + f.arten.length + (f.reihe ? 1 : 0) + f.gesundheit.length
-    + (f.darmArt ? 1 : 0) + (f.maxZeit ? 1 : 0) + (f.nurLeicht ? 1 : 0) + (f.nurEigene ? 1 : 0)
+    + (f.darmArt ? 1 : 0) + (f.maxZeit ? 1 : 0) + (f.nurLeicht ? 1 : 0) + (f.nurEigene ? 1 : 0) + (f.nurFavoriten ? 1 : 0)
 }
 
 export interface Persoenlich {
@@ -177,6 +178,8 @@ export interface Persoenlich {
   ausschluesse: Ausschluss[]
   /** Ergebnis aus der Anamnese, nur gesetzt wenn der Schalter an ist */
   anamnese: AnamneseProfil | null
+  /** IDs der Favoriten (für den Filter „Nur Favoriten“) */
+  favoriten?: ReadonlySet<string>
 }
 
 export interface Treffer {
@@ -187,7 +190,7 @@ export interface Treffer {
   warnungen: DiagnoseWarnung[]
 }
 
-export function passtZuFilter(r: Rezept, f: FilterZustand): boolean {
+export function passtZuFilter(r: Rezept, f: FilterZustand, favoriten?: ReadonlySet<string>): boolean {
   const q = normalisiere(f.suche)
   if (q) {
     const such = normalisiere(r.suchtext)
@@ -212,6 +215,7 @@ export function passtZuFilter(r: Rezept, f: FilterZustand): boolean {
   if (f.maxZeit && r.zeitMin > f.maxZeit) return false
   if (f.nurLeicht && r.schwierigkeit > 1) return false
   if (f.nurEigene && r.quelle !== 'ki') return false
+  if (f.nurFavoriten && !favoriten?.has(r.id)) return false
   return true
 }
 
@@ -229,7 +233,7 @@ export function wendeAn(alle: Rezept[], f: FilterZustand, p: Persoenlich): { tre
   let ausgeblendet = 0
   const treffer: Treffer[] = []
   for (const r of alle) {
-    if (!passtZuFilter(r, f)) continue
+    if (!passtZuFilter(r, f, p.favoriten)) continue
     if (harteBegriffe.some(a => ausschlussTrifft(r, a.begriff)) || anamneseRegeln.some(rg => rg.trifft(r))) {
       ausgeblendet++
       continue
@@ -300,4 +304,27 @@ export function tagesVorschlaege(
     .sort((a, b) => b.wert - a.wert)
     .slice(0, anzahl)
     .map(({ t, mahlzeit: m, ballast }) => ({ t, mahlzeit: m, ballast }))
+}
+
+// ─── Rezept des Tages ────────────────────────────────────────────────────────
+
+function hash(text: string): number {
+  let h = 2166136261
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return h >>> 0
+}
+
+/**
+ * Wählt pro Nutzer und Kalendertag ein festes Rezept (bleibt den ganzen Tag gleich, wechselt täglich).
+ * Rezepte, die zu den Einschränkungen nicht passen, sind schon ausgeblendet; „Schmeckt mir nicht“ und
+ * Diagnose-Hinweise werden nur gewählt, wenn nichts anderes übrig ist.
+ */
+export function rezeptDesTages(treffer: Treffer[], userId: string, datum: string): Treffer | null {
+  const sauber = treffer.filter(t => t.weich.length === 0 && t.warnungen.length === 0)
+  const pool = (sauber.length > 0 ? sauber : treffer).filter(t => t.r.quelle === 'start')
+  const kandidaten = pool.length > 0 ? pool : treffer
+  if (kandidaten.length === 0) return null
+  // nach ID sortieren, damit neue KI-Rezepte die Auswahl eines Tages nicht verschieben
+  const sortiert = [...kandidaten].sort((a, b) => a.r.id.localeCompare(b.r.id))
+  return sortiert[hash(`${userId}|${datum}`) % sortiert.length]
 }

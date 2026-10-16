@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { BookPlus, ChefHat, Clock, Flame, Trash2, Users, AlertTriangle } from 'lucide-react'
+import { BookPlus, ChefHat, Clock, Flame, Minus, Plus, Trash2, Users, AlertTriangle } from 'lucide-react'
 import type { Treffer } from '../../../lib/entdecken/filter'
 import { ARTEN, GESUNDHEIT_REIHEN, REIHEN, SCHWIERIGKEIT } from '../../../lib/entdecken/katalog'
 import { SCHWELLEN } from '../../../lib/entdecken/engine'
 import { ZUTATEN, zutatZeile } from '../../../lib/entdecken/zutaten'
-import { Sheet, Hinweis, RezeptBild, TagChip, gesundheitsTags, zahl } from './gemeinsam'
+import { FavoritHerz, Sheet, Hinweis, RezeptBild, TagChip, gesundheitsTags, zahl } from './gemeinsam'
 import { TagebuchDialog } from './TagebuchDialog'
 
 function NaehrZeile({ label, wert, einheit, stellen = 1, einzug = false, fett = false }: {
@@ -18,11 +18,22 @@ function NaehrZeile({ label, wert, einheit, stellen = 1, einzug = false, fett = 
   )
 }
 
+/** 0,5 → „½“, 1,5 → „1½“ */
+function portionenText(n: number): string {
+  const ganz = Math.floor(n)
+  const halb = n - ganz >= 0.25 && n - ganz < 0.75
+  const aufgerundet = n - ganz >= 0.75 ? 1 : 0
+  if (halb) return ganz === 0 ? '½' : `${ganz}½`
+  return String(ganz + aufgerundet)
+}
+
 export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
   t: Treffer; userId: string; onClose: () => void; onLoeschen?: () => void
 }) {
   const { r } = t
   const [tagebuch, setTagebuch] = useState(false)
+  const [wunschPortionen, setWunschPortionen] = useState(r.portionen)
+  const faktor = wunschPortionen / r.portionen
   const tags = gesundheitsTags(r)
   const arten = ARTEN.filter(a => r.arten.includes(a.id))
   const reihen = REIHEN.filter(x => r.alleReihen.includes(x.id))
@@ -35,6 +46,7 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
           <button onClick={() => setTagebuch(true)} className="btn-primary flex-1 flex items-center justify-center gap-2">
             <BookPlus size={16} /> Tagebuch
           </button>
+          <FavoritHerz r={r} beschriftung className="px-4 rounded-full border border-border hover:bg-bg-elevated text-text-primary" />
           {onLoeschen && (
             <button onClick={() => { onLoeschen(); onClose() }} aria-label="Rezept löschen"
               className="p-2.5 rounded-full text-danger hover:bg-danger/10 border border-border"><Trash2 size={16} /></button>
@@ -115,13 +127,29 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
           </details>
         </section>
 
-        {/* Zutaten */}
+        {/* Zutaten mit Portionsregler */}
         <section className="space-y-2">
-          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide">Zutaten für {r.portionen} {r.portionen === 1 ? 'Portion' : 'Portionen'}</h3>
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide">Zutaten</h3>
+          <div className="flex items-center gap-2 rounded-2xl bg-bg-elevated border border-border p-2.5" role="group" aria-label="Portionsregler">
+            <span className="text-sm text-text-secondary flex-1 pl-1">Für</span>
+            <button onClick={() => setWunschPortionen(p => Math.max(0.5, p - 0.5))} disabled={wunschPortionen <= 0.5} aria-label="Weniger Portionen"
+              className="w-9 h-9 rounded-xl bg-bg-card border border-border flex items-center justify-center disabled:opacity-40"><Minus size={14} /></button>
+            <span className="w-24 text-center font-semibold text-text-primary tabular-nums" aria-live="polite" data-testid="portionen-anzeige">
+              {portionenText(wunschPortionen)} {wunschPortionen === 1 ? 'Portion' : 'Portionen'}
+            </span>
+            <button onClick={() => setWunschPortionen(p => Math.min(24, p + 0.5))} disabled={wunschPortionen >= 24} aria-label="Mehr Portionen"
+              className="w-9 h-9 rounded-xl bg-bg-card border border-border flex items-center justify-center disabled:opacity-40"><Plus size={14} /></button>
+          </div>
+          {faktor !== 1 && (
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>Rezept ist für {r.portionen} {r.portionen === 1 ? 'Portion' : 'Portionen'} gedacht. Nährwerte gelten weiter pro Portion.</span>
+              <button onClick={() => setWunschPortionen(r.portionen)} className="text-brand hover:underline shrink-0 ml-2">Zurücksetzen</button>
+            </div>
+          )}
           <ul className="rounded-2xl bg-bg-elevated border border-border divide-y divide-border">
             {r.zutaten.map((z, i) => {
               const zt = ZUTATEN[z.id]
-              return zt ? <li key={i} className="px-3 py-2 text-sm text-text-primary">{zutatZeile(zt, z.g)}</li> : null
+              return zt ? <li key={i} className="px-3 py-2 text-sm text-text-primary">{zutatZeile(zt, z.g * faktor)}</li> : null
             })}
           </ul>
         </section>

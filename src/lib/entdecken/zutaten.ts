@@ -230,7 +230,7 @@ export function zutatZeile(z: Zutat, g: number): string {
   if (e) {
     const anzahl = g / e.g
     const gerundet = Math.round(anzahl * 2) / 2
-    if (gerundet >= 0.5 && gerundet <= 12 && Math.abs(gerundet * e.g - g) / g <= 0.2) {
+    if (gerundet >= 0.5 && gerundet <= 12 && Math.abs(gerundet * e.g - g) / g <= 0.12) {
       const nenner = gerundet > 1 ? (e.p ?? e.n) : e.n
       if (e.stueck) return `${menge(gerundet)} ${nenner}`
       return `${menge(gerundet)} ${nenner} ${z.name}`

@@ -73,6 +73,7 @@ export function FilterSheet({ filter, onChange, anzahl, onClose }: {
         <Gruppe titel="Zeit und Aufwand">
           {[15, 30, 45].map(min => <Chip key={min} aktiv={filter.maxZeit === min} onClick={() => onChange({ ...filter, maxZeit: filter.maxZeit === min ? null : min })}>bis {min} Min.</Chip>)}
           <Chip aktiv={filter.nurLeicht} onClick={() => onChange({ ...filter, nurLeicht: !filter.nurLeicht })}>Nur leichte Rezepte</Chip>
+          <Chip aktiv={filter.nurFavoriten} onClick={() => onChange({ ...filter, nurFavoriten: !filter.nurFavoriten })}>♥ Nur Favoriten</Chip>
           <Chip aktiv={filter.nurEigene} onClick={() => onChange({ ...filter, nurEigene: !filter.nurEigene })}>Nur meine KI-Rezepte</Chip>
         </Gruppe>
         <Gruppe titel="Sortierung">
