@@ -273,3 +273,26 @@ html.theme-fade *::after {
   .confetti, .rays { display: none; }
   html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after { transition: none !important; }
 }
+
+/* Druckansicht (Rezepte „Entdecken“): nur der Druckbereich wird gedruckt */
+.druck-bereich { display: none; }
+@page { margin: 15mm; }
+@media print {
+  body:has(.druck-bereich) { background: #fff !important; overflow: visible !important; height: auto !important; }
+  body:has(.druck-bereich) > *:not(.druck-bereich) { display: none !important; }
+  .druck-bereich { display: block !important; background: #fff; font-family: system-ui, sans-serif; font-size: 12pt; line-height: 1.45; }
+  .druck-bereich, .druck-bereich * { color: #000 !important; background: transparent !important; }
+  .druck-bereich h1 { font-size: 20pt; margin: 0 0 4pt; }
+  .druck-bereich h2 { font-size: 13pt; margin: 14pt 0 4pt; border-bottom: 1px solid #000; }
+  .druck-bereich ul { margin: 0; padding-left: 18pt; list-style: disc; }
+  .druck-bereich ol { margin: 0; padding-left: 18pt; list-style: decimal; }
+  .druck-bereich li { margin: 2pt 0; break-inside: avoid; }
+  .druck-bereich table { border-collapse: collapse; width: 100%; }
+  .druck-bereich td { padding: 2pt 0; border-bottom: 1px solid #bbb; }
+  .druck-bereich td:last-child { text-align: right; }
+  .druck-bereich .druck-klein { font-size: 9pt; margin-top: 12pt; }
+  .druck-bereich ul.druck-box { list-style: none; padding-left: 0; }
+  .druck-bereich .druck-box li::before { content: "☐ "; }
+  .druck-bereich .druck-box li.erledigt { text-decoration: line-through; }
+  .druck-bereich .druck-box li.erledigt::before { content: "☑ "; }
+}

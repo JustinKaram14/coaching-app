@@ -192,6 +192,7 @@ export interface Database {
           kohlenhydrate_g: number | null
           fett_g: number | null
           barcode: string | null
+          ballaststoffe_g?: number | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['food_log']['Row'], 'id' | 'created_at'>
