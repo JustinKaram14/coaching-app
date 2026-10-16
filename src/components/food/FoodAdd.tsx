@@ -26,6 +26,8 @@ export interface FoodItemInput {
   protein_g: number
   kohlenhydrate_g: number
   fett_g: number
+  /** nur gesetzt, wenn die Quelle Ballaststoffe angibt (z. B. Barcode-Produkte) */
+  ballaststoffe_g?: number
   barcode?: string
 }
 
@@ -321,7 +323,7 @@ export function PortionPicker({ entry, onConfirm, onBack, busy }: {
         <h3 className="text-2xl font-bold text-text-primary leading-tight">{entry.name}</h3>
         {entry.brand && <div className="text-sm text-text-muted mt-0.5">{entry.brand}</div>}
         <div className="text-xs text-text-muted mt-1.5">
-          pro 100 g: {Math.round(resolved.per100.kcal)} kcal · P {formatAmount(resolved.per100.protein)} g · K {formatAmount(resolved.per100.carbs)} g · F {formatAmount(resolved.per100.fat)} g
+          pro 100 g: {Math.round(resolved.per100.kcal)} kcal · P {formatAmount(resolved.per100.protein)} g · K {formatAmount(resolved.per100.carbs)} g · F {formatAmount(resolved.per100.fat)} g{resolved.per100.fiber != null ? ` · Ballaststoffe ${formatAmount(resolved.per100.fiber)} g` : ''}
         </div>
       </div>
 

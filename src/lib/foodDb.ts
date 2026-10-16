@@ -10,6 +10,8 @@ export interface Per100 {
   protein: number
   carbs: number
   fat: number
+  /** Ballaststoffe pro 100 g; fehlt, wenn die Quelle keine Angabe hat */
+  fiber?: number
 }
 
 /** Eine Einheit neben Gramm, z. B. „Stück“ (120 g) oder „Keks“ (11 g). */
@@ -210,6 +212,7 @@ export interface OFFNutriments {
   proteins_100g?: number
   carbohydrates_100g?: number
   fat_100g?: number
+  fiber_100g?: number | string
 }
 
 export interface OFFProduct {
@@ -273,7 +276,10 @@ export function entryFromOff(product: OFFProduct, code?: string): FoodEntry | nu
     name,
     brand: product.brands?.split(',')[0]?.trim() || undefined,
     source: 'off',
-    per100: { kcal, protein: num(n.proteins_100g), carbs: num(n.carbohydrates_100g), fat: num(n.fat_100g) },
+    per100: {
+      kcal, protein: num(n.proteins_100g), carbs: num(n.carbohydrates_100g), fat: num(n.fat_100g),
+      ...(n.fiber_100g != null && n.fiber_100g !== '' ? { fiber: num(n.fiber_100g) } : {}),
+    },
     units,
     barcode,
     needsUnits: !serving || serving.label === 'Portion',
@@ -462,5 +468,6 @@ export function macrosFor(per100: Per100, grams: number) {
     protein_g: round1(per100.protein * factor),
     kohlenhydrate_g: round1(per100.carbs * factor),
     fett_g: round1(per100.fat * factor),
+    ...(per100.fiber != null ? { ballaststoffe_g: round1(per100.fiber * factor) } : {}),
   }
 }
