@@ -18,11 +18,23 @@ function getCorsHeaders(origin: string | null) {
 }
 
 // Bildmodelle der Reihe nach probieren; GEMINI_IMAGE_MODEL (Secret) hat Vorrang
-const BILD_MODELLE = ['gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview', 'gemini-3-pro-image-preview']
+const BILD_MODELLE = ['gemini-2.5-flash-image', 'gemini-3.1-flash-image', 'gemini-3-pro-image-preview']
 const BUCKET = 'rezept-bilder'
 
 function text(s: unknown, max: number): string {
   return String(s ?? '').replace(/[\r\n]+/g, ' ').trim().slice(0, max)
+}
+
+/** Verkleinert auf 800 px Breite als JPEG (aus ca. 1,7 MB werden ca. 100 KB). Klappt das nicht, bleibt das Original. */
+async function verkleinere(bytes: Uint8Array, mime: string): Promise<{ bytes: Uint8Array; mime: string }> {
+  try {
+    const { Image } = await import('https://deno.land/x/imagescript@1.3.0/mod.ts')
+    const img = await Image.decode(bytes)
+    const klein = await img.resize(Math.min(800, img.width), Image.RESIZE_AUTO).encodeJPEG(82)
+    return { bytes: klein, mime: 'image/jpeg' }
+  } catch {
+    return { bytes, mime }
+  }
 }
 
 async function erzeugeBild(apiKey: string, prompt: string): Promise<{ bytes: Uint8Array; mime: string } | { fehler: string }> {
@@ -46,7 +58,7 @@ async function erzeugeBild(apiKey: string, prompt: string): Promise<{ bytes: Uin
           const bin = atob(d.data)
           const bytes = new Uint8Array(bin.length)
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-          return { bytes, mime: d.mimeType ?? d.mime_type ?? 'image/png' }
+          return await verkleinere(bytes, d.mimeType ?? d.mime_type ?? 'image/png')
         }
       }
       letzter = `${modell}: keine Bilddaten in der Antwort`
