@@ -6,6 +6,7 @@ import type {
   Allergen, Ernaehrungsart, Gesundheit, Naehrwerte, Rezept, RezeptDef,
 } from './types'
 import { ZUTATEN } from './zutaten'
+import { pflanzenVon } from './pflanzen'
 
 export const SCHWELLEN = {
   /** Ballaststoffreich: mindestens ein Drittel des Tagesziels pro Portion */
@@ -34,6 +35,8 @@ export const SCHWELLEN = {
   /** Leicht verdaulich: höchstens 20 g Fett und keine FODMAP-reiche Zutat über 10 g pro Portion */
   leichtFettG: 20,
   leichtFodmapG: 10,
+  /** Pflanzenvielfalt: mindestens so viele verschiedene Pflanzen pro Rezept */
+  pflanzenReich: 6,
   /** Schnell zubereitet / Wenig Zutaten */
   schnellMin: 20,
   wenigZutaten: 3,
@@ -174,6 +177,7 @@ export function berechneRezept(def: RezeptDef): Rezept {
     alleReihen,
     zutatenAnzahl,
     suchtext: [...new Set(suchwoerter)].join(' '),
+    pflanzen: pflanzenVon(def.zutaten).map(p => p.key),
   }
 }
 

@@ -6,6 +6,8 @@ import { todayISO } from '../../../lib/utils'
 import { naehrwerteFuerMenge, type MengenModus } from '../../../lib/entdecken/engine'
 import { eintragenInTagebuch } from '../../../lib/entdecken/daten'
 import { naechsteMahlzeit } from '../../../lib/entdecken/filter'
+import { pflanzenVon } from '../../../lib/entdecken/pflanzen'
+import { schreibePflanzen } from '../../../lib/entdecken/pflanzenDaten'
 import { MAHLZEITEN, type Mahlzeit, type Rezept } from '../../../lib/entdecken/types'
 import { Sheet, zahl } from './gemeinsam'
 
@@ -20,7 +22,7 @@ export function TagebuchDialog({ r, userId, onClose }: { r: Rezept; userId: stri
   const [modus, setModus] = useState<MengenModus>('portion')
   const [menge, setMenge] = useState(1)
   const [speichert, setSpeichert] = useState(false)
-  const [fertig, setFertig] = useState<null | { ohneBallaststoffe: boolean }>(null)
+  const [fertig, setFertig] = useState<null | { ohneBallaststoffe: boolean; pflanzen: number }>(null)
   const [fehler, setFehler] = useState('')
 
   const schritt = modus === 'portion' ? 0.5 : 10
@@ -39,7 +41,12 @@ export function TagebuchDialog({ r, userId, onClose }: { r: Rezept; userId: stri
     setFehler('')
     const res = await eintragenInTagebuch(userId, r, { datum, mahlzeit, modus, menge })
     setSpeichert(false)
-    if (res.ok) setFertig({ ohneBallaststoffe: res.ohneBallaststoffe })
+    if (res.ok) {
+      // Die Pflanzen des Rezepts zählen fürs Wochenziel „30 Pflanzen“ (ein Fehler hier stört den Eintrag nicht)
+      const pflanzen = pflanzenVon(r.zutaten)
+      void schreibePflanzen(userId, pflanzen, datum, 'rezept').catch(() => false)
+      setFertig({ ohneBallaststoffe: res.ohneBallaststoffe, pflanzen: pflanzen.length })
+    }
     else setFehler('Das Eintragen hat nicht geklappt. Bitte versuche es noch einmal.')
   }
 
@@ -60,6 +67,7 @@ export function TagebuchDialog({ r, userId, onClose }: { r: Rezept; userId: stri
           <div className="w-12 h-12 rounded-full bg-success/15 text-success flex items-center justify-center mx-auto"><Check size={24} /></div>
           <div className="font-semibold text-text-primary">Eingetragen</div>
           <div className="text-sm text-text-secondary">{r.name} · {Math.round(n.kcal)} kcal · {mahlzeit}</div>
+          {fertig.pflanzen > 0 && <div className="text-xs text-success">🌱 {fertig.pflanzen} {fertig.pflanzen === 1 ? 'Pflanze' : 'Pflanzen'} für dein Wochenziel eingetragen.</div>}
           {fertig.ohneBallaststoffe && (
             <div className="text-xs text-warning">Die Ballaststoffe wurden noch nicht mitgespeichert, weil die Datenbank noch nicht aktualisiert ist.</div>
           )}

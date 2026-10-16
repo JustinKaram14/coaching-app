@@ -208,6 +208,7 @@ export function passtZuFilter(r: Rezept, f: FilterZustand, favoriten?: ReadonlyS
     if (g === 'aox' && r.gesundheit.antioxidantien < 2) return false
     if (g === 'darm' && !r.gesundheit.darmfreundlich && !r.gesundheit.leichtVerdaulich) return false
     if (g === 'omega3' && !r.gesundheit.entzuendungshemmend) return false
+    if (g === 'pflanzen' && r.pflanzen.length < SCHWELLEN.pflanzenReich) return false
   }
   if (f.darmArt === 'praebiotisch' && !r.gesundheit.praebiotisch) return false
   if (f.darmArt === 'probiotisch' && !r.gesundheit.probiotisch) return false

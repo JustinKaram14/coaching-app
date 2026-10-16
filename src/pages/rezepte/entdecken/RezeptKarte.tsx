@@ -3,8 +3,8 @@ import type { Treffer } from '../../../lib/entdecken/filter'
 import { FavoritHerz, RezeptBild, TagChip, gesundheitsTags } from './gemeinsam'
 
 /** Karte wie in einer Entdecken-Reihe: Foto, Name, kcal und Zeit */
-export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false }: {
-  t: Treffer; onOpen: () => void; breit?: boolean; gesundheit?: boolean
+export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false, zusatz }: {
+  t: Treffer; onOpen: () => void; breit?: boolean; gesundheit?: boolean; zusatz?: string
 }) {
   const { r } = t
   const tags = gesundheit ? gesundheitsTags(r).slice(0, 2) : []
@@ -30,6 +30,7 @@ export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false }: {
           <span className="inline-flex items-center gap-1"><Flame size={12} aria-hidden="true" />{Math.round(r.pro.kcal)} kcal</span>
           <span className="inline-flex items-center gap-1"><Clock size={12} aria-hidden="true" />{r.zeitMin} Min.</span>
         </div>
+        {zusatz && <div className="text-[11px] font-semibold text-success">{zusatz}</div>}
         {tags.length > 0 && <div className="flex flex-wrap gap-1">{tags.map(tag => <TagChip key={tag.text} tag={tag} />)}</div>}
       </div>
     </button>

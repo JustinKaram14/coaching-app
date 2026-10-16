@@ -65,6 +65,10 @@ export const GESUNDHEIT_REIHEN = {
     label: 'Darmfreundlich', emoji: '🫶',
     info: 'Präbiotisch (z. B. Zwiebel, Knoblauch, Hafer, Hülsenfrüchte), probiotisch (z. B. Joghurt, Kefir, Sauerkraut, Miso) oder leicht verdaulich (wenig Fett, keine größere Menge blähender Zutaten).',
   },
+  pflanzen: {
+    label: 'Pflanzenvielfalt', emoji: '🌱',
+    info: `Mindestens ${SCHWELLEN.pflanzenReich} verschiedene Pflanzen im Rezept (Gemüse, Obst, Getreide, Hülsenfrüchte, Nüsse, Samen, Kräuter). Jede Pflanze zählt einmal, die Menge ist egal. Das hilft beim Wochenziel „30 Pflanzen“.`,
+  },
   omega3: {
     label: 'Entzündungshemmend / Omega-3', emoji: '🐟',
     info: `Mindestens ${SCHWELLEN.omega3ReichMg / 1000} g Omega-3-Fettsäuren pro Portion (z. B. aus fettem Fisch, Walnüssen, Leinsamen, Chia) oder etwas weniger zusammen mit vielen Antioxidantien.`,

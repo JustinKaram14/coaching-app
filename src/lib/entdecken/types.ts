@@ -129,6 +129,8 @@ export interface Rezept extends RezeptDef {
   zutatenAnzahl: number
   /** kleingeschriebene Suchwörter: Name, Zutaten, Aliase */
   suchtext: string
+  /** Schlüssel der verschiedenen Pflanzen im Rezept (für das Wochenziel „30 Pflanzen“) */
+  pflanzen: string[]
 }
 
 export type DiagnoseCode = 'diabetes' | 'bluthochdruck' | 'reizdarm' | 'cholesterin' | 'niere'

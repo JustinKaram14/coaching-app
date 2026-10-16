@@ -23,6 +23,9 @@ import { PersoenlichSheet } from './PersoenlichSheet'
 import { KiDialog } from './KiDialog'
 import { BilderAdmin } from './BilderAdmin'
 import { EinkaufslisteSheet } from './EinkaufslisteSheet'
+import { FortschrittsBalken, PflanzenSheet } from './PflanzenSheet'
+import { PFLANZEN_ZIEL, wochenStart } from '../../../lib/entdecken/pflanzen'
+import { usePflanzen } from '../../../lib/entdecken/pflanzenDaten'
 import { baueEinkaufsListe } from '../../../lib/entdecken/einkauf'
 
 function Reihe({ titel, emoji, items, onAlle, onOeffnen, gesundheit = false, leer, extra }: {
@@ -99,6 +102,9 @@ export function EntdeckenTab() {
   const fav = useFavoriten(userId)
   const einkauf = useEinkauf(userId)
   const [einkaufOffen, setEinkaufOffen] = useState(false)
+  const [pflanzenOffen, setPflanzenOffen] = useState(false)
+  const diesewoche = wochenStart(toLocalISO(new Date()))
+  const pflanzenWoche = usePflanzen(userId, diesewoche)
 
   const [filter, setFilter] = useState<FilterZustand>(LEERER_FILTER)
   const [filterOffen, setFilterOffen] = useState(false)
@@ -159,6 +165,7 @@ export function EntdeckenTab() {
       return darmTab === 'alle' ? g.darmfreundlich || g.leichtVerdaulich
         : darmTab === 'praebiotisch' ? g.praebiotisch : darmTab === 'probiotisch' ? g.probiotisch : g.leichtVerdaulich
     }),
+    pflanzen: basis.treffer.filter(t => t.r.pflanzen.length >= SCHWELLEN.pflanzenReich).sort((a, b) => b.r.pflanzen.length - a.r.pflanzen.length),
     omega3: basis.treffer.filter(t => t.r.gesundheit.entzuendungshemmend).sort((a, b) => b.r.pro.omega3 - a.r.pro.omega3),
   }
 
@@ -252,6 +259,19 @@ export function EntdeckenTab() {
           )}
           {fav.nurLokal && favoritenTreffer.length > 0 && <p className="text-xs text-warning -mt-4">Favoriten werden gerade nur auf diesem Gerät gespeichert, bis die Datenbank aktualisiert ist.</p>}
 
+          <button onClick={() => setPflanzenOffen(true)} data-testid="pflanzen-karte"
+            className="w-full text-left card space-y-2 hover:border-brand/50 transition-colors" aria-label={`Pflanzen diese Woche: ${pflanzenWoche.stand.anzahl} von ${PFLANZEN_ZIEL}. Öffnen`}>
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="font-bold text-text-primary">🌱 Pflanzen diese Woche</h3>
+              <span className="text-sm text-text-secondary tabular-nums"><strong className="text-text-primary">{pflanzenWoche.stand.anzahl}</strong> / {PFLANZEN_ZIEL}</span>
+            </div>
+            <FortschrittsBalken anzahl={pflanzenWoche.stand.anzahl} />
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>{pflanzenWoche.stand.anzahl >= PFLANZEN_ZIEL ? 'Wochenziel erreicht.' : `Noch ${PFLANZEN_ZIEL - pflanzenWoche.stand.anzahl} verschiedene Pflanzen bis zum Wochenziel.`}</span>
+              <span className="text-brand font-medium flex items-center gap-0.5">Details <ChevronRight size={12} /></span>
+            </div>
+          </button>
+
           {stand && heute && (
             <BallaststoffKarte stand={stand} ohneAngabe={heute.ohneAngabe} vorschlaege={vorschlaege} mahlzeit={vorschlagMahlzeit} onOeffnen={oeffnen} />
           )}
@@ -313,6 +333,8 @@ export function EntdeckenTab() {
                   {DARM_ARTEN.map(d => <Chip key={d.id} aktiv={darmTab === d.id} onClick={() => setDarmTab(d.id)}>{d.label}</Chip>)}
                 </div>
               } />
+            <Reihe titel={GESUNDHEIT_REIHEN.pflanzen.label} emoji={GESUNDHEIT_REIHEN.pflanzen.emoji} items={gesundheitReihen.pflanzen} gesundheit onOeffnen={oeffnen}
+              onAlle={() => setFilter(f => ({ ...f, gesundheit: ['pflanzen'] }))} />
             <Reihe titel={GESUNDHEIT_REIHEN.omega3.label} emoji={GESUNDHEIT_REIHEN.omega3.emoji} items={gesundheitReihen.omega3} gesundheit onOeffnen={oeffnen}
               onAlle={() => setFilter(f => ({ ...f, gesundheit: ['omega3'] }))} />
           </section>
@@ -353,6 +375,7 @@ export function EntdeckenTab() {
         </>
       )}
 
+      {pflanzenOffen && <PflanzenSheet userId={userId} vorschlagsPool={basis.treffer} onOeffnen={oeffnen} onClose={() => setPflanzenOffen(false)} />}
       {einkaufOffen && (
         <EinkaufslisteSheet liste={einkaufsListe} eintraege={einkauf.eintraege} haken={einkauf.haken} nurLokal={einkauf.nurLokal}
           onHaken={einkauf.hakenUmschalten} onEntfernen={id => void einkauf.entfernen(id)} onLeeren={() => void einkauf.leeren()}

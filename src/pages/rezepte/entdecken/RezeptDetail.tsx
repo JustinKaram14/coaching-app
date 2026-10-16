@@ -7,6 +7,7 @@ import { ZUTATEN, zutatZeile } from '../../../lib/entdecken/zutaten'
 import { EinkaufKontext, FavoritHerz, Sheet, Hinweis, RezeptBild, TagChip, TeilenDruckenLeiste, gesundheitsTags, teilenMeldung, zahl } from './gemeinsam'
 import { DruckAnsicht, RezeptDruck } from './Druck'
 import { rezeptText, teile } from '../../../lib/entdecken/teilen'
+import { pflanzeFuerKey } from '../../../lib/entdecken/pflanzen'
 import { TagebuchDialog } from './TagebuchDialog'
 
 function NaehrZeile({ label, wert, einheit, stellen = 1, einzug = false, fett = false }: {
@@ -137,6 +138,12 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
               <div className="text-xs text-text-secondary pt-1">Omega-3 (ALA/EPA/DHA): ca. {zahl(r.pro.omega3 / 1000, 1)} g pro Portion</div>
             )}
           </div>
+          {r.pflanzen.length > 0 && (
+            <div className="rounded-2xl bg-bg-elevated border border-border p-3 space-y-1.5" data-testid="detail-pflanzen">
+              <div className="text-xs text-text-secondary">🌱 <strong>{r.pflanzen.length} {r.pflanzen.length === 1 ? 'Pflanze' : 'verschiedene Pflanzen'}</strong> für dein Wochenziel (Schätzung)</div>
+              <div className="flex flex-wrap gap-1">{r.pflanzen.map(k => <span key={k} className="rounded-full bg-success/10 border border-success/30 text-success text-[11px] px-2 py-0.5">{pflanzeFuerKey(k)?.name ?? k}</span>)}</div>
+            </div>
+          )}
           <details className="text-xs text-text-muted">
             <summary className="cursor-pointer">So wird gerechnet</summary>
             <ul className="mt-1.5 space-y-1 list-disc pl-4">
