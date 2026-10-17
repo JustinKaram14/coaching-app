@@ -3,10 +3,11 @@ import {
   BookOpen, Plus, Trash2, ChefHat, CalendarDays, Sparkles,
   ChevronLeft, ChevronRight, X, Check, Info, UtensilsCrossed,
   ShoppingCart, Copy, Share2, Send, MessageCircle, Wallet,
-  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus, Play, ArrowLeft, ArrowRight, Compass,
+  Home, Image, Link, Wand2, CalendarPlus, Layers, Minus, Play, ArrowLeft, ArrowRight, Compass, Lock,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useKi } from '../hooks/useKi'
 import { Spinner } from '../components/ui/Spinner'
 import { toLocalISO, todayISO as localTodayISO } from '../lib/utils'
 import { parseIngredients, parseSteps, scaleIngredient } from '../lib/recipe'
@@ -124,9 +125,11 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
   r: Rezept; onDelete: () => void; onImageGenerated: (id: string, url: string) => void; onOpenDetail: () => void
 }) {
   const [generatingImg, setGeneratingImg] = useState(false)
+  const { requireKi } = useKi()
 
   async function generateImage(e: React.MouseEvent) {
     e.stopPropagation()
+    if (!(await requireKi())) return
     setGeneratingImg(true)
     const { data } = await supabase.functions.invoke('generate-recipe-image', {
       body: { rezeptName: r.name, zutaten: r.zutaten_text ?? undefined },
@@ -274,6 +277,7 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
   onImageGenerated: (id: string, url: string) => void
   onInstructionsGenerated: (id: string, kochanleitung: string) => void
 }) {
+  const { requireKi } = useKi()
   const basePort = r.portionen || 1
   const [portionen, setPortionen] = useState(basePort)
   const [generatingImg, setGeneratingImg] = useState(false)
@@ -319,6 +323,7 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
   }
 
   async function generateImage() {
+    if (!(await requireKi())) return
     setGeneratingImg(true)
     const { data } = await supabase.functions.invoke('generate-recipe-image', {
       body: { rezeptName: r.name, zutaten: r.zutaten_text ?? undefined },
@@ -331,6 +336,7 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
   }
 
   async function generateInstructions() {
+    if (!(await requireKi())) return
     setGeneratingInstr(true)
     const { data } = await supabase.functions.invoke('generate-recipe-instructions', {
       body: {
@@ -576,6 +582,7 @@ const emptyRezept: NewRezeptState = {
 function NewRezeptForm({ userId, onSaved, onCancel }: {
   userId: string; onSaved: (r: Rezept) => void; onCancel: () => void
 }) {
+  const { requireKi } = useKi()
   const [importUrl, setImportUrl] = useState('')
   const [importText, setImportText] = useState('')
   const [showTextImport, setShowTextImport] = useState(false)
@@ -591,6 +598,7 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
     setForm(f => ({ ...f, [k]: e.target.value }))
 
   async function importFromUrl() {
+    if (!(await requireKi())) return
     const url = importUrl.trim()
     const text = importText.trim()
     if (!url && !text) return
@@ -633,7 +641,7 @@ function NewRezeptForm({ userId, onSaved, onCancel }: {
     setSaving(true)
 
     let bild_url: string | null = null
-    if (generateImage) {
+    if (generateImage && (await requireKi())) {
       const { data: imgData } = await supabase.functions.invoke('generate-recipe-image', {
         body: { rezeptName: form.name.trim(), zutaten: form.zutaten_text || undefined },
       })
@@ -992,6 +1000,7 @@ function EinkaufslisteView({ liste }: { liste: Einkaufsliste }) {
 // ─── Koch-Chat View ───────────────────────────────────────────────────────────
 
 function KochplanView({ guide }: { guide: string }) {
+  const { requireKi } = useKi()
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -1002,6 +1011,7 @@ function KochplanView({ guide }: { guide: string }) {
   }, [chatHistory])
 
   async function sendQuestion() {
+    if (!(await requireKi())) return
     const q = input.trim()
     if (!q || loading) return
     setInput('')
@@ -1134,6 +1144,7 @@ interface MyHaushalt {
 function KiPlanerTab({ rezepte, userId, settings }: {
   rezepte: Rezept[]; userId: string; settings: Partial<ClientSettings>
 }) {
+  const { requireKi } = useKi()
   const [step, setStep] = useState<KiStep>('config')
   const [reviewTab, setReviewTab] = useState<ReviewTab>('plan')
 
@@ -1188,6 +1199,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
   }
 
   async function generatePlan() {
+    if (!(await requireKi())) return
     setStep('loading')
     setError('')
     try {
@@ -1499,6 +1511,7 @@ function KiPlanerTab({ rezepte, userId, settings }: {
 
 export function Rezepte() {
   const { user } = useAuth()
+  const { kiAktiv, requireKi } = useKi()
   const [tab, setTab] = useState<Tab>('rezepte')
   const [rezepte, setRezepte] = useState<Rezept[]>([])
   const [rezepteLoading, setRezepteLoading] = useState(true)
@@ -1530,6 +1543,7 @@ export function Rezepte() {
   }
 
   async function generateAllMissing() {
+    if (!(await requireKi())) return
     const incomplete = rezepte.filter(r => !r.bild_url || !r.kochanleitung)
     if (incomplete.length === 0) return
     setBulkGenerating(true)
@@ -1593,11 +1607,11 @@ export function Rezepte() {
 
       <div className="flex gap-1 p-1 bg-bg-elevated rounded-xl border border-border">
         {tabs.map(({ id, icon: Icon, label }) => (
-          <button key={id} onClick={() => setTab(id)} aria-label={id === 'entdecken' && neueEmpfehlungen > 0 ? `${label}, ${neueEmpfehlungen} neue Empfehlung${neueEmpfehlungen > 1 ? 'en' : ''} von deinem Coach` : label} aria-pressed={tab === id}
+          <button key={id} onClick={async () => { if (id !== 'ki' || await requireKi()) setTab(id) }} aria-label={id === 'entdecken' && neueEmpfehlungen > 0 ? `${label}, ${neueEmpfehlungen} neue Empfehlung${neueEmpfehlungen > 1 ? 'en' : ''} von deinem Coach` : label} aria-pressed={tab === id}
             className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
               tab === id ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
             }`}>
-            <span className="relative inline-flex"><Icon size={15} />{id === 'entdecken' && neueEmpfehlungen > 0 && <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-0.5" aria-hidden="true">{neueEmpfehlungen}</span>}</span><span className="hidden sm:inline">{label}</span>
+            <span className="relative inline-flex"><Icon size={15} />{id === 'entdecken' && neueEmpfehlungen > 0 && <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center px-0.5" aria-hidden="true">{neueEmpfehlungen}</span>}</span><span className="hidden sm:inline">{label}</span>{id === 'ki' && !kiAktiv && <Lock size={11} className="opacity-70" />}
           </button>
         ))}
       </div>

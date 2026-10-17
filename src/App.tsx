@@ -21,6 +21,7 @@ import { More } from './pages/More'
 import { Charakter } from './pages/Charakter'
 import { DayStatusProvider } from './hooks/useDayStatus'
 import { GameProvider } from './hooks/useGame'
+import { KiProvider } from './hooks/useKi'
 import { GameOverlay } from './components/game/GameOverlay'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -28,12 +29,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <PageLoader />
   if (!user) return <Navigate to="/login" replace />
   return (
-    <DayStatusProvider>
-      <GameProvider>
-        <Layout>{children}</Layout>
-        <GameOverlay />
-      </GameProvider>
-    </DayStatusProvider>
+    <KiProvider>
+      <DayStatusProvider>
+        <GameProvider>
+          <Layout>{children}</Layout>
+          <GameOverlay />
+        </GameProvider>
+      </DayStatusProvider>
+    </KiProvider>
   )
 }
 

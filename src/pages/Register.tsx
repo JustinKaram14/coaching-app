@@ -31,7 +31,7 @@ export function Register() {
       setError('Das Passwort muss mindestens 8 Zeichen lang sein.')
       return
     }
-    if (!consentDsgvo || !consentCoach || !consentAi) {
+    if (!consentDsgvo || !consentCoach) {
       setError('Bitte stimme allen erforderlichen Einwilligungen zu, um fortzufahren.')
       return
     }
@@ -162,8 +162,8 @@ export function Register() {
                 </span>
               </label>
 
-              {/* Pflicht: KI-Analyse */}
-              <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl bg-brand/5 border border-brand/20">
+              {/* Optional: KI-Analyse */}
+              <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl bg-bg-elevated/50 border border-border">
                 <input
                   type="checkbox"
                   checked={consentAi}
@@ -171,7 +171,7 @@ export function Register() {
                   className="mt-0.5 shrink-0 w-4 h-4 accent-brand"
                 />
                 <span className="text-xs text-text-secondary leading-relaxed group-hover:text-text-primary transition-colors">
-                  <span className="font-medium text-text-primary">* </span>Ich willige ein, dass Fotos und Screenshots zur KI-Analyse (Ernährung, Training) an Google Gemini (USA) übermittelt werden. Diese Einwilligung ist für die Nutzung der App erforderlich und kann jederzeit in den Einstellungen widerrufen werden (Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO).
+                  <span className="font-medium text-text-primary">Optional: </span>Ich willige ein, dass Fotos, Screenshots, Videos und Texte für KI-Funktionen (z. B. Mahlzeit-Erkennung, Technik-Analyse, Koch-Assistent) an Google Gemini (USA) übermittelt werden. Ohne diese Einwilligung kannst du die App trotzdem nutzen, nur die KI-Funktionen sind gesperrt. Du kannst sie jederzeit in den Einstellungen ändern (Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO).
                 </span>
               </label>
             </div>
@@ -185,7 +185,7 @@ export function Register() {
             <button
               type="submit"
               className="btn-primary w-full flex items-center justify-center gap-2"
-              disabled={loading || !consentDsgvo || !consentCoach || !consentAi}
+              disabled={loading || !consentDsgvo || !consentCoach}
             >
               {loading && <Spinner size={18} />}
               {loading ? 'Registrieren...' : 'Account erstellen'}

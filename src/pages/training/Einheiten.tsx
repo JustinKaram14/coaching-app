@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { ExerciseNameInput } from '../../components/ExerciseNameInput'
 import { useAuth } from '../../hooks/useAuth'
+import { KiSchloss, useKi } from '../../hooks/useKi'
 import { useTheme } from '../../hooks/useTheme'
 import { useNavigate } from 'react-router-dom'
 import { formatDate, todayISO } from '../../lib/utils'
@@ -1515,6 +1516,7 @@ export function WorkoutRunner({ workout: runningWorkout, onFinish: finishWorkout
   )
 }
 export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen: openTemplates, startVorlageId: startTemplateId, onStartHandled: onStartDone }) {
+  let { requireKi } = useKi()
   let { user: authUser } = useAuth(),
     { colors: chartColors } = useTheme(),
     navigate = useNavigate(),
@@ -2126,7 +2128,9 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
             }}
           />
           <div
-            onClick={() => fileInput.current?.click()}
+            onClick={async () => {
+              ;(await requireKi()) && fileInput.current?.click()
+            }}
             className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
               ${screenshot ? 'border-brand/50 bg-brand/5' : 'border-border hover:border-brand/40 hover:bg-brand/5'}`}
           >
@@ -2165,6 +2169,7 @@ export function TrainingEinheiten({ embedded: isEmbedded = false, onOpenVorlagen
                   <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
                     <Sparkles size={13} className="text-accent" />
                     Apple Watch Screenshot analysieren
+                    <KiSchloss />
                   </div>
                   <div className="text-xs text-text-muted">
                     {'Dauer, Kalorien & Herzfrequenz werden automatisch erkannt'}

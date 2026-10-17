@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Moon, Camera, Sparkles, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { KiSchloss, useKi } from '../hooks/useKi'
 import { useTheme } from '../hooks/useTheme'
 import { formatDate, calcSleepHours, todayISO } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
@@ -42,6 +43,7 @@ export function Sleep() {
   const [analyzing, setAnalyzing] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const { requireKi } = useKi()
   const [sleepGoal, setSleepGoal] = useState(8)
   const [form, setForm] = useState({ datum: todayISO(), einschlafzeit: '23:00', aufwachzeit: '07:00', schlafqualitaet: '7', notizen: '' })
 
@@ -229,7 +231,7 @@ export function Sleep() {
           <input ref={fileRef} type="file" accept="image/*" className="hidden"
             onChange={e => { if (e.target.files?.[0]) analyzePhoto(e.target.files[0]) }} />
           <div
-            onClick={() => fileRef.current?.click()}
+            onClick={async () => { if (await requireKi()) fileRef.current?.click() }}
             className={`relative flex items-center gap-3 p-3 rounded-xl border-2 border-dashed cursor-pointer transition-all
               ${photoPreview ? 'border-accent/50 bg-accent/5' : 'border-border hover:border-accent/40 hover:bg-accent/5'}`}
           >
@@ -258,6 +260,7 @@ export function Sleep() {
                   <div className="text-sm font-medium text-text-primary flex items-center gap-1.5">
                     <Sparkles size={13} className="text-accent" />
                     Schlaf-App Screenshot analysieren
+                    <KiSchloss />
                   </div>
                   <div className="text-xs text-text-muted">Apple Health, Oura, Whoop — Zeiten & Qualität werden automatisch erkannt</div>
                 </div>
