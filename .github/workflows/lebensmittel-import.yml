@@ -1,0 +1,34 @@
+name: Lebensmittel-Datenbank importieren
+
+# Lädt BLS 4.0 und die meistgescannten Produkte aus Open Food Facts in die Tabelle `lebensmittel`.
+# Manuell starten (Actions → Lebensmittel-Datenbank importieren → Run workflow); erneutes Ausführen aktualisiert die Daten.
+on:
+  workflow_dispatch:
+    inputs:
+      off_anzahl:
+        description: 'Anzahl Markenprodukte aus Open Food Facts'
+        default: '30000'
+      bls_url:
+        description: 'Optional: direkter Link zur BLS-Excel-Datei'
+        default: ''
+  push:
+    branches: [claude/lebensmittel-db]
+    paths: [scripts/lebensmittel/**, .github/workflows/lebensmittel-import.yml]
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl==3.1.5 requests==2.32.3
+      - name: Import
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OFF_ANZAHL: ${{ inputs.off_anzahl || '30000' }}
+          BLS_URL: ${{ inputs.bls_url }}
+        run: python -u scripts/lebensmittel/import.py

@@ -1,0 +1,332 @@
+"""Importiert Lebensmittel in die Supabase-Tabelle `lebensmittel`.
+
+Quellen:
+  - Bundeslebensmittelschlüssel (BLS) 4.0, Max Rubner-Institut (2025), DOI 10.25826/Data20251217-134202-0
+  - Open Food Facts (ODbL): in Deutschland meistgescannte Produkte
+
+Läuft im GitHub-Workflow `lebensmittel-import.yml`.
+Umgebung: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, optional OFF_ANZAHL (Standard 30000), BLS_URL.
+"""
+
+import io
+import math
+import os
+import re
+import sys
+import time
+
+import openpyxl
+import requests
+
+UA = {'User-Agent': 'HLX-Coaching-App/1.0 (Lebensmittel-Import; github.com/YoungShindy/coaching-app)'}
+
+BLS_KANDIDATEN = [
+    os.environ.get('BLS_URL', ''),
+    'https://blsdb.de/assets/uploads/BLS_4_0_Daten_2025_DE.xlsx',
+]
+BLS_SEITEN = ['https://blsdb.de/download', 'https://www.blsdb.de/download']
+
+# Hauptgruppen nach erstem Buchstaben des BLS-Codes
+BLS_GRUPPEN = {
+    'B': 'Brot & Backwaren', 'C': 'Getreide', 'D': 'Feine Backwaren', 'E': 'Eier', 'F': 'Obst',
+    'G': 'Gemüse', 'H': 'Hülsenfrüchte & Nüsse', 'K': 'Kartoffeln & Pilze', 'M': 'Milch & Milchprodukte',
+    'N': 'Getränke', 'P': 'Alkoholische Getränke', 'Q': 'Fette & Öle', 'R': 'Gewürze & Zutaten',
+    'S': 'Süßwaren & Zucker', 'T': 'Fisch', 'U': 'Fleisch', 'V': 'Wild & Innereien', 'W': 'Wurst',
+    'X': 'Gerichte', 'Y': 'Gerichte',
+}
+
+# Synonyme: steht der Schlüssel im BLS-Namen, sind auch diese Suchwörter treffend
+SYNONYME = {
+    'möhre': 'karotte mohrrübe', 'kartoffel': 'erdapfel', 'quark': 'topfen', 'brötchen': 'semmel schrippe',
+    'pfannkuchen': 'eierkuchen crepe', 'tomate': 'paradeiser', 'blumenkohl': 'karfiol', 'aprikose': 'marille',
+    'sahne': 'rahm', 'hackfleisch': 'hack faschiertes', 'pute': 'truthahn', 'hähnchen': 'huhn hühnchen chicken',
+    'hühnerei': 'ei eier', 'rote bete': 'rote beete', 'feldsalat': 'rapunzel', 'teigwaren': 'nudeln pasta',
+    'weizenmehl': 'mehl', 'haferflocken': 'porridge', 'pflaume': 'zwetschge', 'johannisbeere': 'ribisel',
+    'meerrettich': 'kren', 'rosenkohl': 'kohlsprossen', 'grünkohl': 'braunkohl', 'kürbis': 'hokkaido',
+}
+
+PFLICHT = ['kcal', 'protein', 'kh', 'fett']
+
+
+def zahl(v):
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v) if math.isfinite(v) else None
+    s = str(v).strip().replace(' ', '').replace(',', '.')
+    if s in ('', '-', '—', 'n.a.', 'na', 'tr', 'Tr'):
+        return None
+    s = s.lstrip('<~≈ ')
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def runde(v, stellen=1):
+    return None if v is None else round(v, stellen)
+
+
+# ─── BLS ─────────────────────────────────────────────────────────────────────
+
+def bls_laden():
+    urls = [u for u in BLS_KANDIDATEN if u]
+    for seite in BLS_SEITEN:
+        try:
+            html = requests.get(seite, headers=UA, timeout=60).text
+            for href in re.findall(r'href="([^"]+\.xlsx)"', html, re.I):
+                if 'daten' in href.lower() or 'data' in href.lower():
+                    urls.append(requests.compat.urljoin(seite, href))
+        except requests.RequestException as e:
+            print(f'Downloadseite {seite} nicht erreichbar: {e}')
+    for url in urls:
+        try:
+            r = requests.get(url, headers=UA, timeout=180)
+            if r.ok and r.content[:2] == b'PK':
+                print(f'BLS geladen: {url} ({len(r.content) // 1024} KB)')
+                return r.content
+            print(f'BLS {url}: HTTP {r.status_code}')
+        except requests.RequestException as e:
+            print(f'BLS {url}: {e}')
+    sys.exit('BLS-Datei nicht gefunden. Bitte BLS_URL setzen.')
+
+
+def spalte_finden(kopf, regeln, belegt):
+    """Erste Spalte, deren Kopfzeile zu einer Regel passt (Regeln in Prioritätsreihenfolge)."""
+    for regel in regeln:
+        for i, k in enumerate(kopf):
+            if i not in belegt and regel(k):
+                return i
+    return None
+
+
+def wort(*w):
+    return lambda k: any(re.search(rf'(^|[^a-z0-9]){re.escape(x)}([^a-z0-9]|$)', k) for x in w)
+
+
+def enthaelt(alle, ohne=()):
+    return lambda k: all(a in k for a in alle) and not any(o in k for o in ohne)
+
+
+def bls_lesen(inhalt):
+    wb = openpyxl.load_workbook(io.BytesIO(inhalt), read_only=True, data_only=True)
+    blatt = max(wb.worksheets, key=lambda ws: ws.max_row or 0)
+    zeilen = list(blatt.iter_rows(values_only=True))
+    print(f'Tabellenblatt „{blatt.title}“: {len(zeilen)} Zeilen, {len(zeilen[0]) if zeilen else 0} Spalten')
+
+    code_re = re.compile(r'^[A-Z]\d{6}$')
+
+    def ist_code(z, j):
+        return j < len(z) and isinstance(z[j], str) and bool(code_re.match(z[j].strip()))
+
+    # Datenstart: erste Zeile, ab der fünf Zeilen in Folge in derselben Spalte einen BLS-Code haben
+    treffer = next(((i, j) for i in range(min(len(zeilen) - 5, 50)) for j in range(len(zeilen[i]))
+                    if all(ist_code(zeilen[i + k], j) for k in range(5))), None)
+    if not treffer:
+        for z in zeilen[:6]:
+            print('  ', [str(c)[:20] for c in z[:10]])
+        sys.exit('BLS-Codes nicht gefunden (erwartet: Buchstabe + 6 Ziffern).')
+    start, code_sp = treffer
+    breite = max(len(z) for z in zeilen[:start + 1])
+    kopf = [' '.join(str(z[j]) for z in zeilen[:start] if j < len(z) and z[j] is not None).lower() for j in range(breite)]
+    print(f'Datenstart in Zeile {start + 1}, BLS-Code in Spalte {code_sp + 1}')
+    for j, k in enumerate(kopf[:12]):
+        print(f'  Kopf {j + 1}: {k[:90]}')
+
+    # Namensspalte: Text mit größter Durchschnittslänge in den ersten Datenzeilen
+    probe = zeilen[start:start + 200]
+    def textlaenge(j):
+        werte = [z[j] for z in probe if j < len(z) and isinstance(z[j], str)]
+        return sum(len(w) for w in werte) / max(1, len(probe)) if len(werte) > len(probe) * 0.8 else 0
+    name_sp = max((j for j in range(breite) if j != code_sp), key=textlaenge)
+
+    belegt = {code_sp, name_sp}
+    regeln = {
+        'kcal': [wort('enercc'), enthaelt(['energie', 'kcal']), enthaelt(['energy', 'kcal'])],
+        'kj': [wort('enercj'), enthaelt(['energie', 'kj']), enthaelt(['energy', 'kj'])],
+        'protein': [wort('prot625', 'prot'), enthaelt(['protein'], ['pflanz', 'tier', 'amino']), enthaelt(['eiweiß'], ['pflanz', 'tier'])],
+        'fett': [wort('fat'), enthaelt(['fett'], ['säure', 'saeure', 'fettsäure'])],
+        'kh': [wort('choavl', 'cho'), enthaelt(['kohlenhydrat'], ['ballast'])],
+        'zucker': [wort('sugar'), enthaelt(['zucker', 'gesamt']), enthaelt(['zucker'], ['alkohol', 'austausch'])],
+        'ballast': [wort('fibt'), enthaelt(['ballaststoff', 'gesamt']), enthaelt(['ballaststoff'])],
+        'gesaettigt': [wort('fasat'), enthaelt(['gesättigt'], ['einfach', 'mehrfach', 'ungesättigt'])],
+        'salz': [wort('nacl'), enthaelt(['salz'], ['salzig'])],
+        'natrium': [wort('na'), enthaelt(['natrium'])],
+    }
+    sp = {}
+    for feld, r in regeln.items():
+        j = spalte_finden(kopf, r, belegt)
+        if j is not None:
+            sp[feld] = j
+            belegt.add(j)
+    print(f'Name in Spalte {name_sp + 1}: {kopf[name_sp][:60]}')
+    for feld, j in sp.items():
+        print(f'  {feld:<10} → Spalte {j + 1}: {kopf[j][:90]}')
+    if 'kcal' not in sp and 'kj' in sp:
+        print('  kcal wird aus kJ berechnet')
+    fehlend = [f for f in PFLICHT if f not in sp and not (f == 'kcal' and 'kj' in sp)]
+    if fehlend:
+        sys.exit(f'Pflichtspalten nicht erkannt: {fehlend}')
+    natrium_in_mg = 'natrium' in sp and 'mg' in kopf[sp['natrium']]
+
+    def wert(z, feld):
+        j = sp.get(feld)
+        return zahl(z[j]) if j is not None and j < len(z) else None
+
+    eintraege, gesehen = [], set()
+    for z in zeilen[start:]:
+        code = z[code_sp].strip() if code_sp < len(z) and isinstance(z[code_sp], str) else ''
+        name = str(z[name_sp]).strip() if name_sp < len(z) and z[name_sp] else ''
+        if not code_re.match(code) or not name or code in gesehen:
+            continue
+        gesehen.add(code)
+        kcal = wert(z, 'kcal')
+        if kcal is None and wert(z, 'kj') is not None:
+            kcal = wert(z, 'kj') / 4.184
+        if kcal is None:
+            continue
+        salz = wert(z, 'salz')
+        if salz is None and wert(z, 'natrium') is not None:
+            salz = wert(z, 'natrium') * 2.54 / (1000 if natrium_in_mg else 1)
+        klein = name.lower()
+        syn = ' '.join(v for k, v in SYNONYME.items() if k in klein) or None
+        eintraege.append({
+            'id': f'bls:{code}', 'quelle': 'bls', 'name': name[:200], 'marke': None,
+            'kategorie': BLS_GRUPPEN.get(code[0]), 'barcode': None,
+            'kcal': round(kcal), 'protein': runde(wert(z, 'protein')), 'kh': runde(wert(z, 'kh')),
+            'zucker': runde(wert(z, 'zucker')), 'fett': runde(wert(z, 'fett')),
+            'gesaettigt': runde(wert(z, 'gesaettigt')), 'ballast': runde(wert(z, 'ballast')),
+            'salz': runde(salz, 2), 'ml': code[0] in 'NP', 'portion_g': None, 'menge': None,
+            'nutriscore': None, 'nova': None, 'zusatzstoffe': None, 'bio': None,
+            'beliebtheit': 0, 'suchwoerter': syn,
+        })
+    return eintraege
+
+
+def bls_pruefen(eintraege):
+    """Stichproben gegen bekannte Nährwerte, damit eine falsch erkannte Spalte nicht importiert wird."""
+    proben = [
+        ('banane', 'kcal', 70, 115), ('butter', 'fett', 70, 90), ('haferflocken', 'kh', 45, 72),
+        ('vollmilch', 'protein', 2.8, 4.0), ('hühnerei', 'protein', 10, 15),
+    ]
+    fehler = []
+    for wort_, feld, lo, hi in proben:
+        treffer = sorted((e for e in eintraege if e['name'].lower().startswith(wort_)), key=lambda e: len(e['name']))
+        if not treffer:
+            print(f'  Stichprobe {wort_}: nicht gefunden')
+            continue
+        e = treffer[0]
+        ok = e[feld] is not None and lo <= e[feld] <= hi
+        print(f'  Stichprobe {e["name"]}: {feld}={e[feld]} kcal={e["kcal"]} P={e["protein"]} KH={e["kh"]} F={e["fett"]} {"✓" if ok else "✗"}')
+        if not ok:
+            fehler.append(e['name'])
+    if fehler:
+        sys.exit(f'Unplausible Werte bei {fehler}. Spaltenzuordnung prüfen.')
+
+
+# ─── Open Food Facts ─────────────────────────────────────────────────────────
+
+OFF_FELDER = ','.join([
+    'code', 'product_name_de', 'product_name', 'brands', 'quantity', 'serving_quantity', 'nutriments',
+    'nutriscore_grade', 'nova_group', 'additives_tags', 'labels_tags', 'unique_scans_n', 'categories_tags',
+])
+
+
+def off_laden(ziel):
+    produkte, seite = {}, 1
+    while len(produkte) < ziel and seite <= 1000:
+        for versuch in range(6):
+            try:
+                r = requests.get('https://world.openfoodfacts.org/api/v2/search', headers=UA, timeout=90, params={
+                    'countries_tags_en': 'germany', 'sort_by': 'unique_scans_n', 'page_size': 250,
+                    'page': seite, 'fields': OFF_FELDER,
+                })
+                if r.status_code == 200:
+                    break
+                print(f'OFF Seite {seite}: HTTP {r.status_code}, neuer Versuch')
+            except requests.RequestException as e:
+                print(f'OFF Seite {seite}: {e}, neuer Versuch')
+            time.sleep(15 * (versuch + 1))
+        else:
+            print(f'OFF Seite {seite} endgültig fehlgeschlagen, Abbruch mit {len(produkte)} Produkten')
+            break
+        liste = r.json().get('products') or []
+        if not liste:
+            break
+        for p in liste:
+            e = off_eintrag(p)
+            if e and e['id'] not in produkte:
+                produkte[e['id']] = e
+        if seite % 10 == 0:
+            print(f'OFF Seite {seite}: {len(produkte)} Produkte übernommen')
+        seite += 1
+        time.sleep(6.5)  # Open Food Facts erlaubt 10 Suchanfragen pro Minute
+    return list(produkte.values())
+
+
+def off_eintrag(p):
+    code = str(p.get('code') or '').strip()
+    name = (p.get('product_name_de') or p.get('product_name') or '').strip()
+    n = p.get('nutriments') or {}
+    if not re.fullmatch(r'\d{8,14}', code) or not name:
+        return None
+    kcal = zahl(n.get('energy-kcal_100g'))
+    if kcal is None and zahl(n.get('energy_100g')) is not None:
+        kcal = zahl(n.get('energy_100g')) / 4.184
+    protein, kh, fett = zahl(n.get('proteins_100g')), zahl(n.get('carbohydrates_100g')), zahl(n.get('fat_100g'))
+    if kcal is None or kcal < 0 or kcal > 900 or None in (protein, kh, fett):
+        return None
+    if protein + kh + fett > 105 or min(protein, kh, fett) < 0:
+        return None
+    menge = (p.get('quantity') or '').strip()[:40] or None
+    ml = bool(menge and re.search(r'\d\s*(ml|cl|l)\b', menge.lower()))
+    labels = p.get('labels_tags') or []
+    nova = p.get('nova_group')
+    grade = (p.get('nutriscore_grade') or '').lower()
+    return {
+        'id': f'off:{code}', 'quelle': 'off', 'name': name[:200], 'marke': (p.get('brands') or '').split(',')[0].strip()[:80] or None,
+        'kategorie': None, 'barcode': code,
+        'kcal': round(kcal), 'protein': runde(protein), 'kh': runde(kh), 'zucker': runde(zahl(n.get('sugars_100g'))),
+        'fett': runde(fett), 'gesaettigt': runde(zahl(n.get('saturated-fat_100g'))), 'ballast': runde(zahl(n.get('fiber_100g'))),
+        'salz': runde(zahl(n.get('salt_100g')), 2), 'ml': ml,
+        'portion_g': runde(zahl(p.get('serving_quantity'))) if (zahl(p.get('serving_quantity')) or 0) > 0 else None,
+        'menge': menge, 'nutriscore': grade if grade in ('a', 'b', 'c', 'd', 'e') else None,
+        'nova': int(nova) if str(nova) in ('1', '2', '3', '4') else None,
+        'zusatzstoffe': [a.split(':', 1)[-1] for a in (p.get('additives_tags') or [])][:40] or None,
+        'bio': any(l in ('en:organic', 'en:eu-organic', 'de:bio') for l in labels),
+        'beliebtheit': int(p.get('unique_scans_n') or 0), 'suchwoerter': None,
+    }
+
+
+# ─── Upload ──────────────────────────────────────────────────────────────────
+
+def hochladen(eintraege):
+    url = os.environ['SUPABASE_URL'].rstrip('/') + '/rest/v1/lebensmittel'
+    key = os.environ['SUPABASE_SERVICE_ROLE_KEY']
+    kopf = {**UA, 'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal'}
+    for i in range(0, len(eintraege), 500):
+        teil = eintraege[i:i + 500]
+        r = requests.post(url, headers=kopf, json=teil, timeout=120)
+        if not r.ok:
+            sys.exit(f'Upload fehlgeschlagen ({r.status_code}): {r.text[:500]}')
+    print(f'{len(eintraege)} Einträge hochgeladen')
+
+
+def main():
+    bls = bls_lesen(bls_laden())
+    print(f'BLS: {len(bls)} Lebensmittel erkannt')
+    bls_pruefen(bls)
+    if len(bls) < 5000:
+        sys.exit('Zu wenige BLS-Einträge, Import abgebrochen.')
+    hochladen(bls)
+
+    off = off_laden(int(os.environ.get('OFF_ANZAHL') or 30000))
+    print(f'Open Food Facts: {len(off)} Produkte')
+    for e in off[:5]:
+        print(f'  {e["name"]} ({e["marke"]}): {e["kcal"]} kcal, Scans {e["beliebtheit"]}')
+    hochladen(off)
+
+
+if __name__ == '__main__':
+    main()
