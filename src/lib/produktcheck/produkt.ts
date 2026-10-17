@@ -101,21 +101,21 @@ export async function ladeProdukt(barcode: string): Promise<{ produkt: Produkt; 
 
 export interface Alternative { produkt: Produkt; punkte: number }
 
-/** Bis zu 5 bekannte Produkte derselben Kategorie mit deutlich besserer Bewertung */
+/** Bis zu 5 bekannte Produkte derselben Kategorie mit deutlich besserer Bewertung; genauere Kategorie zuerst */
 export async function ladeAlternativen(p: Produkt, punkte: number | null): Promise<Alternative[]> {
-  const kandidaten = [p.kategorien.at(-1), p.kategorien.at(-2)].filter((k): k is string => !!k)
-  for (const kategorie of kandidaten) {
+  const ergebnis: Alternative[] = []
+  for (const kategorie of [p.kategorien.at(-1), p.kategorien.at(-2)].filter((k): k is string => !!k)) {
     const { data } = await supabase.from('lebensmittel').select(DB_FELDER).contains('kategorien', [kategorie])
       .neq('barcode', p.barcode).order('beliebtheit', { ascending: false }).limit(60)
     const besser = ((data ?? []) as LebensmittelZeile[])
       .map(ausDatenbank)
       .map(produkt => ({ produkt, punkte: bewerte(produkt).punkte }))
-      .filter((a): a is Alternative => a.punkte != null && a.punkte >= (punkte ?? 0) + 5)
+      .filter((a): a is Alternative => a.punkte != null && a.punkte >= (punkte ?? 0) + 5 && !ergebnis.some(e => e.produkt.barcode === a.produkt.barcode))
       .sort((a, b) => b.punkte - a.punkte)
-      .slice(0, 5)
-    if (besser.length >= 2 || kategorie === kandidaten.at(-1)) return besser
+    ergebnis.push(...besser.slice(0, 5 - ergebnis.length))
+    if (ergebnis.length >= 3) break
   }
-  return []
+  return ergebnis
 }
 
 // ─── Warnungen: Anamnese (Allergien/Unverträglichkeiten) und eigene Präferenzen ──

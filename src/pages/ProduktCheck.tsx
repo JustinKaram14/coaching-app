@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronRight, FileSearch, Keyboard, ScanBarcode, SlidersHorizontal, Star, X } from 'lucide-react'
+import { ChevronRight, FileSearch, ScanBarcode, Search, SlidersHorizontal, Star, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { bewerte, stufeFuer, type Bewertung, type Produkt } from '../lib/produktcheck/bewertung'
-import { ladeProdukt, scanSpeichern, warnungen, type Praeferenzen, type Scan } from '../lib/produktcheck/produkt'
+import { ausDatenbank, ladeProdukt, scanSpeichern, warnungen, type LebensmittelZeile, type Praeferenzen, type Scan } from '../lib/produktcheck/produkt'
 import { leseAnamnese } from '../lib/entdecken/filter'
 import { useAnamneseTexte } from '../lib/entdecken/daten'
 import { BottomSheet } from '../components/ui/BottomSheet'
@@ -12,8 +12,10 @@ import { Spinner } from '../components/ui/Spinner'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Methodik, ProduktDetail, Punkt, Punktzahl } from './produktcheck/ProduktDetail'
 import { ScannerVollbild } from './produktcheck/ScannerVollbild'
+import { AlternativenListe, Uebersicht, letzte30Tage } from './produktcheck/Uebersicht'
 
 interface Ergebnis { produkt: Produkt; bewertung: Bewertung; offline: boolean }
+type Liste = 'verlauf' | 'favoriten' | 'alternativen' | 'uebersicht'
 
 const PRAEFERENZEN: { key: keyof Praeferenzen; label: string }[] = [
   { key: 'vegan', label: 'Vegan' },
@@ -34,7 +36,9 @@ export function ProduktCheck() {
   const [ergebnis, setErgebnis] = useState<Ergebnis | null>(null)
   const [detailOffen, setDetailOffen] = useState(false)
   const [scans, setScans] = useState<Scan[] | null>(null)
-  const [liste, setListe] = useState<'verlauf' | 'favoriten'>('verlauf')
+  const [liste, setListe] = useState<Liste>('verlauf')
+  const [stufeFilter, setStufeFilter] = useState<string | null>(null)
+  const [treffer, setTreffer] = useState<{ produkt: Produkt; bewertung: Bewertung }[] | null>(null)
   const [praef, setPraef] = useState<Praeferenzen>({})
   const [sheet, setSheet] = useState<'praeferenzen' | 'methodik' | null>(null)
 
@@ -68,6 +72,24 @@ export function ProduktCheck() {
 
   const erkannt = useCallback((code: string) => { oeffnen(code) }, [oeffnen])
 
+  // Eingabe: Ziffern = Barcode, sonst Produktsuche über die Lebensmittel-Datenbank
+  useEffect(() => {
+    const q = eingabe.trim()
+    if (q.length < 2 || /^\d+$/.test(q)) { setTreffer(null); return }
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('suche_lebensmittel', { q, anzahl: 20 })
+      setTreffer(((data ?? []) as LebensmittelZeile[]).map(z => { const produkt = ausDatenbank(z); return { produkt, bewertung: bewerte(produkt) } }))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [eingabe])
+
+  function trefferOeffnen(t: { produkt: Produkt; bewertung: Bewertung }) {
+    if (t.produkt.barcode) { oeffnen(t.produkt.barcode, true); return }
+    // Grundnahrungsmittel aus dem BLS haben keinen Barcode: direkt aus der Datenbank bewerten
+    setErgebnis({ ...t, offline: false })
+    setDetailOffen(true)
+  }
+
   async function praefSetzen(key: keyof Praeferenzen, an: boolean) {
     const neu = { ...praef, [key]: an }
     setPraef(neu)
@@ -82,7 +104,7 @@ export function ProduktCheck() {
   }
 
   const warn = ergebnis ? warnungen(ergebnis.produkt, profil, praef) : []
-  const sichtbar = (scans ?? []).filter(s => liste === 'verlauf' || s.favorit)
+  const sichtbar = (stufeFilter ? letzte30Tage(scans ?? []) : scans ?? []).filter(s => (liste === 'verlauf' || s.favorit) && (!stufeFilter || (s.punkte != null && stufeFuer(s.punkte).label === stufeFilter)))
 
   const detail = ergebnis && (
     <BottomSheet open={detailOffen} onClose={() => setDetailOffen(false)} title="Produkt-Check" tall>
@@ -108,11 +130,30 @@ export function ProduktCheck() {
 
       <form className="flex gap-2" onSubmit={e => { e.preventDefault(); if (/^\d{8,14}$/.test(eingabe.trim())) oeffnen(eingabe.trim(), true) }}>
         <div className="relative flex-1">
-          <Keyboard size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          <input className="input pl-9" inputMode="numeric" placeholder="Barcode eingeben" value={eingabe} onChange={e => setEingabe(e.target.value.replace(/\D/g, ''))} />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+          <input type="search" className="input pl-9" placeholder="Produkt suchen oder Barcode eingeben" value={eingabe} onChange={e => setEingabe(e.target.value)} />
         </div>
-        <button className="btn-secondary shrink-0" disabled={!/^\d{8,14}$/.test(eingabe)}>Prüfen</button>
+        {/^\d+$/.test(eingabe.trim()) && <button className="btn-secondary shrink-0" disabled={!/^\d{8,14}$/.test(eingabe.trim())}>Prüfen</button>}
       </form>
+      {treffer && (
+        <ul className="card !p-0 divide-y divide-border overflow-hidden -mt-2">
+          {treffer.length === 0 && <li className="p-4 text-sm text-text-muted text-center">Keine Produkte gefunden</li>}
+          {treffer.map((t, i) => (
+            <li key={t.produkt.barcode || i}>
+              <button onClick={() => trefferOeffnen(t)} className="w-full flex items-center gap-3 p-3 text-left hover:bg-bg-elevated transition-colors">
+                {t.produkt.bild ? <img src={t.produkt.bild} alt="" className="w-10 h-10 rounded-lg object-contain bg-white shrink-0" loading="lazy" /> : <div className="w-10 h-10 rounded-lg bg-bg-elevated shrink-0" />}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium text-text-primary truncate">{t.produkt.name}</span>
+                  {t.produkt.marke && <span className="block text-xs text-text-muted truncate">{t.produkt.marke}</span>}
+                </span>
+                {t.bewertung.punkte != null && t.bewertung.stufe && (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-text-primary shrink-0"><Punkt farbe={t.bewertung.stufe.farbe} size={9} />{t.bewertung.punkte}</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {laden && !scanner && <div className="flex justify-center"><Spinner /></div>}
       {fehler && !scanner && <p className="text-sm text-danger text-center">{fehler}</p>}
 
@@ -122,8 +163,16 @@ export function ProduktCheck() {
       </div>
 
       <section className="space-y-3">
-        <SegmentedTabs tabs={[{ key: 'verlauf', label: 'Verlauf' }, { key: 'favoriten', label: 'Favoriten' }]} value={liste} onChange={k => setListe(k as 'verlauf' | 'favoriten')} label="Gescannte Produkte" className="" />
-        {scans === null ? <div className="flex justify-center py-6"><Spinner /></div> : sichtbar.length === 0 ? (
+        <SegmentedTabs tabs={[{ key: 'verlauf', label: 'Verlauf' }, { key: 'favoriten', label: 'Favoriten' }, { key: 'alternativen', label: 'Alternativen' }, { key: 'uebersicht', label: 'Übersicht' }]}
+          value={liste} onChange={k => { setListe(k as Liste); setStufeFilter(null) }} label="Gescannte Produkte" className="" />
+        {stufeFilter && (
+          <button onClick={() => setStufeFilter(null)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-bg-elevated text-text-secondary">
+            Nur „{stufeFilter}“ (letzte 30 Tage) <X size={12} />
+          </button>
+        )}
+        {liste === 'uebersicht' ? (scans && <Uebersicht scans={scans} onStufe={stufe => { setStufeFilter(stufe); setListe('verlauf') }} />)
+          : liste === 'alternativen' ? (scans && <AlternativenListe scans={scans} onOeffnen={code => oeffnen(code, true)} />)
+          : scans === null ? <div className="flex justify-center py-6"><Spinner /></div> : sichtbar.length === 0 ? (
           <EmptyState icon={liste === 'verlauf' ? ScanBarcode : Star} title={liste === 'verlauf' ? 'Noch nichts gescannt' : 'Noch keine Favoriten'}
             description={liste === 'verlauf' ? 'Scanne dein erstes Produkt, es erscheint dann hier.' : 'Markiere Produkte in der Detailansicht mit dem Stern.'} />
         ) : (

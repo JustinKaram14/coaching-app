@@ -281,6 +281,8 @@ export function Methodik() {
       <p>Ab 75 Punkten „Ausgezeichnet“, ab 50 „Gut“, ab 25 „Mäßig“, darunter „Schlecht“.</p>
       <h4 className="font-semibold text-text-primary pt-2">Einstufung der Zusatzstoffe</h4>
       <p>Die Risikostufen sind eine eigene, vorsorgliche Einschätzung. Grundlage sind Bewertungen der Europäischen Behörde für Lebensmittelsicherheit (EFSA), Einstufungen der Internationalen Krebsforschungsagentur (IARC) und größere wissenschaftliche Studien. Zugelassene Zusatzstoffe gelten in den erlaubten Mengen behördlich als sicher; die Einstufung zeigt, wo es begründete Zweifel oder Hinweise auf Risiken gibt.</p>
+      <h4 className="font-semibold text-text-primary pt-2">Warum vorsorglich?</h4>
+      <p>Wie viel eines Zusatzstoffs ein Produkt enthält, steht nicht auf der Verpackung. Viele Zusatzstoffe stecken zudem in sehr vielen Produkten, sodass sich die Mengen über den Tag summieren. Deshalb weist der Produkt-Check auch dann auf mögliche Risiken hin, wenn ein Stoff zugelassen ist und einzeln als unbedenklich gilt.</p>
       <h4 className="font-semibold text-text-primary pt-2">Datenquellen</h4>
       <p>Produktdaten von Open Food Facts (Open Database License), Grundnahrungsmittel aus dem Bundeslebensmittelschlüssel 4.0 (Max Rubner-Institut). Angaben können unvollständig oder veraltet sein. Der Produkt-Check ersetzt keine ärztliche oder ernährungsfachliche Beratung.</p>
     </div>
