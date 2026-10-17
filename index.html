@@ -7,7 +7,7 @@
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
     <meta http-equiv="Permissions-Policy" content="camera=*, microphone=(), geolocation=()" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://static.openfoodfacts.org https://raw.githubusercontent.com https://api.workoutxapp.com; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://generativelanguage.googleapis.com wss://*.supabase.co https://world.openfoodfacts.org https://api.pexels.com https://api.workoutxapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://static.openfoodfacts.org https://raw.githubusercontent.com https://api.workoutxapp.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://world.openfoodfacts.org; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
     <meta http-equiv="X-Frame-Options" content="DENY" />
     <title>HLX Together</title>
     <link rel="manifest" href="/coaching-app/manifest.json" />
@@ -59,11 +59,8 @@
       document.documentElement.classList.add('sp-on', 'sp-hold')
     </script>
     <link rel="preload" href="/splash/hlx-splash.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- App-Schriften laden, ohne den ersten Frame der Startanimation zu blockieren -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /></noscript>
+    <noscript></noscript>
     <style>
       /* Startanimation „HLX Together · Healthy & Athletic" (ca. 2,4 s). Steht inline, damit sie sichtbar ist,
          noch bevor das App-Bundle geladen ist. Schrift: Plus Jakarta Sans (OFL), nur die benötigten Zeichen.
