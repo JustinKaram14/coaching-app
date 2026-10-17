@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useKi } from '../hooks/useKi'
 import { useTheme } from '../hooks/useTheme'
 import { todayISO, toLocalISO, tokenColor } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
@@ -428,6 +429,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   onAdd: (item: FoodItemInput) => Promise<void>
 }) {
   const { user } = useAuth()
+  const { kiAktiv, requireKi } = useKi()
   const [tab, setTab] = useState<AddTab>('search')
   const [selectedProduct, setSelectedProduct] = useState<OFFProduct | null>(null)
   const [selectedBarcode, setSelectedBarcode] = useState<string | undefined>()
@@ -624,7 +626,8 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     setSaving(false)
   }
 
-  function switchTab(t: AddTab) {
+  async function switchTab(t: AddTab) {
+    if ((t === 'photo' || t === 'text') && !(await requireKi())) return
     setTab(t)
     setSelectedProduct(null)
     setSelectedBarcode(undefined)
@@ -675,7 +678,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                   tab === t.id ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <span className="text-sm">{t.emoji}</span>
+                <span className="text-sm">{!kiAktiv && (t.id === 'photo' || t.id === 'text') ? '🔒' : t.emoji}</span>
                 <span className="text-[11px] font-medium">{t.label}</span>
               </button>
             ))}

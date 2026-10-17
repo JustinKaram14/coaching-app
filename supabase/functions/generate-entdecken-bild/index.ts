@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { KI_GESPERRT, kiErlaubt } from '../_shared/ki.ts'
 
 const ALLOWED_ORIGINS = [
   'https://justinkaram14.github.io',
@@ -84,6 +85,7 @@ serve(async (req) => {
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
+  if (!(await kiErlaubt(authHeader))) return json({ error: KI_GESPERRT }, 403)
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })

@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { KI_GESPERRT, kiErlaubt } from '../_shared/ki.ts'
 
 const ALLOWED_ORIGINS = [
   'https://justinkaram14.github.io',
@@ -44,6 +45,11 @@ serve(async (req) => {
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  if (!(await kiErlaubt(authHeader))) {
+    return new Response(JSON.stringify({ error: KI_GESPERRT }), {
+      status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
