@@ -54,7 +54,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease -PappVersionCode=${{ github.run_number }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
