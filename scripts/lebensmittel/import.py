@@ -299,6 +299,19 @@ def liste(v):
     return [x for x in (v or '').split(',') if x]
 
 
+def de_beliebtheit(tags):
+    """Beliebtheit in Deutschland aus den OFF-Popularitäts-Tags, z. B. 'top-1000-de-scans-2024', 'at-least-10-de-scans-2024'."""
+    wert = 0
+    for t in tags:
+        if m := re.fullmatch(r'top-(\d+)-de-scans-\d{4}', t):
+            wert = max(wert, 1_000_000 // int(m[1]))
+        elif m := re.fullmatch(r'at-least-(\d+)-de-scans-\d{4}', t):
+            wert = max(wert, int(m[1]))
+        elif re.fullmatch(r'top-country-de-scans-\d{4}', t):
+            wert = max(wert, 500)
+    return wert
+
+
 def off_laden(ziel):
     """Die in Deutschland meistgescannten Produkte aus dem Komplett-Export (CSV, tab-getrennt, gzip)."""
     csv.field_size_limit(sys.maxsize)
@@ -307,7 +320,8 @@ def off_laden(ziel):
         r.raise_for_status()
         text = io.TextIOWrapper(gzip.GzipFile(fileobj=r.raw), encoding='utf-8', errors='replace', newline='')
         leser = csv.DictReader(text, delimiter='\t', quoting=csv.QUOTE_NONE)
-        fehlend = [f for f in ['code', 'product_name', 'countries_tags', 'unique_scans_n', 'categories_tags'] + OFF_NAEHRWERTE[:4]
+        mit_tags = 'popularity_tags' in (leser.fieldnames or [])
+        fehlend = [f for f in ['code', 'product_name', 'countries_tags', 'popularity_tags', 'unique_scans_n', 'categories_tags'] + OFF_NAEHRWERTE[:4]
                    if f not in (leser.fieldnames or [])]
         print(f'OFF-Export: {len(leser.fieldnames or [])} Spalten, fehlend: {fehlend}')
         for z in leser:
@@ -327,6 +341,11 @@ def off_laden(ziel):
                 'image_front_small_url': z.get('image_front_small_url') or z.get('image_small_url'),
             }
             e = off_eintrag(p)
+            if e and mit_tags:
+                # Rangfolge nach Beliebtheit in Deutschland, nicht weltweit
+                e['beliebtheit'] = de_beliebtheit(liste(z.get('popularity_tags')))
+                if not e['beliebtheit']:
+                    continue
             if e and e['id'] not in gesehen:
                 gesehen.add(e['id'])
                 eintrag = (e['beliebtheit'], e['id'], e)
