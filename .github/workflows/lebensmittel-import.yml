@@ -20,6 +20,8 @@ permissions:
 
 jobs:
   aufbereiten:
+    # Supabase holt die Daten von YoungShindy/coaching-app (siehe lebensmittel_import_anfordern)
+    if: github.repository == 'YoungShindy/coaching-app'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
