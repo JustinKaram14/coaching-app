@@ -10,13 +10,15 @@ Der Workflow legt sie auf dem Branch `lebensmittel-daten` ab, Supabase übernimm
 Umgebung: optional OFF_ANZAHL (Standard 30000), BLS_URL.
 """
 
+import csv
+import gzip
+import heapq
 import io
 import json
 import math
 import os
 import re
 import sys
-import time
 import zipfile
 from html import unescape
 
@@ -186,7 +188,9 @@ def bls_lesen(inhalt):
     def textlaenge(j):
         werte = [z[j] for z in probe if j < len(z) and isinstance(z[j], str)]
         return sum(len(w) for w in werte) / max(1, len(probe)) if len(werte) > len(probe) * 0.8 else 0
-    name_sp = max((j for j in range(breite) if j != code_sp), key=textlaenge)
+    name_sp = next((j for j, k in enumerate(kopf) if 'bezeichnung' in k and 'referenz' not in k and 'herkunft' not in k), None)
+    if name_sp is None:
+        name_sp = max((j for j in range(breite) if j != code_sp), key=textlaenge)
 
     belegt = {code_sp, name_sp}
     regeln = {
@@ -247,6 +251,7 @@ def bls_lesen(inhalt):
             'salz': runde(salz, 2), 'ml': code[0] in 'NP', 'portion_g': None, 'menge': None,
             'nutriscore': None, 'nova': None, 'zusatzstoffe': None, 'bio': None,
             'beliebtheit': 0, 'suchwoerter': syn,
+            'kategorien': None, 'obst_gemuese': 100 if code[0] in 'FG' else None, 'bild': None,
         })
     return eintraege
 
@@ -257,59 +262,73 @@ def bls_pruefen(eintraege):
         ('banane', 'kcal', 70, 115), ('butter', 'fett', 70, 90), ('haferflocken', 'kh', 45, 72),
         ('vollmilch', 'protein', 2.8, 4.0), ('hühnerei', 'protein', 10, 15),
     ]
-    fehler = []
+    fehler, gefunden = [], 0
     for wort_, feld, lo, hi in proben:
         treffer = sorted((e for e in eintraege if e['name'].lower().startswith(wort_)), key=lambda e: len(e['name']))
         if not treffer:
             print(f'  Stichprobe {wort_}: nicht gefunden')
             continue
         e = treffer[0]
+        gefunden += 1
         ok = e[feld] is not None and lo <= e[feld] <= hi
         print(f'  Stichprobe {e["name"]}: {feld}={e[feld]} kcal={e["kcal"]} P={e["protein"]} KH={e["kh"]} F={e["fett"]} {"✓" if ok else "✗"}')
         if not ok:
             fehler.append(e['name'])
-    if fehler:
-        sys.exit(f'Unplausible Werte bei {fehler}. Spaltenzuordnung prüfen.')
+    if fehler or gefunden < 3:
+        sys.exit(f'Stichproben fehlgeschlagen (gefunden: {gefunden}, unplausibel: {fehler}). Spaltenzuordnung prüfen.')
 
 
 # ─── Open Food Facts ─────────────────────────────────────────────────────────
 
-OFF_FELDER = ','.join([
-    'code', 'product_name_de', 'product_name', 'brands', 'quantity', 'serving_quantity', 'nutriments',
-    'nutriscore_grade', 'nova_group', 'additives_tags', 'labels_tags', 'unique_scans_n', 'categories_tags',
-])
+OFF_EXPORT = 'https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz'
+OFF_NAEHRWERTE = [
+    'energy-kcal_100g', 'energy_100g', 'proteins_100g', 'carbohydrates_100g', 'fat_100g', 'sugars_100g',
+    'saturated-fat_100g', 'fiber_100g', 'salt_100g', 'fruits-vegetables-legumes-estimate-from-ingredients_100g',
+    'fruits-vegetables-nuts-estimate-from-ingredients_100g', 'fruits-vegetables-nuts_100g',
+]
+
+
+def liste(v):
+    return [x for x in (v or '').split(',') if x]
 
 
 def off_laden(ziel):
-    produkte, seite = {}, 1
-    while len(produkte) < ziel and seite <= 1000:
-        for versuch in range(6):
-            try:
-                r = requests.get('https://world.openfoodfacts.org/api/v2/search', headers=UA, timeout=90, params={
-                    'countries_tags_en': 'germany', 'sort_by': 'unique_scans_n', 'page_size': 250,
-                    'page': seite, 'fields': OFF_FELDER,
-                })
-                if r.status_code == 200:
-                    break
-                print(f'OFF Seite {seite}: HTTP {r.status_code}, neuer Versuch')
-            except requests.RequestException as e:
-                print(f'OFF Seite {seite}: {e}, neuer Versuch')
-            time.sleep(15 * (versuch + 1))
-        else:
-            print(f'OFF Seite {seite} endgültig fehlgeschlagen, Abbruch mit {len(produkte)} Produkten')
-            break
-        liste = r.json().get('products') or []
-        if not liste:
-            break
-        for p in liste:
+    """Die in Deutschland meistgescannten Produkte aus dem Komplett-Export (CSV, tab-getrennt, gzip)."""
+    csv.field_size_limit(sys.maxsize)
+    beste, zeilen, de, gesehen = [], 0, 0, set()
+    with SITZUNG.get(OFF_EXPORT, stream=True, timeout=600) as r:
+        r.raise_for_status()
+        text = io.TextIOWrapper(gzip.GzipFile(fileobj=r.raw), encoding='utf-8', errors='replace', newline='')
+        leser = csv.DictReader(text, delimiter='\t', quoting=csv.QUOTE_NONE)
+        fehlend = [f for f in ['code', 'product_name', 'countries_tags', 'unique_scans_n', 'categories_tags'] + OFF_NAEHRWERTE[:4]
+                   if f not in (leser.fieldnames or [])]
+        print(f'OFF-Export: {len(leser.fieldnames or [])} Spalten, fehlend: {fehlend}')
+        for z in leser:
+            zeilen += 1
+            if zeilen % 500000 == 0:
+                print(f'  {zeilen} Zeilen gelesen, {de} aus Deutschland')
+            if 'en:germany' not in (z.get('countries_tags') or ''):
+                continue
+            de += 1
+            p = {
+                'code': z.get('code'), 'product_name': z.get('product_name'), 'brands': z.get('brands'),
+                'quantity': z.get('quantity'), 'serving_quantity': z.get('serving_quantity'),
+                'nutriments': {k: z.get(k) for k in OFF_NAEHRWERTE},
+                'nutriscore_grade': z.get('nutriscore_grade'), 'nova_group': z.get('nova_group'),
+                'additives_tags': liste(z.get('additives_tags')), 'labels_tags': liste(z.get('labels_tags')),
+                'unique_scans_n': z.get('unique_scans_n'), 'categories_tags': liste(z.get('categories_tags')),
+                'image_front_small_url': z.get('image_front_small_url') or z.get('image_small_url'),
+            }
             e = off_eintrag(p)
-            if e and e['id'] not in produkte:
-                produkte[e['id']] = e
-        if seite % 10 == 0:
-            print(f'OFF Seite {seite}: {len(produkte)} Produkte übernommen')
-        seite += 1
-        time.sleep(6.5)  # Open Food Facts erlaubt 10 Suchanfragen pro Minute
-    return list(produkte.values())
+            if e and e['id'] not in gesehen:
+                gesehen.add(e['id'])
+                eintrag = (e['beliebtheit'], e['id'], e)
+                if len(beste) < ziel:
+                    heapq.heappush(beste, eintrag)
+                elif eintrag[:2] > beste[0][:2]:
+                    heapq.heapreplace(beste, eintrag)
+    print(f'OFF-Export: {zeilen} Zeilen, {de} aus Deutschland, {len(beste)} übernommen')
+    return [e for _, _, e in sorted(beste, key=lambda t: t[:2], reverse=True)]
 
 
 def off_eintrag(p):
@@ -339,10 +358,16 @@ def off_eintrag(p):
         'salz': runde(zahl(n.get('salt_100g')), 2), 'ml': ml,
         'portion_g': runde(zahl(p.get('serving_quantity'))) if (zahl(p.get('serving_quantity')) or 0) > 0 else None,
         'menge': menge, 'nutriscore': grade if grade in ('a', 'b', 'c', 'd', 'e') else None,
-        'nova': int(nova) if str(nova) in ('1', '2', '3', '4') else None,
+        'nova': int(zahl(nova)) if zahl(nova) in (1, 2, 3, 4) else None,
         'zusatzstoffe': [a.split(':', 1)[-1] for a in (p.get('additives_tags') or [])][:40] or None,
         'bio': any(l in ('en:organic', 'en:eu-organic', 'de:bio') for l in labels),
-        'beliebtheit': int(p.get('unique_scans_n') or 0), 'suchwoerter': None,
+        'beliebtheit': int(zahl(p.get('unique_scans_n')) or 0), 'suchwoerter': None,
+        # Für Produkt-Check und Alternativen: die drei genauesten Kategorien, Obst-/Gemüseanteil, Bild
+        'kategorien': (p.get('categories_tags') or [])[-3:] or None,
+        'obst_gemuese': runde(next((zahl(n.get(k)) for k in (
+            'fruits-vegetables-legumes-estimate-from-ingredients_100g', 'fruits-vegetables-nuts-estimate-from-ingredients_100g',
+            'fruits-vegetables-nuts_100g') if zahl(n.get(k)) is not None), None)),
+        'bild': (p.get('image_front_small_url') or '')[:300] or None,
     }
 
 
