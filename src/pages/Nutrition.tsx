@@ -228,12 +228,12 @@ function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
       const { data: rows } = await supabase.rpc('suche_lebensmittel', { q: term, anzahl: 25 })
       const eigene = ((rows ?? []) as LebensmittelRow[]).map(ausDatenbank)
       setResults(eigene)
-      // Seltene Produkte: live bei Open Food Facts nachsehen
+      // Seltene Produkte: live bei Open Food Facts nachsehen (Fehler dort lassen die eigenen Treffer stehen)
       if (eigene.length < 5) {
         const res = await fetch(
           `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&json=1&page_size=20&fields=code,product_name,product_name_de,brands,nutriments,serving_quantity&lc=de&cc=de`
-        )
-        const data = await res.json()
+        ).catch(() => null)
+        const data = res?.ok ? await res.json().catch(() => ({})) : {}
         const codes = new Set(eigene.map(p => p.code).filter(Boolean))
         const products = ((data.products ?? []) as OFFProduct[]).filter(p =>
           (p.product_name || p.product_name_de) && (p.nutriments?.['energy-kcal_100g'] ?? 0) > 0 && !codes.has(p.code)

@@ -18,6 +18,7 @@ import re
 import sys
 import time
 import zipfile
+from html import unescape
 
 import openpyxl
 import requests
@@ -70,50 +71,71 @@ def runde(v, stellen=1):
 
 # ─── BLS ─────────────────────────────────────────────────────────────────────
 
+SITZUNG = requests.Session()
+SITZUNG.headers.update(UA)
+
+
+def hrefs(html, basis):
+    return [requests.compat.urljoin(basis, unescape(h)) for h in re.findall(r'href="([^"]+)"', html, re.I)]
+
+
+def ist_datei_link(h):
+    return bool(re.search(r'\.(xlsx|zip)(\?|$)', h, re.I)) or 'zipservlet' in h.lower() or 'download?token' in h.lower()
+
+
 def bls_links():
-    """Mögliche Download-Links der BLS-Datendatei sammeln (deutsche Datei zuerst)."""
+    """Mögliche Download-Links der BLS-Datendatei sammeln (deutsche Datendatei zuerst)."""
     links = [os.environ.get('BLS_URL', '')]
     try:
-        for res in requests.get(BLS_GOVDATA, headers=UA, timeout=60).json()['result']['resources']:
+        for res in SITZUNG.get(BLS_GOVDATA, timeout=60).json()['result']['resources']:
             links.append(res.get('url') or '')
     except (requests.RequestException, ValueError, KeyError) as e:
         print(f'govdata nicht nutzbar: {e}')
     for seite in BLS_SEITEN:
         try:
-            html = requests.get(seite, headers=UA, timeout=60).text
-            hrefs = re.findall(r'href="([^"]+)"', html, re.I)
-            datei = [h for h in hrefs if re.search(r'\.(xlsx|zip)(\?|$)', h, re.I) or 'derivate' in h.lower() or 'download' in h.lower()]
-            print(f'{seite}: {len(hrefs)} Links, davon passend:')
-            for h in datei[:25]:
-                print(f'   {h}')
-            links += [requests.compat.urljoin(seite, h) for h in datei
-                      if re.search(r'\.(xlsx|zip)(\?|$)', h, re.I) or 'zipservlet' in h.lower()]
+            gefunden = [h for h in hrefs(SITZUNG.get(seite, timeout=60).text, seite) if ist_datei_link(h)]
+            print(f'{seite}: {gefunden[:10]}')
+            links += gefunden
         except requests.RequestException as e:
             print(f'{seite} nicht erreichbar: {e}')
     links = [l for l in dict.fromkeys(links) if l]
-    return sorted(links, key=lambda l: (not re.search(r'daten|data', l, re.I), not re.search(r'_de\b|_de\.', l, re.I), 'compon' in l.lower()))
+    return sorted(links, key=lambda l: ('compon' in l.lower(), not re.search(r'daten|data', l, re.I), not re.search(r'_de\b|_de\.', l, re.I)))
+
+
+def bls_aus_antwort(url, inhalt):
+    """Excel-Datei aus einer Antwort holen (direkt oder aus ZIP); None, wenn keine passende Datei enthalten ist."""
+    z = zipfile.ZipFile(io.BytesIO(inhalt))
+    if 'xl/workbook.xml' in z.namelist():
+        return inhalt if 'compon' not in url.lower() else None
+    innen = sorted((n for n in z.namelist() if n.lower().endswith('.xlsx') and 'compon' not in n.lower()),
+                   key=lambda n: (not re.search(r'daten|data', n, re.I), not re.search(r'_de\b|_de\.', n, re.I)))
+    print(f'  ZIP-Inhalt: {z.namelist()[:10]}')
+    return z.read(innen[0]) if innen else None
 
 
 def bls_laden():
-    for url in bls_links():
+    besucht, offen = set(), bls_links()
+    while offen:
+        url = offen.pop(0)
+        if url in besucht or len(besucht) > 30:
+            continue
+        besucht.add(url)
         try:
-            r = requests.get(url, headers=UA, timeout=300)
+            r = SITZUNG.get(url, timeout=300)
         except requests.RequestException as e:
             print(f'BLS {url}: {e}')
             continue
-        if not r.ok or r.content[:2] != b'PK':
-            print(f'BLS {url}: HTTP {r.status_code}, kein Excel/ZIP')
+        if r.ok and r.content[:2] == b'PK':
+            datei = bls_aus_antwort(url, r.content)
+            if datei:
+                print(f'BLS geladen: {url} ({len(datei) // 1024} KB)')
+                return datei
             continue
-        z = zipfile.ZipFile(io.BytesIO(r.content))
-        if 'xl/workbook.xml' in z.namelist():
-            print(f'BLS geladen: {url} ({len(r.content) // 1024} KB)')
-            return r.content
-        innen = sorted((n for n in z.namelist() if n.lower().endswith('.xlsx') and 'compon' not in n.lower()),
-                       key=lambda n: (not re.search(r'daten|data', n, re.I), not re.search(r'_de\b|_de\.', n, re.I)))
-        if innen:
-            print(f'BLS geladen: {url} → {innen[0]}')
-            return z.read(innen[0])
-        print(f'BLS {url}: ZIP ohne Excel-Datei ({z.namelist()[:5]})')
+        art = r.headers.get('content-type', '')
+        print(f'BLS {url}: HTTP {r.status_code}, {art}, Anfang: {r.text[:120]!r}')
+        if r.ok and 'html' in art:
+            # Verzeichnisseite: enthaltene Excel-Dateien vorne anstellen
+            offen = [h for h in hrefs(r.text, url) if ist_datei_link(h) and h not in besucht] + offen
     sys.exit('BLS-Datei nicht gefunden. Link im Workflow-Feld „bls_url“ angeben.')
 
 
