@@ -14,9 +14,6 @@ on:
       bls_url:
         description: 'Optional: direkter Link zur BLS-Datei (Excel oder ZIP)'
         default: ''
-  push:
-    branches: [claude/lebensmittel-db]
-    paths: [scripts/lebensmittel/**, .github/workflows/lebensmittel-import.yml]
 
 permissions:
   contents: write
