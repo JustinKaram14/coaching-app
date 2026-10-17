@@ -4,6 +4,9 @@ import { KI_GESPERRT, kiErlaubt } from '../_shared/ki.ts'
 
 const ALLOWED_ORIGINS = [
   'https://justinkaram14.github.io',
+  // Android-/iOS-App (Capacitor)
+  'https://localhost',
+  'capacitor://localhost',
   'http://localhost:5173',
   'http://localhost:4173',
   'http://localhost:5174',
