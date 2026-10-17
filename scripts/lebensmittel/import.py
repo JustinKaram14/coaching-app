@@ -4,27 +4,28 @@ Quellen:
   - Bundeslebensmittelschlüssel (BLS) 4.0, Max Rubner-Institut (2025), DOI 10.25826/Data20251217-134202-0
   - Open Food Facts (ODbL): in Deutschland meistgescannte Produkte
 
-Läuft im GitHub-Workflow `lebensmittel-import.yml`.
-Umgebung: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, optional OFF_ANZAHL (Standard 30000), BLS_URL.
+Läuft im GitHub-Workflow `lebensmittel-import.yml` und schreibt JSON-Teile nach `out/` (teil-01.json, …).
+Der Workflow legt sie auf dem Branch `lebensmittel-daten` ab, Supabase übernimmt sie per pg_net
+(siehe Migration 20261017150000_lebensmittel_import.sql).
+Umgebung: optional OFF_ANZAHL (Standard 30000), BLS_URL.
 """
 
 import io
+import json
 import math
 import os
 import re
 import sys
 import time
+import zipfile
 
 import openpyxl
 import requests
 
 UA = {'User-Agent': 'HLX-Coaching-App/1.0 (Lebensmittel-Import; github.com/YoungShindy/coaching-app)'}
 
-BLS_KANDIDATEN = [
-    os.environ.get('BLS_URL', ''),
-    'https://blsdb.de/assets/uploads/BLS_4_0_Daten_2025_DE.xlsx',
-]
-BLS_SEITEN = ['https://blsdb.de/download', 'https://www.blsdb.de/download']
+BLS_GOVDATA = 'https://www.govdata.de/ckan/api/3/action/package_show?id=bundeslebensmittelschlussel-bls-version-4-0-deutsche-nahrstoffdatenbank'
+BLS_SEITEN = ['https://www.openagrar.de/receive/openagrar_mods_00112643', 'https://blsdb.de/download']
 
 # Hauptgruppen nach erstem Buchstaben des BLS-Codes
 BLS_GRUPPEN = {
@@ -69,26 +70,51 @@ def runde(v, stellen=1):
 
 # ─── BLS ─────────────────────────────────────────────────────────────────────
 
-def bls_laden():
-    urls = [u for u in BLS_KANDIDATEN if u]
+def bls_links():
+    """Mögliche Download-Links der BLS-Datendatei sammeln (deutsche Datei zuerst)."""
+    links = [os.environ.get('BLS_URL', '')]
+    try:
+        for res in requests.get(BLS_GOVDATA, headers=UA, timeout=60).json()['result']['resources']:
+            links.append(res.get('url') or '')
+    except (requests.RequestException, ValueError, KeyError) as e:
+        print(f'govdata nicht nutzbar: {e}')
     for seite in BLS_SEITEN:
         try:
             html = requests.get(seite, headers=UA, timeout=60).text
-            for href in re.findall(r'href="([^"]+\.xlsx)"', html, re.I):
-                if 'daten' in href.lower() or 'data' in href.lower():
-                    urls.append(requests.compat.urljoin(seite, href))
+            hrefs = re.findall(r'href="([^"]+)"', html, re.I)
+            datei = [h for h in hrefs if re.search(r'\.(xlsx|zip)(\?|$)', h, re.I) or 'derivate' in h.lower() or 'download' in h.lower()]
+            print(f'{seite}: {len(hrefs)} Links, davon passend:')
+            for h in datei[:25]:
+                print(f'   {h}')
+            links += [requests.compat.urljoin(seite, h) for h in datei
+                      if re.search(r'\.(xlsx|zip)(\?|$)', h, re.I) or 'zipservlet' in h.lower()]
         except requests.RequestException as e:
-            print(f'Downloadseite {seite} nicht erreichbar: {e}')
-    for url in urls:
+            print(f'{seite} nicht erreichbar: {e}')
+    links = [l for l in dict.fromkeys(links) if l]
+    return sorted(links, key=lambda l: (not re.search(r'daten|data', l, re.I), not re.search(r'_de\b|_de\.', l, re.I), 'compon' in l.lower()))
+
+
+def bls_laden():
+    for url in bls_links():
         try:
-            r = requests.get(url, headers=UA, timeout=180)
-            if r.ok and r.content[:2] == b'PK':
-                print(f'BLS geladen: {url} ({len(r.content) // 1024} KB)')
-                return r.content
-            print(f'BLS {url}: HTTP {r.status_code}')
+            r = requests.get(url, headers=UA, timeout=300)
         except requests.RequestException as e:
             print(f'BLS {url}: {e}')
-    sys.exit('BLS-Datei nicht gefunden. Bitte BLS_URL setzen.')
+            continue
+        if not r.ok or r.content[:2] != b'PK':
+            print(f'BLS {url}: HTTP {r.status_code}, kein Excel/ZIP')
+            continue
+        z = zipfile.ZipFile(io.BytesIO(r.content))
+        if 'xl/workbook.xml' in z.namelist():
+            print(f'BLS geladen: {url} ({len(r.content) // 1024} KB)')
+            return r.content
+        innen = sorted((n for n in z.namelist() if n.lower().endswith('.xlsx') and 'compon' not in n.lower()),
+                       key=lambda n: (not re.search(r'daten|data', n, re.I), not re.search(r'_de\b|_de\.', n, re.I)))
+        if innen:
+            print(f'BLS geladen: {url} → {innen[0]}')
+            return z.read(innen[0])
+        print(f'BLS {url}: ZIP ohne Excel-Datei ({z.namelist()[:5]})')
+    sys.exit('BLS-Datei nicht gefunden. Link im Workflow-Feld „bls_url“ angeben.')
 
 
 def spalte_finden(kopf, regeln, belegt):
@@ -298,19 +324,18 @@ def off_eintrag(p):
     }
 
 
-# ─── Upload ──────────────────────────────────────────────────────────────────
+# ─── Ausgabe ─────────────────────────────────────────────────────────────────
 
-def hochladen(eintraege):
-    url = os.environ['SUPABASE_URL'].rstrip('/') + '/rest/v1/lebensmittel'
-    key = os.environ['SUPABASE_SERVICE_ROLE_KEY']
-    kopf = {**UA, 'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates,return=minimal'}
-    for i in range(0, len(eintraege), 500):
-        teil = eintraege[i:i + 500]
-        r = requests.post(url, headers=kopf, json=teil, timeout=120)
-        if not r.ok:
-            sys.exit(f'Upload fehlgeschlagen ({r.status_code}): {r.text[:500]}')
-    print(f'{len(eintraege)} Einträge hochgeladen')
+def schreiben(eintraege, ordner='out', je_teil=3000):
+    os.makedirs(ordner, exist_ok=True)
+    teile = 0
+    for i in range(0, len(eintraege), je_teil):
+        teile += 1
+        with open(f'{ordner}/teil-{teile:02d}.json', 'w', encoding='utf-8') as f:
+            json.dump(eintraege[i:i + je_teil], f, ensure_ascii=False, separators=(',', ':'))
+    with open(f'{ordner}/teile.txt', 'w') as f:
+        f.write(str(teile))
+    print(f'{len(eintraege)} Einträge in {teile} Teilen geschrieben')
 
 
 def main():
@@ -319,13 +344,12 @@ def main():
     bls_pruefen(bls)
     if len(bls) < 5000:
         sys.exit('Zu wenige BLS-Einträge, Import abgebrochen.')
-    hochladen(bls)
 
     off = off_laden(int(os.environ.get('OFF_ANZAHL') or 30000))
     print(f'Open Food Facts: {len(off)} Produkte')
     for e in off[:5]:
         print(f'  {e["name"]} ({e["marke"]}): {e["kcal"]} kcal, Scans {e["beliebtheit"]}')
-    hochladen(off)
+    schreiben(bls + off)
 
 
 if __name__ == '__main__':

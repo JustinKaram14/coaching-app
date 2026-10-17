@@ -23,11 +23,39 @@ interface OFFNutriments {
 }
 
 interface OFFProduct {
+  code?: string
   product_name?: string
   product_name_de?: string
   brands?: string
   nutriments?: OFFNutriments
   serving_quantity?: number
+  /** Nährwerte pro 100 ml statt 100 g */
+  ml?: boolean
+}
+
+/** Zeile aus der eigenen Lebensmittel-Datenbank (BLS 4.0 + Open Food Facts) */
+interface LebensmittelRow {
+  name: string
+  marke: string | null
+  kategorie: string | null
+  barcode: string | null
+  kcal: number
+  protein: number | null
+  kh: number | null
+  fett: number | null
+  ml: boolean
+  portion_g: number | null
+}
+
+function ausDatenbank(l: LebensmittelRow): OFFProduct {
+  return {
+    code: l.barcode ?? undefined,
+    product_name_de: l.name,
+    brands: l.marke ?? l.kategorie ?? undefined,
+    serving_quantity: l.portion_g ?? undefined,
+    ml: l.ml,
+    nutriments: { 'energy-kcal_100g': l.kcal, proteins_100g: l.protein ?? 0, carbohydrates_100g: l.kh ?? 0, fat_100g: l.fett ?? 0 },
+  }
 }
 
 interface NutritionGoals {
@@ -185,7 +213,7 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
   )
 }
 
-// ─── FoodSearch (Open Food Facts) ────────────────────────────────────────────
+// ─── FoodSearch (eigene Datenbank, Open Food Facts live als Ergänzung) ───────
 
 function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
   const [q, setQ] = useState('')
@@ -197,14 +225,21 @@ function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
     if (term.length < 2) { setResults([]); return }
     setLoading(true)
     try {
-      const res = await fetch(
-        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&json=1&page_size=20&fields=product_name,product_name_de,brands,nutriments,serving_quantity&lc=de&cc=de`
-      )
-      const data = await res.json()
-      const products = ((data.products ?? []) as OFFProduct[]).filter(p =>
-        (p.product_name || p.product_name_de) && (p.nutriments?.['energy-kcal_100g'] ?? 0) > 0
-      )
-      setResults(products.slice(0, 15))
+      const { data: rows } = await supabase.rpc('suche_lebensmittel', { q: term, anzahl: 25 })
+      const eigene = ((rows ?? []) as LebensmittelRow[]).map(ausDatenbank)
+      setResults(eigene)
+      // Seltene Produkte: live bei Open Food Facts nachsehen
+      if (eigene.length < 5) {
+        const res = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&json=1&page_size=20&fields=code,product_name,product_name_de,brands,nutriments,serving_quantity&lc=de&cc=de`
+        )
+        const data = await res.json()
+        const codes = new Set(eigene.map(p => p.code).filter(Boolean))
+        const products = ((data.products ?? []) as OFFProduct[]).filter(p =>
+          (p.product_name || p.product_name_de) && (p.nutriments?.['energy-kcal_100g'] ?? 0) > 0 && !codes.has(p.code)
+        )
+        setResults([...eigene, ...products.slice(0, 15 - eigene.length)])
+      }
     } catch {
       setResults([])
     }
@@ -244,6 +279,7 @@ function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
                 <div className="text-right text-xs ml-3 shrink-0">
                   <div className="font-semibold text-text-primary">
                     {Math.round(n['energy-kcal_100g'] ?? 0)} kcal
+                    <span className="font-normal text-text-muted"> /100{p.ml ? ' ml' : ' g'}</span>
                   </div>
                   <div className="text-text-secondary">
                     P:{Math.round((n.proteins_100g ?? 0) * 10) / 10}
@@ -255,6 +291,9 @@ function FoodSearch({ onSelect }: { onSelect: (p: OFFProduct) => void }) {
             )
           })}
         </div>
+      )}
+      {q.length >= 2 && !loading && results.length > 0 && (
+        <p className="text-center text-[10px] text-text-muted">Nährwerte: Bundeslebensmittelschlüssel 4.0 (Max Rubner-Institut) · Open Food Facts</p>
       )}
       {q.length >= 2 && !loading && results.length === 0 && (
         <p className="text-center py-6 text-sm text-text-muted">Keine Ergebnisse gefunden</p>
@@ -378,14 +417,14 @@ function PortionSelector({ product, barcode, onConfirm, onBack }: {
         <div className="font-semibold text-text-primary text-sm">{name}</div>
         {product.brands && <div className="text-xs text-text-muted">{product.brands}</div>}
         <div className="text-[11px] text-text-muted mt-0.5">
-          pro 100g: {Math.round(n['energy-kcal_100g'] ?? 0)} kcal ·
+          pro 100{product.ml ? ' ml' : ' g'}: {Math.round(n['energy-kcal_100g'] ?? 0)} kcal ·
           {' '}P:{Math.round((n.proteins_100g ?? 0) * 10) / 10}g ·
           {' '}K:{Math.round((n.carbohydrates_100g ?? 0) * 10) / 10}g ·
           {' '}F:{Math.round((n.fat_100g ?? 0) * 10) / 10}g
         </div>
       </div>
       <div>
-        <label className="label">Menge (g)</label>
+        <label className="label">Menge ({product.ml ? 'ml' : 'g'})</label>
         <input type="number" className="input" value={menge}
           onChange={e => setMenge(e.target.value)} min="1" max="5000" autoFocus />
       </div>
@@ -468,6 +507,13 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     setBarcodeLoading(true)
     setBarcodeError('')
     try {
+      const { data: eigen } = await supabase.from('lebensmittel').select('*').eq('barcode', code).limit(1).maybeSingle()
+      if (eigen) {
+        setSelectedProduct(ausDatenbank(eigen as LebensmittelRow))
+        setSelectedBarcode(code)
+        setBarcodeLoading(false)
+        return
+      }
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
       const data = await res.json()
       const p = data.product as OFFProduct | undefined
@@ -697,7 +743,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
           ) : (
             <>
               {tab === 'search' && (
-                <FoodSearch onSelect={p => { setSelectedProduct(p); setSelectedBarcode(undefined) }} />
+                <FoodSearch onSelect={p => { setSelectedProduct(p); setSelectedBarcode(p.code) }} />
               )}
 
               {tab === 'barcode' && (
