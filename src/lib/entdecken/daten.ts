@@ -255,12 +255,14 @@ export function bereinigeDef(roh: unknown, id: string): RezeptDef | null {
 export function useKiRezepte(userId: string) {
   const [zeilen, setZeilen] = useState<KiZeile[]>([])
   const [nurLokal, setNurLokal] = useState(false)
+  const [geladen, setGeladen] = useState(false)
   const key = `entdecken_ki_${userId}`
 
   useEffect(() => {
     let aktiv = true
     supabase.from('entdecken_rezepte').select('id,daten,bild_url').eq('user_id', userId).order('created_at', { ascending: false }).then(({ data, error }) => {
       if (!aktiv) return
+      setGeladen(true)
       if (istTabelleFehlt(error)) { setNurLokal(true); setZeilen(lokal.lesen(key, [])); return }
       setZeilen((data ?? []) as KiZeile[])
     })
@@ -294,7 +296,7 @@ export function useKiRezepte(userId: string) {
     if (!nurLokal) await supabase.from('entdecken_rezepte').delete().eq('id', id)
   }, [nurLokal, key])
 
-  return { rezepte, speichern, loeschen, nurLokal }
+  return { rezepte, speichern, loeschen, nurLokal, geladen }
 }
 
 // ─── Startbibliothek mit Bildern ─────────────────────────────────────────────

@@ -19,6 +19,7 @@ export function Einkaufsliste() {
   const ki = useKiRezepte(userId)
   const artikel = useEigeneArtikel(userId)
   const [eigene, setEigene] = useState<Map<string, Rezept>>(new Map())
+  const [eigeneGeladen, setEigeneGeladen] = useState(false)
   const [neuerArtikel, setNeuerArtikel] = useState('')
   const [leerenFrage, setLeerenFrage] = useState(false)
   const [drucken, setDrucken] = useState(false)
@@ -32,10 +33,12 @@ export function Einkaufsliste() {
   )
   const eigeneSchluessel = eigeneIds.join(',')
   useEffect(() => {
-    if (!eigeneSchluessel) { setEigene(new Map()); return }
+    if (!eigeneSchluessel) { setEigene(new Map()); setEigeneGeladen(true); return }
     let aktiv = true
     supabase.from('rezepte').select('*').in('id', eigeneSchluessel.split(',')).then(({ data }) => {
-      if (aktiv && data) setEigene(new Map((data as Rezept[]).map(r => [r.id, r])))
+      if (!aktiv) return
+      if (data) setEigene(new Map((data as Rezept[]).map(r => [r.id, r])))
+      setEigeneGeladen(true)
     })
     return () => { aktiv = false }
   }, [eigeneSchluessel])
@@ -111,13 +114,14 @@ export function Einkaufsliste() {
             {einkauf.eintraege.map(e => {
               const ke = liste.kostenJeEintrag.get(e.id)
               const fehlt = liste.verwaist.some(v => v.id === e.id)
+              const laedt = fehlt && !(e.rezeptId.startsWith(EIGEN_PRAEFIX) ? eigeneGeladen : ki.geladen)
               return (
                 <li key={e.id} className="flex items-center gap-3 rounded-2xl bg-bg-elevated border border-border px-3 py-2.5">
                   <ChefHat size={16} className="text-text-muted shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-text-primary truncate">{e.rezeptName}</div>
                     <div className="text-[11px] text-text-muted">
-                      {fehlt ? 'Rezept nicht mehr vorhanden' : ke && ke.bepreist > 0 ? `≈ ${euroSpanne(ke.min, ke.max)}` : 'ohne Preisschätzung'}
+                      {laedt ? 'wird geladen …' : fehlt ? 'Rezept nicht mehr vorhanden' : ke && ke.bepreist > 0 ? `≈ ${euroSpanne(ke.min, ke.max)}` : 'ohne Preisschätzung'}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0" role="group" aria-label={`Portionen ${e.rezeptName}`}>
