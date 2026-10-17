@@ -88,57 +88,73 @@ function CalorieRing({ eaten, goal }: { eaten: number; goal: number }) {
 }
 
 // ─── CalorieBilanzRing ────────────────────────────────────────────────────────────────────────
+// Ein großer Ring = Tagesbudget (Ziel + Sport). Gegessenes füllt ihn, Sport verlängert ihn sichtbar.
+// In der Mitte steht groß, wie viel noch offen ist.
+
+function bogen(r: number, start: number, ende: number) {
+  const umfang = 2 * Math.PI * r
+  const laenge = Math.max(0, ende - start) * umfang
+  return { strokeDasharray: `${laenge} ${umfang}`, strokeDashoffset: -start * umfang }
+}
 
 function CalorieBilanzRing({ consumed, burned, goal }: { consumed: number; burned: number; goal: number }) {
   const { colors } = useTheme()
-  const R_OUT = 50, R_IN = 36, cx = 60, cy = 60
-  const circOut = 2 * Math.PI * R_OUT
-  const circIn  = 2 * Math.PI * R_IN
-  const net = Math.max(0, consumed - burned)
-  const consumedPct = goal > 0 ? Math.min(consumed / goal, 1) : 0
-  const burnedPct   = goal > 0 ? Math.min(burned  / goal, 1) : 0
-  const netRatio    = goal > 0 ? net / goal : 0
-  const atGoal  = Math.abs(netRatio - 1) < 0.1
-  const overGoal = net > goal * 1.1
-  const statusColor = atGoal ? colors.success : colors.warning
+  const R = 92, cx = 110, cy = 110, dicke = 18
+  const budget = Math.max(1, goal + burned)
+  const offen = goal + burned - consumed
+  const ueber = offen < 0
+  const gegessenAnteil = Math.min(1, consumed / budget)
+  const sportStart = goal / budget
+  const knapp = !ueber && offen <= budget * 0.1
 
   return (
-    <div className="flex flex-col items-center gap-2 shrink-0">
-      <svg width="144" height="144" viewBox="0 0 120 120">
-        {/* Outer bg */}
-        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke={colors.track} strokeWidth="10" />
-        {/* Outer blue: consumed */}
-        <circle cx={cx} cy={cy} r={R_OUT} fill="none" stroke={colors.info} strokeWidth="10" strokeLinecap="round"
-          strokeDasharray={circOut} strokeDashoffset={circOut * (1 - consumedPct)}
-          transform={`rotate(-90,${cx},${cy})`}
-          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-        />
-        {/* Inner bg */}
-        <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke={colors.track} strokeWidth="8" />
-        {/* Inner red: burned */}
-        {burned > 0 && (
-          <circle cx={cx} cy={cy} r={R_IN} fill="none" stroke={colors.danger} strokeWidth="8" strokeLinecap="round"
-            strokeDasharray={circIn} strokeDashoffset={circIn * (1 - burnedPct)}
-            transform={`rotate(-90,${cx},${cy})`}
-            style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-          />
-        )}
-        {/* Center */}
-        <text x={cx} y={cy - 9} textAnchor="middle" fill={colors.text} fontSize="19" fontWeight="700">{net}</text>
-        <text x={cx} y={cy + 4}  textAnchor="middle" fill={colors.tick} fontSize="8">kcal netto</text>
-        <text x={cx} y={cy + 16} textAnchor="middle" fill={statusColor} fontSize="7.5" fontWeight="600">
-          {atGoal ? '✓ Ziel erreicht' : overGoal ? `+${net - goal} über Ziel` : `${goal - net} bis Ziel`}
+    <div className="flex flex-col items-center gap-3 w-full">
+      <svg viewBox="0 0 220 220" className="w-full max-w-[260px]" role="img"
+        aria-label={ueber ? `${-offen} kcal über deinem Tagesbudget` : `Noch ${offen} kcal offen`}>
+        <g transform={`rotate(-90 ${cx} ${cy})`}>
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke={colors.track} strokeWidth={dicke} />
+          {/* Sport-Bonus: verlängert das Budget */}
+          {burned > 0 && (
+            <circle cx={cx} cy={cy} r={R} fill="none" stroke={colors.warning} strokeOpacity={0.35} strokeWidth={dicke}
+              {...bogen(R, sportStart, 1)} />
+          )}
+          {/* Gegessen */}
+          {consumed > 0 && (
+            <circle cx={cx} cy={cy} r={R} fill="none" stroke={ueber ? colors.danger : colors.brand} strokeWidth={dicke}
+              strokeLinecap={gegessenAnteil >= 1 ? 'butt' : 'round'} {...bogen(R, 0, gegessenAnteil)}
+              style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+          )}
+          {/* Markierung: hier endet das Ziel ohne Sport */}
+          {burned > 0 && (
+            <line x1={cx + R - dicke / 2 - 3} y1={cy} x2={cx + R + dicke / 2 + 3} y2={cy} stroke={colors.warning} strokeWidth={2.5}
+              transform={`rotate(${sportStart * 360} ${cx} ${cy})`} />
+          )}
+        </g>
+        <text x={cx} y={cy - 30} textAnchor="middle" fill={colors.tick} fontSize="13">{ueber ? 'drüber' : 'noch offen'}</text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fill={ueber ? colors.danger : colors.text} fontSize="46" fontWeight="800"
+          style={{ fontVariantNumeric: 'tabular-nums' }}>{ueber ? `+${-offen}` : offen}</text>
+        <text x={cx} y={cy + 34} textAnchor="middle" fill={colors.tick} fontSize="13">kcal</text>
+        <text x={cx} y={cy + 56} textAnchor="middle" fontSize="11.5" fontWeight="600"
+          fill={ueber ? colors.danger : knapp ? colors.warning : colors.success}>
+          {ueber ? 'über dem Budget' : knapp ? 'fast erreicht' : 'im Rahmen'}
         </text>
       </svg>
-      <div className="flex gap-5 text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-info shrink-0" />
-          <span className="text-text-secondary">{consumed} kcal gegessen</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-danger shrink-0" />
-          <span className="text-text-secondary">{burned} kcal verbrannt</span>
-        </span>
+
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-brand" />gegessen</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-warning/40" />Sport-Bonus</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: colors.track }} />noch frei</span>
+      </div>
+
+      {/* Rechnung: Ziel + Sport − Gegessen = offen */}
+      <div className="w-full grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-1 text-center">
+        <div><div className="text-base font-bold text-text-primary tabular-nums">{goal}</div><div className="text-[11px] text-text-muted">Ziel</div></div>
+        <span className="text-text-muted">+</span>
+        <div><div className="text-base font-bold text-warning tabular-nums">{burned}</div><div className="text-[11px] text-text-muted">Sport</div></div>
+        <span className="text-text-muted">−</span>
+        <div><div className="text-base font-bold text-brand tabular-nums">{consumed}</div><div className="text-[11px] text-text-muted">gegessen</div></div>
+        <span className="text-text-muted">=</span>
+        <div><div className={`text-base font-bold tabular-nums ${ueber ? 'text-danger' : 'text-text-primary'}`}>{ueber ? `+${-offen}` : offen}</div><div className="text-[11px] text-text-muted">{ueber ? 'drüber' : 'offen'}</div></div>
       </div>
     </div>
   )
@@ -1290,20 +1306,6 @@ export function Nutrition() {
               burned={burnedKcal}
               goal={goals.kalorie_tagesziel}
             />
-            <div className="w-full border-t border-border pt-4 grid grid-cols-3 gap-2 text-center text-xs">
-              <div>
-                <div className="text-base font-bold text-text-primary">{totals.kalorien}</div>
-                <div className="text-text-muted">gegessen</div>
-              </div>
-              <div>
-                <div className="text-base font-bold text-danger">{burnedKcal}</div>
-                <div className="text-text-muted">verbrannt</div>
-              </div>
-              <div>
-                <div className="text-base font-bold text-text-primary">{goals.kalorie_tagesziel}</div>
-                <div className="text-text-muted">Ziel</div>
-              </div>
-            </div>
           </div>
 
           {burnedKcal === 0 && (

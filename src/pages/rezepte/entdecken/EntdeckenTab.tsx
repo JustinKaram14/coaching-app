@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ChevronRight, Clock, Flame, Search, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth'
 import { KiSchloss, useKi } from '../../../hooks/useKi'
 import { DATA_CHANGED_EVENT } from '../../../lib/supabase'
@@ -23,13 +24,11 @@ import { FilterSheet, Chip } from './FilterSheet'
 import { PersoenlichSheet } from './PersoenlichSheet'
 import { KiDialog } from './KiDialog'
 import { BilderAdmin } from './BilderAdmin'
-import { EinkaufslisteSheet } from './EinkaufslisteSheet'
 import { CoachEmpfehlungen } from './CoachEmpfehlungen'
 import { istAktuell, useEmpfehlungen, type Empfehlung } from '../../../lib/entdecken/empfehlungen'
 import { FortschrittsBalken, PflanzenSheet } from './PflanzenSheet'
 import { PFLANZEN_ZIEL, wochenStart } from '../../../lib/entdecken/pflanzen'
 import { usePflanzen } from '../../../lib/entdecken/pflanzenDaten'
-import { baueEinkaufsListe } from '../../../lib/entdecken/einkauf'
 
 function Reihe({ titel, emoji, items, onAlle, onOeffnen, gesundheit = false, leer, extra }: {
   titel: string; emoji: string; items: Treffer[]; onAlle?: () => void; onOeffnen: (t: Treffer) => void
@@ -105,7 +104,7 @@ export function EntdeckenTab() {
   const fav = useFavoriten(userId)
   const einkauf = useEinkauf(userId)
   const empfehlungen = useEmpfehlungen(userId)
-  const [einkaufOffen, setEinkaufOffen] = useState(false)
+  const navigate = useNavigate()
   const [pflanzenOffen, setPflanzenOffen] = useState(false)
   const diesewoche = wochenStart(toLocalISO(new Date()))
   const pflanzenWoche = usePflanzen(userId, diesewoche)
@@ -150,15 +149,11 @@ export function EntdeckenTab() {
     })
   }, [empfehlungen.liste, alle, persoenlich])
   const empfehlungOeffnen = (e: Empfehlung, t: Treffer) => { void empfehlungen.alsGesehenMarkieren(e.id); oeffnen(t) }
-  const einkaufsListe = useMemo(
-    () => baueEinkaufsListe(einkauf.eintraege, new Map(alle.map(r => [r.id, r]))),
-    [einkauf.eintraege, alle],
-  )
   const einkaufKontext = useMemo(() => ({
     hinzufuegen: einkauf.hinzufuegen,
     portionenAufListe: (id: string) => einkauf.eintraege.find(e => e.rezeptId === id)?.portionen ?? null,
-    oeffneListe: () => setEinkaufOffen(true),
-  }), [einkauf.hinzufuegen, einkauf.eintraege])
+    oeffneListe: () => navigate('/einkaufsliste'),
+  }), [einkauf.hinzufuegen, einkauf.eintraege, navigate])
   const tagesRezept = useMemo(() => rezeptDesTages(basis.treffer, userId, toLocalISO(new Date())), [basis, userId])
   const favoritenTreffer = useMemo(() => basis.treffer.filter(t => fav.favoriten.has(t.r.id)), [basis, fav.favoriten])
 
@@ -201,7 +196,7 @@ export function EntdeckenTab() {
           <SlidersHorizontal size={18} />
           {anzahlFilter > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center px-1">{anzahlFilter}</span>}
         </button>
-        <button onClick={() => setEinkaufOffen(true)} aria-label={`Einkaufsliste${einkauf.eintraege.length ? `, ${einkauf.eintraege.length} Rezepte` : ''}`} className="relative btn-secondary px-3.5 flex items-center">
+        <button onClick={() => navigate('/einkaufsliste')} aria-label={`Einkaufsliste${einkauf.eintraege.length ? `, ${einkauf.eintraege.length} Rezepte` : ''}`} className="relative btn-secondary px-3.5 flex items-center">
           <ShoppingCart size={18} className={einkauf.eintraege.length ? 'text-brand' : ''} />
           {einkauf.eintraege.length > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center px-1">{einkauf.eintraege.length}</span>}
         </button>
@@ -420,11 +415,6 @@ export function EntdeckenTab() {
       )}
 
       {pflanzenOffen && <PflanzenSheet userId={userId} vorschlagsPool={basis.treffer} onOeffnen={oeffnen} onClose={() => setPflanzenOffen(false)} />}
-      {einkaufOffen && (
-        <EinkaufslisteSheet liste={einkaufsListe} eintraege={einkauf.eintraege} haken={einkauf.haken} nurLokal={einkauf.nurLokal}
-          onHaken={einkauf.hakenUmschalten} onEntfernen={id => void einkauf.entfernen(id)} onLeeren={() => void einkauf.leeren()}
-          onHakenLoeschen={einkauf.hakenLoeschen} onClose={() => setEinkaufOffen(false)} />
-      )}
       {filterOffen && <FilterSheet filter={filter} onChange={setFilter} anzahl={ergebnis.treffer.length} onClose={() => setFilterOffen(false)} />}
       {persoenlichOffen && <PersoenlichSheet einstellungen={einstellungen} anamnese={anamneseTexte} profil={profil ?? (anamneseTexte ? leseAnamnese(anamneseTexte.allergien, anamneseTexte.erkrankungen) : null)} onClose={() => setPersoenlichOffen(false)} />}
       {kiOffen && (

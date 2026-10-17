@@ -1,4 +1,4 @@
-import { useCallback, useContext, useState } from 'react'
+import { useCallback, useContext, useMemo, useState } from 'react'
 import { BookPlus, ChefHat, Clock, Flame, Minus, Plus, ShoppingCart, Trash2, Users, AlertTriangle } from 'lucide-react'
 import type { Treffer } from '../../../lib/entdecken/filter'
 import { ARTEN, GESUNDHEIT_REIHEN, REIHEN, SCHWIERIGKEIT } from '../../../lib/entdecken/katalog'
@@ -9,6 +9,8 @@ import { DruckAnsicht, RezeptDruck } from './Druck'
 import { rezeptText, teile } from '../../../lib/entdecken/teilen'
 import { pflanzeFuerKey } from '../../../lib/entdecken/pflanzen'
 import { TagebuchDialog } from './TagebuchDialog'
+import { KostenPrognose } from '../../../components/KostenPrognose'
+import { kostenZutaten } from '../../../lib/einkauf/preise'
 
 function NaehrZeile({ label, wert, einheit, stellen = 1, einzug = false, fett = false }: {
   label: string; wert: number; einheit: string; stellen?: number; einzug?: boolean; fett?: boolean
@@ -43,6 +45,7 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
   const [drucken, setDrucken] = useState(false)
   const [teilenStatus, setTeilenStatus] = useState('')
   const druckFertig = useCallback(() => setDrucken(false), [])
+  const kosten = useMemo(() => kostenZutaten(r.zutaten), [r.zutaten])
 
   async function aufDieListe() {
     setListeStatus('')
@@ -184,6 +187,7 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
               return zt ? <li key={i} className="px-3 py-2 text-sm text-text-primary">{zutatZeile(zt, z.g * faktor)}</li> : null
             })}
           </ul>
+          <KostenPrognose kosten={kosten} rezeptPortionen={r.portionen} portionen={wunschPortionen} />
           <button onClick={aufDieListe} className="btn-secondary w-full flex items-center justify-center gap-2 text-sm">
             <ShoppingCart size={15} />
             {aufListe === null ? 'Auf die Einkaufsliste' : aufListe === wunschPortionen ? 'Schon auf der Einkaufsliste' : `Einkaufsliste auf ${portionenText(wunschPortionen)} Port. ändern`}
