@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   BookOpen, Plus, Trash2, ChefHat, CalendarDays, Sparkles,
   ChevronLeft, ChevronRight, X, Check, Info, UtensilsCrossed,
@@ -14,6 +15,10 @@ import { parseIngredients, parseSteps, scaleIngredient } from '../lib/recipe'
 import type { Rezept, ClientSettings, MealPlanEntry } from '../types/database'
 import { EntdeckenTab } from './rezepte/entdecken/EntdeckenTab'
 import { useUngeseheneEmpfehlungen } from '../lib/entdecken/empfehlungen'
+import { useEinkauf } from '../lib/entdecken/daten'
+import { EIGEN_PRAEFIX } from '../lib/einkauf/liste'
+import { kostenText } from '../lib/einkauf/preise'
+import { KostenPrognose, kostenKurz } from '../components/KostenPrognose'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +145,7 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
 }) {
   const [generatingImg, setGeneratingImg] = useState(false)
   const { requireKi } = useKi()
+  const preis = useMemo(() => kostenKurz(kostenText(r.zutaten_text), r.portionen), [r.zutaten_text, r.portionen])
 
   async function generateImage(e: React.MouseEvent) {
     e.stopPropagation()
@@ -184,9 +190,10 @@ function RezeptCard({ r, onDelete, onImageGenerated, onOpenDetail }: {
             <MacroRow label="F" value={r.fett_g} color="text-success" />
           </div>
           {(r.zutaten_text || r.kochanleitung) && (
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {r.zutaten_text && <span className="text-[10px] bg-bg-card rounded px-1.5 py-0.5 text-text-muted border border-border">🛒 Zutaten</span>}
               {r.kochanleitung && <span className="text-[10px] bg-bg-card rounded px-1.5 py-0.5 text-text-muted border border-border">📖 Anleitung</span>}
+              {preis && <span className="text-[10px] bg-success/10 rounded px-1.5 py-0.5 text-success font-medium">{preis}</span>}
             </div>
           )}
         </div>
@@ -291,7 +298,7 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
   onImageGenerated: (id: string, url: string) => void
   onInstructionsGenerated: (id: string, kochanleitung: string) => void
 }) {
-  const { requireKi } = useKi()
+  const { kiAktiv, requireKi } = useKi()
   const basePort = r.portionen || 1
   const [portionen, setPortionen] = useState(basePort)
   const [generatingImg, setGeneratingImg] = useState(false)
@@ -306,6 +313,14 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
   // Nährwerte sind pro Portion hinterlegt; „Portionen“ rechnet nur die Zutatenmengen um
   const [eatPortionen, setEatPortionen] = useState(1)
   const [cooking, setCooking] = useState(false)
+  const einkauf = useEinkauf(userId)
+  const [listeStatus, setListeStatus] = useState<'' | 'ok' | 'fehler'>('')
+  const kosten = useMemo(() => kostenText(r.zutaten_text), [r.zutaten_text])
+  const aufListe = einkauf.eintraege.find(e => e.rezeptId === EIGEN_PRAEFIX + r.id)?.portionen ?? null
+
+  async function aufEinkaufsliste() {
+    setListeStatus((await einkauf.hinzufuegen({ id: EIGEN_PRAEFIX + r.id, name: r.name }, portionen)) ? 'ok' : 'fehler')
+  }
   const checkedKey = `rezept_einkauf_${r.id}`
   const [checked, setChecked] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem(checkedKey) ?? '[]') } catch { return [] }
@@ -368,11 +383,15 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
     setGeneratingInstr(false)
   }
 
-  // Auto-generate missing image and instructions when modal opens
+  // Fehlendes Bild und fehlende Anleitung automatisch erzeugen, aber nur mit KI-Einwilligung
+  // (ohne Einwilligung würde sonst beim Öffnen sofort das Zustimmungsfenster erscheinen)
+  const autoKiGelaufen = useRef(false)
   useEffect(() => {
+    if (!kiAktiv || autoKiGelaufen.current) return
+    autoKiGelaufen.current = true
     if (!r.bild_url) generateImage()
     if (!r.kochanleitung) generateInstructions()
-  }, [])
+  }, [kiAktiv])
 
   async function addToPlan() {
     setAdding(true)
@@ -446,6 +465,8 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
             </button>
           </div>
 
+          <KostenPrognose kosten={kosten} rezeptPortionen={basePort} portionen={portionen} />
+
           {/* Zutaten = Einkaufsliste */}
           {ingredientLines.length > 0 && (
             <div>
@@ -479,6 +500,18 @@ function RezeptDetailModal({ r, userId, onClose, onDelete, onImageGenerated, onI
                   Haken zurücksetzen
                 </button>
               )}
+              <button onClick={aufEinkaufsliste} disabled={aufListe === portionen}
+                className="btn-secondary w-full mt-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                <ShoppingCart size={15} />
+                {aufListe === null ? 'Auf die Einkaufsliste' : aufListe === portionen ? 'Schon auf der Einkaufsliste' : `Einkaufsliste auf ${portionen % 1 === 0 ? portionen : portionen.toFixed(1)} Port. ändern`}
+              </button>
+              {(listeStatus === 'ok' || aufListe !== null) && (
+                <div className="text-xs text-text-secondary mt-1.5 flex items-center gap-2">
+                  <span>Auf der Einkaufsliste für {String(aufListe ?? portionen).replace('.', ',')} Port.</span>
+                  <RouterLink to="/einkaufsliste" className="text-brand hover:underline">Liste ansehen</RouterLink>
+                </div>
+              )}
+              {listeStatus === 'fehler' && <div className="text-xs text-danger mt-1.5">Konnte nicht gespeichert werden. Bitte erneut versuchen.</div>}
             </div>
           )}
 

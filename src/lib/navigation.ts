@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard, Scale, Dumbbell, Moon, Apple, Pill, Calendar,
-  Settings, Users, ChefHat, Ellipsis, Smile, ScanBarcode,
+  Settings, Users, ChefHat, Ellipsis, Smile, ScanBarcode, ShoppingCart,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -18,6 +18,7 @@ export const clientNav: NavItem[] = [
   { to: '/sleep', icon: Moon, label: 'Schlaf' },
   { to: '/nutrition', icon: Apple, label: 'Ernährung' },
   { to: '/rezepte', icon: ChefHat, label: 'Rezepte' },
+  { to: '/einkaufsliste', icon: ShoppingCart, label: 'Einkaufsliste' },
   { to: '/produkt-check', icon: ScanBarcode, label: 'Produkt-Check' },
   { to: '/supplements', icon: Pill, label: 'Supplements' },
   { to: '/calendar', icon: Calendar, label: 'Kalender' },

@@ -20,6 +20,7 @@ import { Legal } from './pages/Legal'
 import { More } from './pages/More'
 import { Charakter } from './pages/Charakter'
 import { ProduktCheck } from './pages/ProduktCheck'
+import { Einkaufsliste } from './pages/Einkaufsliste'
 import { DayStatusProvider } from './hooks/useDayStatus'
 import { GameProvider } from './hooks/useGame'
 import { KiProvider } from './hooks/useKi'
@@ -84,6 +85,7 @@ function AppRoutes() {
       <Route path="/nutrition" element={<ProtectedRoute><Nutrition /></ProtectedRoute>} />
       <Route path="/rezepte" element={<ProtectedRoute><Rezepte /></ProtectedRoute>} />
       <Route path="/supplements" element={<ProtectedRoute><Supplements /></ProtectedRoute>} />
+      <Route path="/einkaufsliste" element={<ProtectedRoute><Einkaufsliste /></ProtectedRoute>} />
       <Route path="/produkt-check" element={<ProtectedRoute><ProduktCheck /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

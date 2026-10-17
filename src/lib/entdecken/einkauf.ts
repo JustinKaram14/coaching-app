@@ -1,7 +1,6 @@
-// Einkaufsliste für „Entdecken“: mehrere Rezepte werden zusammengerechnet und nach Supermarkt-Bereichen sortiert.
+// Typen und Supermarkt-Bereiche der Einkaufsliste (zusammengerechnet wird in lib/einkauf/liste.ts).
 
-import type { Rezept } from './types'
-import { ZUTATEN, zutatZeile } from './zutaten'
+import { ZUTATEN } from './zutaten'
 
 export interface EinkaufsEintrag {
   id: string
@@ -40,9 +39,6 @@ zuordnen('Hülsenfrüchte & Soja', ['kichererbsen', 'linsen_rot', 'linsen_braun'
 zuordnen('Nüsse, Samen & Trockenfrüchte', ['mandeln', 'walnuesse', 'cashews', 'haselnuesse', 'mandelmus', 'erdnussmus', 'sonnenblumenkerne', 'kuerbiskerne', 'chiasamen', 'leinsamen', 'sesam', 'tahini', 'datteln'])
 zuordnen('Konserven & Vorrat', ['tomaten_stueckig', 'tomatenmark', 'oliven', 'kokosmilch', 'sojasauce', 'senf', 'balsamico', 'gemuesebruehe', 'honig', 'ahornsirup', 'kakao'])
 
-/** Wasser steht nicht auf der Einkaufsliste */
-const IGNORIERT = new Set(['wasser'])
-
 export function bereichFuer(id: string): string {
   const z = ZUTATEN[id]
   if (!z) return 'Obst & Gemüse'
@@ -51,34 +47,4 @@ export function bereichFuer(id: string): string {
   if (NACH_ID[id]) return NACH_ID[id]
   if (z.basis) return 'Öle & Gewürze'
   return 'Obst & Gemüse'
-}
-
-/** Rechnet alle Einträge der Liste zu einer Zutatenliste zusammen */
-export function baueEinkaufsListe(eintraege: EinkaufsEintrag[], rezepte: ReadonlyMap<string, Rezept>): EinkaufsListe {
-  const summe = new Map<string, { g: number; aus: Set<string> }>()
-  const verwaist: EinkaufsEintrag[] = []
-  for (const e of eintraege) {
-    const r = rezepte.get(e.rezeptId)
-    if (!r) { verwaist.push(e); continue }
-    const faktor = e.portionen / r.portionen
-    for (const z of r.zutaten) {
-      if (!ZUTATEN[z.id] || IGNORIERT.has(z.id)) continue
-      const alt = summe.get(z.id) ?? { g: 0, aus: new Set<string>() }
-      alt.g += z.g * faktor
-      alt.aus.add(r.name)
-      summe.set(z.id, alt)
-    }
-  }
-  const nachBereich = new Map<string, EinkaufsZeile[]>()
-  for (const [id, { g, aus }] of summe) {
-    const bereich = bereichFuer(id)
-    const liste = nachBereich.get(bereich) ?? []
-    liste.push({ id, text: zutatZeile(ZUTATEN[id], g), gramm: g, aus: [...aus] })
-    nachBereich.set(bereich, liste)
-  }
-  const bereiche = BEREICHE.filter(b => nachBereich.has(b)).map(name => ({
-    name,
-    zeilen: nachBereich.get(name)!.sort((a, b) => ZUTATEN[a.id].name.localeCompare(ZUTATEN[b.id].name, 'de')),
-  }))
-  return { bereiche, verwaist, anzahl: bereiche.reduce((s, b) => s + b.zeilen.length, 0) }
 }

@@ -160,7 +160,7 @@ export function useEinkauf(userId: string) {
   const speichereLokal = useCallback((liste: EinkaufsEintrag[]) => { setEintraege(liste); lokal.schreiben(key, liste) }, [key])
 
   /** Setzt das Rezept auf die Liste; steht es schon darauf, wird nur die Portionszahl geändert */
-  const hinzufuegen = useCallback(async (r: Rezept, portionen: number): Promise<boolean> => {
+  const hinzufuegen = useCallback(async (r: Pick<Rezept, 'id' | 'name'>, portionen: number): Promise<boolean> => {
     const bekannt = eintraege.find(e => e.rezeptId === r.id)
     const lokalId = bekannt?.id ?? `lokal-${Date.now()}`
     const neu: EinkaufsEintrag = { id: lokalId, rezeptId: r.id, rezeptName: r.name, portionen }

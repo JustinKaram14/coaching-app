@@ -1,6 +1,9 @@
 import { Clock, Flame, Sparkles } from 'lucide-react'
 import type { Treffer } from '../../../lib/entdecken/filter'
+import { useMemo } from 'react'
 import { FavoritHerz, RezeptBild, TagChip, gesundheitsTags } from './gemeinsam'
+import { kostenKurz } from '../../../components/KostenPrognose'
+import { kostenZutaten } from '../../../lib/einkauf/preise'
 
 /** Karte wie in einer Entdecken-Reihe: Foto, Name, kcal und Zeit */
 export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false, zusatz }: {
@@ -8,6 +11,7 @@ export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false, zusa
 }) {
   const { r } = t
   const tags = gesundheit ? gesundheitsTags(r).slice(0, 2) : []
+  const preis = useMemo(() => kostenKurz(kostenZutaten(r.zutaten), r.portionen), [r.zutaten, r.portionen])
   return (
     <div className={`relative rounded-2xl border border-border bg-bg-card overflow-hidden hover:border-brand/50 transition-colors ${breit ? 'w-full' : 'w-44 shrink-0'}`}>
     <button onClick={onOpen} data-testid="rezept-karte" className="group text-left block w-full">
@@ -31,6 +35,7 @@ export function RezeptKarte({ t, onOpen, breit = false, gesundheit = false, zusa
           <span className="inline-flex items-center gap-1"><Flame size={12} aria-hidden="true" />{Math.round(r.pro.kcal)} kcal</span>
           <span className="inline-flex items-center gap-1"><Clock size={12} aria-hidden="true" />{r.zeitMin} Min.</span>
         </div>
+        {preis && <div className="text-[11px] text-text-muted">{preis}</div>}
         {zusatz && <div className="text-[11px] font-semibold text-success">{zusatz}</div>}
         {tags.length > 0 && <div className="flex flex-wrap gap-1">{tags.map(tag => <TagChip key={tag.text} tag={tag} />)}</div>}
       </div>
