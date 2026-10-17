@@ -9,6 +9,8 @@ import { useKi } from '../hooks/useKi'
 import { useTheme } from '../hooks/useTheme'
 import { todayISO, toLocalISO, tokenColor } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
+import { barcodeDetektor } from '../lib/produktcheck/scanner'
+import { ProduktCheckKarte } from './produktcheck/ProduktCheckKarte'
 import { WaterTracker } from '../components/WaterTracker'
 import { useGame } from '../hooks/useGame'
 import type { FoodLogItem, WasserLogEntry, Rezept } from '../types/database'
@@ -310,7 +312,8 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
   const scanningRef = useRef(true)
   const [camError, setCamError] = useState('')
   const [hint, setHint] = useState('Barcode in den Rahmen halten…')
-  const hasDetector = 'BarcodeDetector' in window
+  // Nativer BarcodeDetector oder zxing-wasm (iPhone/Safari)
+  const hasDetector = true
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
@@ -324,8 +327,7 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
 
   useEffect(() => {
     if (!hasDetector || !videoRef.current) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const detector = new (window as any).BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] })
+    const detectorPromise = barcodeDetektor()
     let animId: number
     async function tick() {
       if (!scanningRef.current || !videoRef.current || videoRef.current.readyState < 2) {
@@ -333,7 +335,7 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
         return
       }
       try {
-        const codes = await detector.detect(videoRef.current)
+        const codes = await (await detectorPromise).detect(videoRef.current)
         if (codes.length > 0) { scanningRef.current = false; onDetected(codes[0].rawValue); return }
       } catch { /* continue */ }
       if (scanningRef.current) animId = setTimeout(() => { animId = requestAnimationFrame(tick) }, 250) as unknown as number
@@ -530,18 +532,8 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   }
 
   function handleCameraCapture(file: File) {
-    if (!('BarcodeDetector' in window)) {
-      setBarcodeError('Barcode-Scanner nicht verfügbar. Bitte Nummer unten eingeben.')
-      return
-    }
     createImageBitmap(file)
-      .then(img => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
-        })
-        return detector.detect(img) as Promise<Array<{ rawValue: string }>>
-      })
+      .then(async img => (await barcodeDetektor()).detect(img))
       .then(codes => {
         if (codes.length > 0) {
           lookupBarcode(codes[0].rawValue)
@@ -734,12 +726,15 @@ function AddFoodModal({ meal, onClose, onAdd }: {
         {/* Body */}
         <div className="p-4">
           {selectedProduct && (tab === 'search' || tab === 'barcode') ? (
+            <>
+            {selectedBarcode && <ProduktCheckKarte barcode={selectedBarcode} />}
             <PortionSelector
               product={selectedProduct}
               barcode={selectedBarcode}
               onConfirm={item => handleAdd(item)}
               onBack={() => { setSelectedProduct(null); setSelectedBarcode(undefined) }}
             />
+            </>
           ) : (
             <>
               {tab === 'search' && (

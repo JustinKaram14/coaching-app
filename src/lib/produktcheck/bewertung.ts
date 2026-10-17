@@ -33,6 +33,8 @@ export interface Produkt {
 /** 0 dunkelgrün, 1 grün, 2 orange, 3 rot */
 export type Farbe = 0 | 1 | 2 | 3
 export const FARBEN = ['#1e8c4e', '#41c36b', '#ef8a26', '#e0392f']
+/** Risikostufen der Zusatzstoffe: kein, begrenzt, mäßig, hoch */
+export const RISIKO_FARBEN = ['#41c36b', '#f2c230', '#ef8a26', '#e0392f']
 
 export interface Merkmal {
   id: 'bio' | 'obst' | 'ballast' | 'protein' | 'kcal' | 'zucker' | 'gesaettigt' | 'salz' | 'zusatzstoffe'
