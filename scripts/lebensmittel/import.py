@@ -49,7 +49,20 @@ SYNONYME = {
     'meerrettich': 'kren', 'rosenkohl': 'kohlsprossen', 'grünkohl': 'braunkohl', 'kürbis': 'hokkaido',
 }
 
+NUDELN = ('teigwaren', 'nudel', 'spaghetti', 'penne', 'fusilli', 'makkaroni', 'farfalle', 'tagliatelle', 'rigatoni', 'spirelli', 'linguine')
+
 PFLICHT = ['kcal', 'protein', 'kh', 'fett']
+
+
+def synonyme(name):
+    """Zusätzliche Suchwörter: Synonyme und zusammengesetzte Wörter wie „Vollkornnudeln“."""
+    klein = name.lower()
+    woerter = [v for k, v in SYNONYME.items() if k in klein]
+    if any(n in klein for n in NUDELN):
+        woerter.append('nudeln pasta')
+        if 'vollkorn' in klein:
+            woerter.append('vollkornnudeln vollkornpasta')
+    return ' '.join(woerter) or None
 
 
 def zahl(v):
@@ -240,8 +253,6 @@ def bls_lesen(inhalt):
         salz = wert(z, 'salz')
         if salz is None and wert(z, 'natrium') is not None:
             salz = wert(z, 'natrium') * 2.54 / (1000 if natrium_in_mg else 1)
-        klein = name.lower()
-        syn = ' '.join(v for k, v in SYNONYME.items() if k in klein) or None
         eintraege.append({
             'id': f'bls:{code}', 'quelle': 'bls', 'name': name[:200], 'marke': None,
             'kategorie': BLS_GRUPPEN.get(code[0]), 'barcode': None,
@@ -250,7 +261,7 @@ def bls_lesen(inhalt):
             'gesaettigt': runde(wert(z, 'gesaettigt')), 'ballast': runde(wert(z, 'ballast')),
             'salz': runde(salz, 2), 'ml': code[0] in 'NP', 'portion_g': None, 'menge': None,
             'nutriscore': None, 'nova': None, 'zusatzstoffe': None, 'bio': None,
-            'beliebtheit': 0, 'suchwoerter': syn,
+            'beliebtheit': 0, 'suchwoerter': synonyme(name),
             'kategorien': None, 'obst_gemuese': 100 if code[0] in 'FG' else None, 'bild': None,
         })
     return eintraege
@@ -387,7 +398,7 @@ def off_eintrag(p):
         'nova': int(zahl(nova)) if zahl(nova) in (1, 2, 3, 4) else None,
         'zusatzstoffe': [a.split(':', 1)[-1] for a in (p.get('additives_tags') or [])][:40] or None,
         'bio': any(l in ('en:organic', 'en:eu-organic', 'de:bio') for l in labels),
-        'beliebtheit': int(zahl(p.get('unique_scans_n')) or 0), 'suchwoerter': None,
+        'beliebtheit': int(zahl(p.get('unique_scans_n')) or 0), 'suchwoerter': synonyme(name),
         # Für Produkt-Check und Alternativen: die drei genauesten Kategorien, Obst-/Gemüseanteil, Bild
         'kategorien': (p.get('categories_tags') or [])[-3:] or None,
         'obst_gemuese': runde(next((zahl(n.get(k)) for k in (
