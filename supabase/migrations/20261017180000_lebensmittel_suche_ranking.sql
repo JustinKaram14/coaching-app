@@ -21,6 +21,7 @@ AS $$
     + (suchnorm(l.name) LIKE s.t || '%')::int * 25
     + (suchnorm(l.name) ~ ('(^|[^a-z])' || s.rx))::int * 15
     + (l.quelle = 'bls')::int * 20
+    + (l.quelle = 'bls' AND suchnorm(l.name) ~ ('^' || s.rx || ',? (roh|frisch)$'))::int * 100
     + (l.quelle = 'bls' AND suchnorm(l.name) ~ '(^|[^a-z])(roh|frisch)([^a-z]|$)')::int * 10
     + ln(1 + l.beliebtheit) * 1.5
     - char_length(l.name) * 0.2
