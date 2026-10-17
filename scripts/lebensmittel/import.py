@@ -264,7 +264,7 @@ def bls_pruefen(eintraege):
     ]
     fehler, gefunden = [], 0
     for wort_, feld, lo, hi in proben:
-        treffer = sorted((e for e in eintraege if e['name'].lower().startswith(wort_)), key=lambda e: len(e['name']))
+        treffer = sorted((e for e in eintraege if re.match(rf'{wort_}([^a-zäöüß]|$)', e['name'].lower())), key=lambda e: len(e['name']))
         if not treffer:
             print(f'  Stichprobe {wort_}: nicht gefunden')
             continue
