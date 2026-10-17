@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ChevronRight, Clock, Flame, Search, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, X, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../../../hooks/useAuth'
+import { KiSchloss, useKi } from '../../../hooks/useKi'
 import { DATA_CHANGED_EVENT } from '../../../lib/supabase'
 import {
   STARTBIBLIOTHEK, ladeHeute, useAnamneseTexte, useEinkauf, useFavoriten, useKiRezepte, usePersoenlich,
@@ -113,6 +114,7 @@ export function EntdeckenTab() {
   const [filterOffen, setFilterOffen] = useState(false)
   const [persoenlichOffen, setPersoenlichOffen] = useState(false)
   const [kiOffen, setKiOffen] = useState(false)
+  const { requireKi } = useKi()
   const [offen, setOffen] = useState<{ id: string } | null>(null)
   const [darmTab, setDarmTab] = useState<DarmArt | 'alle'>('alle')
   const [heute, setHeute] = useState<Awaited<ReturnType<typeof ladeHeute>> | null>(null)
@@ -403,10 +405,10 @@ export function EntdeckenTab() {
                 ))}
               </div>
             )}
-            <button onClick={() => setKiOffen(true)} className="w-full rounded-2xl border border-dashed border-brand/50 bg-brand/5 hover:bg-brand/10 transition-colors p-4 flex items-center gap-3 text-left">
+            <button onClick={async () => { if (await requireKi()) setKiOffen(true) }} className="w-full rounded-2xl border border-dashed border-brand/50 bg-brand/5 hover:bg-brand/10 transition-colors p-4 flex items-center gap-3 text-left">
               <Sparkles size={20} className="text-brand shrink-0" aria-hidden="true" />
               <span>
-                <span className="block font-semibold text-text-primary">Neues Rezept per KI erzeugen</span>
+                <span className="block font-semibold text-text-primary">Neues Rezept per KI erzeugen <KiSchloss /></span>
                 <span className="block text-xs text-text-secondary">Mit Foto, passend zu Mahlzeit, Ernährungsart und deinen Einschränkungen.</span>
               </span>
             </button>

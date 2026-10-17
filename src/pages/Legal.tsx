@@ -142,9 +142,10 @@ export function Legal() {
 
               <P className="mt-4"><strong className="text-text-primary">2.3 KI-Analyse (optional)</strong></P>
               <P>
-                Wenn Sie die optionale Funktion zur KI-gestützten Analyse von Fotos oder Screenshots nutzen (z. B. Ernährungsanalyse, Trainingsauswertung),
-                werden Bilddaten an die Google Gemini API übermittelt. Dies erfolgt nur, wenn Sie dieser Verarbeitung bei der Registrierung ausdrücklich zugestimmt haben.
-                Sie können diese Funktion jederzeit in den Einstellungen deaktivieren.
+                Wenn Sie die optionalen KI-Funktionen nutzen (z. B. Ernährungsanalyse per Foto oder Text, Screenshot-Auswertung, Koch-Assistent, KI-Rezepte),
+                werden die dafür eingegebenen Inhalte (Fotos, Screenshots, Videos oder Text) an die Google Gemini API übermittelt. Dies erfolgt nur, wenn Sie
+                dieser Verarbeitung ausdrücklich zugestimmt haben, bei der Registrierung oder später in der App. Ohne diese Einwilligung können Sie die App
+                vollständig ohne KI nutzen. Sie können die Einwilligung jederzeit in den Einstellungen widerrufen oder erneut erteilen.
               </P>
               <P>Rechtsgrundlage: Art. 9 Abs. 2 lit. a i.V.m. Art. 6 Abs. 1 lit. a DSGVO (optionale, widerrufliche Einwilligung)</P>
 
@@ -273,6 +274,14 @@ export function Legal() {
               <P>
                 Rezepte, die per KI erzeugt werden, können Fehler enthalten. Die App rechnet Nährwerte und Ernährungsart nach und verwirft offensichtlich unpassende Vorschläge, eine Garantie gibt es nicht.
                 Fotos in der App sind KI-generierte Bilder und zeigen das Gericht nur beispielhaft.
+              </P>
+            </Section>
+
+            <Section id="naehrwerte" title="Nährwertdaten">
+              <P>
+                Grundnahrungsmittel: Bundeslebensmittelschlüssel (BLS), Version 4.0, Max Rubner-Institut (2025), DOI 10.25826/Data20251217-134202-0.
+                Markenprodukte: Open Food Facts (openfoodfacts.org), Datenbank unter Open Database License (ODbL).
+                Die Werte sind Durchschnitts- bzw. Herstellerangaben und können vom tatsächlichen Produkt abweichen.
               </P>
             </Section>
 

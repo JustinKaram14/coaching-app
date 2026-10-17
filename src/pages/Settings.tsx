@@ -34,6 +34,7 @@ import { supabase } from '../lib/supabase'
 import { Spinner } from '../components/ui/Spinner'
 import { SegmentedTabs } from '../components/ui/SegmentedTabs'
 import { useAuth } from '../hooks/useAuth'
+import { useKi } from '../hooks/useKi'
 import { useTheme } from '../hooks/useTheme'
 import { Link } from 'react-router-dom'
 
@@ -659,6 +660,7 @@ export function NotificationSettings({ userId: uid, isCoach: coach, settings: no
 }
 export const LEGACY_COLUMNS = ['timezone', 'notif_praise', 'notif_streak', 'notif_water', 'notif_max_per_day']
 export function Settings() {
+  let { kiAktiv, setKiAktiv } = useKi()
   let { user: authUser, profile: authProfile, refreshProfile: reloadProfile } = useAuth(),
     { theme: themeName, setTheme: changeTheme } = useTheme(),
     [form, setForm] = useState({}),
@@ -1276,7 +1278,7 @@ export function Settings() {
               <CircleCheckBig size={14} /> Einwilligungen erteilt
             </div>
             <div>DSGVO-Einwilligung: {form.consent_dsgvo ? '✓' : '✗'}</div>
-            <div>KI-Analyse: {form.consent_ai ? '✓ aktiviert' : '✗ nicht erteilt'}</div>
+            <div>KI-Funktionen: {kiAktiv ? '✓ aktiviert' : '✗ nicht erteilt'}</div>
             <div>
               Erteilt am:{' '}
               {new Date(form.consent_given_at).toLocaleDateString('de', {
@@ -1286,14 +1288,24 @@ export function Settings() {
           </div>
         )}
         {!coachMode && (
-          <div className="p-3 rounded-xl bg-brand/5 border border-brand/20 flex items-start gap-2 text-xs text-text-secondary">
-            <Zap size={14} className="text-brand shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold text-brand mb-0.5">KI-Analyse aktiv</div>Fotos werden zur automatischen
-              Ernährungs- und Trainingsanalyse an Google Gemini übermittelt (gemäß deiner Einwilligung bei der
-              Registrierung).
-            </div>
-          </div>
+          <SettingRow
+            icon={<Zap size={18} />}
+            title="KI-Funktionen"
+            hint={
+              kiAktiv
+                ? 'An: Fotos, Screenshots, Videos und Texte aus KI-Funktionen werden an Google Gemini (USA) übermittelt.'
+                : 'Aus: Die App funktioniert ohne KI, KI-Funktionen sind mit einem Schloss gesperrt.'
+            }
+          >
+            <ToggleSwitch
+              checked={kiAktiv}
+              onChange={async (enabled) => {
+                let { error: kiError } = await setKiAktiv(enabled)
+                kiError ? window.alert(kiError) : setForm((current) => ({ ...current, consent_ai: enabled }))
+              }}
+              label="KI-Funktionen"
+            />
+          </SettingRow>
         )}
         <div className="flex gap-3 text-sm">
           <Link to="/legal" className="text-brand hover:underline flex items-center gap-1">

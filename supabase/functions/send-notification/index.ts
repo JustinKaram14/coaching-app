@@ -3,16 +3,27 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import webpush from 'https://esm.sh/web-push@3.6.7'
 
 const APP_URL = 'https://justinkaram14.github.io/coaching-app/'
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://justinkaram14.github.io',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const ALLOWED_ORIGINS = [
+  'https://justinkaram14.github.io',
+  // Android-/iOS-App (Capacitor)
+  'https://localhost',
+  'capacitor://localhost',
+  'http://localhost:5173',
+]
+function corsFuer(origin: string | null) {
+  return {
+    'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  }
 }
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 // Schickt eine Nachricht an alle Geräte eines Nutzers.
 // Erlaubt: an sich selbst (Test), der Coach an seinen Klienten oder der Klient an seinen Coach.
 serve(async (req) => {
+  const corsHeaders = corsFuer(req.headers.get('Origin'))
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   const authHeader = req.headers.get('Authorization')

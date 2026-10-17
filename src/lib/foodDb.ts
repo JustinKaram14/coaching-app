@@ -1,5 +1,6 @@
 // Lebensmittel-Suche: eingebaute Liste häufiger Lebensmittel (mit Größen, Reifegraden und Einheiten),
-// Produkte aus Open Food Facts und Ergebnisse aus dem Internet (Edge Function „food-search“).
+// eigene Lebensmittel-Datenbank (BLS 4.0 + Open Food Facts), Open Food Facts live als Ergänzung
+// und – nur mit KI-Einwilligung – Ergebnisse aus dem Internet (Edge Function „food-search“).
 
 import { supabase } from './supabase'
 
@@ -39,13 +40,15 @@ export interface FoodEntry {
   id: string
   name: string
   brand?: string
-  source: 'local' | 'web' | 'off'
+  source: 'local' | 'db' | 'web' | 'off'
   per100: Per100
   units: FoodUnit[]
   groups?: VariantGroup[]
   barcode?: string
   /** true, wenn noch keine Stück-/Portionsangabe bekannt ist (Einheiten können nachgeladen werden) */
   needsUnits?: boolean
+  /** Nährwerte pro 100 ml statt 100 g */
+  ml?: boolean
 }
 
 // ─── Hilfsfunktionen ──────────────────────────────────────────────────────────────────────────
@@ -307,10 +310,55 @@ export async function searchOpenFoodFacts(term: string, signal?: AbortSignal): P
 }
 
 export async function lookupBarcodeEntry(code: string): Promise<FoodEntry | null> {
+  // Zuerst in der eigenen Datenbank, dann live bei Open Food Facts
+  const { data: eigen } = await supabase.from('lebensmittel').select('*').eq('barcode', code).limit(1).maybeSingle()
+  if (eigen) return entryFromDb(eigen as LebensmittelRow)
   const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`)
   const data = await res.json()
   if (data.status !== 1 || !data.product) return null
   return entryFromOff(data.product as OFFProduct, code)
+}
+
+// ─── Eigene Lebensmittel-Datenbank (BLS 4.0 + Open Food Facts) ───────────────────────────────────────
+
+/** Zeile aus der Tabelle „lebensmittel“ */
+export interface LebensmittelRow {
+  id: string
+  name: string
+  marke: string | null
+  kategorie: string | null
+  barcode: string | null
+  kcal: number
+  protein: number | null
+  kh: number | null
+  fett: number | null
+  ballast: number | null
+  ml: boolean
+  portion_g: number | null
+}
+
+export function entryFromDb(row: LebensmittelRow): FoodEntry {
+  const portion = num(row.portion_g)
+  return {
+    id: `db-${row.id}`,
+    name: row.name,
+    brand: row.marke ?? undefined,
+    source: 'db',
+    per100: {
+      kcal: num(row.kcal), protein: num(row.protein), carbs: num(row.kh), fat: num(row.fett),
+      ...(row.ballast != null ? { fiber: num(row.ballast) } : {}),
+    },
+    units: portion > 0 ? [{ label: 'Portion', grams: round1(portion) }] : [],
+    barcode: row.barcode ?? undefined,
+    needsUnits: !!row.marke && !(portion > 0),
+    ml: row.ml,
+  }
+}
+
+export async function searchDatabase(term: string): Promise<FoodEntry[]> {
+  const { data, error } = await supabase.rpc('suche_lebensmittel', { q: term, anzahl: 25 })
+  if (error) throw new Error('db')
+  return ((data ?? []) as LebensmittelRow[]).map(entryFromDb)
 }
 
 // ─── Internet-Suche (Edge Function) ─────────────────────────────────────────────────────────────────
