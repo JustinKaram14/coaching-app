@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { KI_GESPERRT, kiErlaubt } from '../_shared/ki.ts'
 
 // Lebensmittel-Suche mit Websuche (Gemini + Google-Suche):
 //  mode "search":   allgemeine Lebensmittel und Marken-Produkte inkl. Größen, Reifegraden und Einheiten
@@ -7,6 +8,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const ALLOWED_ORIGINS = [
   'https://justinkaram14.github.io',
+  // Android-/iOS-App (Capacitor)
+  'https://localhost',
+  'capacitor://localhost',
   'http://localhost:5173',
   'http://localhost:4173',
 ]
@@ -91,6 +95,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } })
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return json({ error: 'Unauthorized' }, 401, cors)
+  if (!(await kiErlaubt(authHeader))) return json({ error: KI_GESPERRT }, 403, cors)
 
   let body: { mode?: unknown; query?: unknown; brand?: unknown }
   try { body = await req.json() } catch { return json({ error: 'Invalid request body' }, 400, cors) }

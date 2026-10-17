@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, Globe, Minus, Package, Plus, Search, Sparkles } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
+import { useKi } from '../../hooks/useKi'
 import { cn } from '../../lib/utils'
 import {
   POPULAR_SEARCHES,
@@ -12,6 +13,7 @@ import {
   normalize,
   resolveEntry,
   saveCustomUnit,
+  searchDatabase,
   searchLocalFoods,
   searchOpenFoodFacts,
   searchWebFoods,
@@ -66,7 +68,7 @@ function FoodCard({ entry, onSelect }: { entry: FoodEntry; onSelect: (entry: Foo
       </div>
       <div className="text-right shrink-0">
         <div className="text-xl font-bold text-text-primary leading-none">{Math.round(entry.per100.kcal)}</div>
-        <div className="text-[11px] text-text-muted mt-1">kcal / 100 g</div>
+        <div className="text-[11px] text-text-muted mt-1">kcal / 100 {entry.ml ? 'ml' : 'g'}</div>
       </div>
     </button>
   )
@@ -83,11 +85,14 @@ function SectionTitle({ icon, children, busy }: { icon: React.ReactNode; childre
 }
 
 export function FoodSearchPanel({ onSelect }: { onSelect: (entry: FoodEntry) => void }) {
+  const { kiAktiv, requireKi } = useKi()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const [webFoods, setWebFoods] = useState<FoodEntry[]>([])
   const [products, setProducts] = useState<FoodEntry[]>([])
+  const [dbFoods, setDbFoods] = useState<FoodEntry[]>([])
   const [webBusy, setWebBusy] = useState(false)
+  const [webOffen, setWebOffen] = useState(false)
   const [productsBusy, setProductsBusy] = useState(false)
   const [productsFailed, setProductsFailed] = useState(false)
 
@@ -101,36 +106,66 @@ export function FoodSearchPanel({ onSelect }: { onSelect: (entry: FoodEntry) => 
   useEffect(() => {
     setWebFoods([])
     setProducts([])
+    setDbFoods([])
     setProductsFailed(false)
+    setWebOffen(false)
     if (debounced.length < 2) { setWebBusy(false); setProductsBusy(false); return }
     const controller = new AbortController()
     let stale = false
 
+    // Eigene Datenbank zuerst; Open Food Facts live nur bei seltenen Produkten (wenige eigene Treffer)
     setProductsBusy(true)
-    searchOpenFoodFacts(debounced, controller.signal)
-      .then(found => { if (!stale) setProducts(found) })
-      .catch(() => { if (!stale && !controller.signal.aborted) setProductsFailed(true) })
+    searchDatabase(debounced)
+      .catch(() => [] as FoodEntry[])
+      .then(async eigene => {
+        if (stale) return
+        setDbFoods(eigene)
+        if (eigene.length >= 5) return
+        try {
+          const found = await searchOpenFoodFacts(debounced, controller.signal)
+          if (!stale) setProducts(found)
+        } catch {
+          if (!stale && !controller.signal.aborted && eigene.length === 0) setProductsFailed(true)
+        }
+      })
       .finally(() => { if (!stale) setProductsBusy(false) })
 
-    // Das Internet nur fragen, wenn die eingebaute Liste nicht schon genug liefert
+    // Die KI-Internetsuche nur mit KI-Einwilligung und wenn die eingebaute Liste nicht schon genug liefert
     if (debounced.length >= 3 && searchLocalFoods(debounced).length < 3) {
-      setWebBusy(true)
-      searchWebFoods(debounced)
-        .then(found => { if (!stale) setWebFoods(found) })
-        .catch(() => { /* Internet-Suche ist optional */ })
-        .finally(() => { if (!stale) setWebBusy(false) })
+      if (kiAktiv) {
+        setWebBusy(true)
+        searchWebFoods(debounced)
+          .then(found => { if (!stale) setWebFoods(found) })
+          .catch(() => { /* Internet-Suche ist optional */ })
+          .finally(() => { if (!stale) setWebBusy(false) })
+      } else {
+        setWebBusy(false)
+        setWebOffen(true)
+      }
     } else {
       setWebBusy(false)
     }
     return () => { stale = true; controller.abort() }
-  }, [debounced])
+  }, [debounced, kiAktiv])
+
+  async function imInternetSuchen() {
+    // Nach der Zustimmung startet die Suche über kiAktiv im Effekt oben neu
+    await requireKi()
+  }
 
   const localNames = new Set(localFoods.map(food => normalize(food.name)))
-  const webList = webFoods.filter(food => !localNames.has(normalize(food.name)))
+  const dbList = dbFoods.filter(food => food.brand || !localNames.has(normalize(food.name)))
+  const knownNames = new Set([...localFoods, ...dbList].map(food => normalize(`${food.name} ${food.brand ?? ''}`)))
+  const webList = webFoods.filter(food => !localNames.has(normalize(food.name)) && !knownNames.has(normalize(`${food.name} ${food.brand ?? ''}`)))
   const webNames = new Set(webList.map(food => normalize(`${food.name} ${food.brand ?? ''}`)))
-  const productList = products.filter(product => !webNames.has(normalize(`${product.name} ${product.brand ?? ''}`)))
-  const common = [...localFoods, ...webList.filter(food => !food.brand)]
-  const brands = [...webList.filter(food => !!food.brand), ...productList]
+  const dbCodes = new Set(dbList.map(food => food.barcode).filter(Boolean))
+  const productList = products.filter(product =>
+    !webNames.has(normalize(`${product.name} ${product.brand ?? ''}`)) &&
+    !knownNames.has(normalize(`${product.name} ${product.brand ?? ''}`)) &&
+    !(product.barcode && dbCodes.has(product.barcode))
+  )
+  const common = [...localFoods, ...dbList.filter(food => !food.brand), ...webList.filter(food => !food.brand)]
+  const brands = [...dbList.filter(food => !!food.brand), ...webList.filter(food => !!food.brand), ...productList]
 
   const searching = debounced !== query.trim() || webBusy || productsBusy
   const nothing = debounced.length >= 2 && !searching && common.length === 0 && brands.length === 0
@@ -188,8 +223,21 @@ export function FoodSearchPanel({ onSelect }: { onSelect: (entry: FoodEntry) => 
       {searching && query.trim().length >= 2 && common.length === 0 && brands.length === 0 && (
         <div className="flex flex-col items-center gap-3 py-12 text-sm text-text-secondary">
           <Spinner />
-          Suche im Internet …
+          Suche …
         </div>
+      )}
+
+      {webOffen && !kiAktiv && debounced === query.trim() && (
+        <button
+          onClick={imInternetSuchen}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border text-sm text-text-secondary hover:border-brand/40 hover:text-text-primary transition-colors"
+        >
+          <span aria-hidden="true">🔒</span> Mit KI im Internet suchen
+        </button>
+      )}
+
+      {debounced.length >= 2 && !searching && (common.length > 0 || brands.length > 0) && (
+        <p className="text-center text-[10px] text-text-muted">Nährwerte: Bundeslebensmittelschlüssel 4.0 (Max Rubner-Institut) · Open Food Facts</p>
       )}
 
       {nothing && (
@@ -243,10 +291,11 @@ export function PortionPicker({ entry, onConfirm, onBack, busy }: {
   const [customLabel, setCustomLabel] = useState('')
   const [customGrams, setCustomGrams] = useState('')
   const pickedByUser = useRef(false)
+  const { kiAktiv } = useKi()
 
-  // Fehlt zu einem Produkt die Stückgröße (z. B. 1 Keks), im Internet nachschlagen
+  // Fehlt zu einem Produkt die Stückgröße (z. B. 1 Keks), per KI im Internet nachschlagen (nur mit Einwilligung)
   useEffect(() => {
-    if (!entry.needsUnits) return
+    if (!entry.needsUnits || !kiAktiv) return
     let stale = false
     setLoadingUnits(true)
     fetchWebUnits(entry)
@@ -254,7 +303,7 @@ export function PortionPicker({ entry, onConfirm, onBack, busy }: {
       .catch(() => { /* optional */ })
       .finally(() => { if (!stale) setLoadingUnits(false) })
     return () => { stale = true }
-  }, [entry])
+  }, [entry, kiAktiv])
 
   const resolved = useMemo(() => resolveEntry(entry, choice, [...customUnits, ...webUnits]), [entry, choice, customUnits, webUnits])
   const selectedUnit = unit === GRAM ? null : resolved.units.find(u => u.label === unit) ?? null
@@ -323,7 +372,7 @@ export function PortionPicker({ entry, onConfirm, onBack, busy }: {
         <h3 className="text-2xl font-bold text-text-primary leading-tight">{entry.name}</h3>
         {entry.brand && <div className="text-sm text-text-muted mt-0.5">{entry.brand}</div>}
         <div className="text-xs text-text-muted mt-1.5">
-          pro 100 g: {Math.round(resolved.per100.kcal)} kcal · P {formatAmount(resolved.per100.protein)} g · K {formatAmount(resolved.per100.carbs)} g · F {formatAmount(resolved.per100.fat)} g{resolved.per100.fiber != null ? ` · Ballaststoffe ${formatAmount(resolved.per100.fiber)} g` : ''}
+          pro 100 {entry.ml ? 'ml' : 'g'}: {Math.round(resolved.per100.kcal)} kcal · P {formatAmount(resolved.per100.protein)} g · K {formatAmount(resolved.per100.carbs)} g · F {formatAmount(resolved.per100.fat)} g{resolved.per100.fiber != null ? ` · Ballaststoffe ${formatAmount(resolved.per100.fiber)} g` : ''}
         </div>
       </div>
 
@@ -351,7 +400,7 @@ export function PortionPicker({ entry, onConfirm, onBack, busy }: {
           {loadingUnits && <span className="flex items-center gap-1.5 text-xs font-normal text-text-muted"><Spinner size={12} /> Stückgrößen werden gesucht …</span>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Chip active={unit === GRAM} onClick={() => chooseUnit(GRAM)}>Gramm</Chip>
+          <Chip active={unit === GRAM} onClick={() => chooseUnit(GRAM)}>{entry.ml ? 'Milliliter' : 'Gramm'}</Chip>
           {resolved.units.map(option => (
             <Chip key={option.label} active={unit === option.label} onClick={() => chooseUnit(option.label)}>
               {option.label}

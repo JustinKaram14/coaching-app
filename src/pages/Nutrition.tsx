@@ -6,9 +6,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useKi } from '../hooks/useKi'
 import { useTheme } from '../hooks/useTheme'
 import { todayISO, toLocalISO, tokenColor } from '../lib/utils'
 import { Spinner } from '../components/ui/Spinner'
+import { barcodeDetektor } from '../lib/produktcheck/scanner'
+import { ProduktCheckKarte } from './produktcheck/ProduktCheckKarte'
 import { WaterTracker } from '../components/WaterTracker'
 import { useGame } from '../hooks/useGame'
 import type { FoodLogItem, WasserLogEntry, Rezept } from '../types/database'
@@ -170,7 +173,8 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
   const scanningRef = useRef(true)
   const [camError, setCamError] = useState('')
   const [hint, setHint] = useState('Barcode in den Rahmen halten…')
-  const hasDetector = 'BarcodeDetector' in window
+  // Nativer BarcodeDetector oder zxing-wasm (iPhone/Safari)
+  const hasDetector = true
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
@@ -184,8 +188,7 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
 
   useEffect(() => {
     if (!hasDetector || !videoRef.current) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const detector = new (window as any).BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] })
+    const detectorPromise = barcodeDetektor()
     let animId: number
     async function tick() {
       if (!scanningRef.current || !videoRef.current || videoRef.current.readyState < 2) {
@@ -193,7 +196,7 @@ function LiveBarcodeScanner({ onDetected, onClose }: { onDetected: (code: string
         return
       }
       try {
-        const codes = await detector.detect(videoRef.current)
+        const codes = await (await detectorPromise).detect(videoRef.current)
         if (codes.length > 0) { scanningRef.current = false; onDetected(codes[0].rawValue); return }
       } catch { /* continue */ }
       if (scanningRef.current) animId = setTimeout(() => { animId = requestAnimationFrame(tick) }, 250) as unknown as number
@@ -260,6 +263,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   onAdd: (item: FoodItemInput) => Promise<void>
 }) {
   const { user } = useAuth()
+  const { kiAktiv, requireKi } = useKi()
   const [tab, setTab] = useState<AddTab>('search')
   const [selectedEntry, setSelectedEntry] = useState<FoodEntry | null>(null)
   const [barcodeInput, setBarcodeInput] = useState('')
@@ -310,18 +314,8 @@ function AddFoodModal({ meal, onClose, onAdd }: {
   }
 
   function handleCameraCapture(file: File) {
-    if (!('BarcodeDetector' in window)) {
-      setBarcodeError('Barcode-Scanner nicht verfügbar. Bitte Nummer unten eingeben.')
-      return
-    }
     createImageBitmap(file)
-      .then(img => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
-        })
-        return detector.detect(img) as Promise<Array<{ rawValue: string }>>
-      })
+      .then(async img => (await barcodeDetektor()).detect(img))
       .then(codes => {
         if (codes.length > 0) {
           lookupBarcode(codes[0].rawValue)
@@ -452,7 +446,8 @@ function AddFoodModal({ meal, onClose, onAdd }: {
     setSaving(false)
   }
 
-  function switchTab(t: AddTab) {
+  async function switchTab(t: AddTab) {
+    if ((t === 'photo' || t === 'text') && !(await requireKi())) return
     setTab(t)
     setSelectedEntry(null)
     setBarcodeError('')
@@ -506,7 +501,7 @@ function AddFoodModal({ meal, onClose, onAdd }: {
                     tab === t.id ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  <span className="text-xl leading-none">{t.emoji}</span>
+                  <span className="text-xl leading-none">{!kiAktiv && (t.id === 'photo' || t.id === 'text') ? '🔒' : t.emoji}</span>
                   <span className="text-xs font-semibold">{t.label}</span>
                 </button>
               ))}
@@ -517,12 +512,15 @@ function AddFoodModal({ meal, onClose, onAdd }: {
         {/* Body */}
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {selectedEntry && (tab === 'search' || tab === 'barcode') ? (
-            <PortionPicker
-              entry={selectedEntry}
-              busy={saving}
-              onConfirm={item => handleAdd(item)}
-              onBack={() => setSelectedEntry(null)}
-            />
+            <div className="space-y-4">
+              {selectedEntry.barcode && <ProduktCheckKarte barcode={selectedEntry.barcode} />}
+              <PortionPicker
+                entry={selectedEntry}
+                busy={saving}
+                onConfirm={item => handleAdd(item)}
+                onBack={() => setSelectedEntry(null)}
+              />
+            </div>
           ) : (
             <>
               {tab === 'search' && (

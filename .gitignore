@@ -35,3 +35,4 @@ android/.gradle/
 android/build/
 # Supabase CLI, lokale Dateien
 supabase/.temp/
+__pycache__/

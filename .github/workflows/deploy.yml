@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   build:
+    # Nur im Haupt-Repo: Forks haben weder Secrets noch GitHub Pages
+    if: github.repository == 'JustinKaram14/coaching-app'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

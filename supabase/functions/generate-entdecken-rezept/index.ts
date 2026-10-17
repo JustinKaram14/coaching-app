@@ -1,9 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ZUTATEN_ZEILEN } from './zutaten-liste.ts'
+import { KI_GESPERRT, kiErlaubt } from '../_shared/ki.ts'
 
 const ALLOWED_ORIGINS = [
   'https://justinkaram14.github.io',
+  // Android-/iOS-App (Capacitor)
+  'https://localhost',
+  'capacitor://localhost',
   'http://localhost:5173',
   'http://localhost:4173',
   'http://localhost:5174',
@@ -52,6 +56,7 @@ serve(async (req) => {
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
+  if (!(await kiErlaubt(authHeader))) return json({ error: KI_GESPERRT }, 403)
   const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })
   const { data: { user }, error: authError } = await client.auth.getUser()
   if (authError || !user) return json({ error: 'Unauthorized' }, 401)
