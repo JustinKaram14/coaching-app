@@ -21,8 +21,9 @@ android {
         applicationId "com.coaching.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Versionsnummer kommt vom APK-Workflow (Build-Nummer), lokal bleibt sie 1
+        versionCode((project.findProperty('appVersionCode') ?: '1').toString().toInteger())
+        versionName "1.0.${project.findProperty('appVersionCode') ?: '0'}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
