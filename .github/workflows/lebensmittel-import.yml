@@ -1,0 +1,45 @@
+name: Lebensmittel-Datenbank aufbereiten
+
+# Lädt BLS 4.0 und die meistgescannten Produkte aus Open Food Facts, bereitet sie auf
+# und legt sie als JSON-Teile auf dem Branch `lebensmittel-daten` ab.
+# Danach übernimmt Supabase die Daten per SQL:
+#   select lebensmittel_import_anfordern(<Anzahl Teile>);   -- Anzahl steht im Log und in teile.txt
+#   select lebensmittel_import_uebernehmen(<Anzahl Teile>); -- einige Sekunden später
+on:
+  workflow_dispatch:
+    inputs:
+      off_anzahl:
+        description: 'Anzahl Markenprodukte aus Open Food Facts'
+        default: '30000'
+      bls_url:
+        description: 'Optional: direkter Link zur BLS-Datei (Excel oder ZIP)'
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  aufbereiten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl==3.1.5 requests==2.32.3
+      - name: Daten aufbereiten
+        env:
+          OFF_ANZAHL: ${{ inputs.off_anzahl || '30000' }}
+          BLS_URL: ${{ inputs.bls_url }}
+        run: python -u scripts/lebensmittel/import.py
+      - name: Auf Branch lebensmittel-daten ablegen
+        working-directory: out
+        run: |
+          git init -q -b lebensmittel-daten
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -q -m "Lebensmittel-Daten $(date -u +%F)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" lebensmittel-daten
+          echo "Teile: $(cat teile.txt)"

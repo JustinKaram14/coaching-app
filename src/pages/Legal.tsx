@@ -277,6 +277,14 @@ export function Legal() {
               </P>
             </Section>
 
+            <Section id="naehrwerte" title="Nährwertdaten">
+              <P>
+                Grundnahrungsmittel: Bundeslebensmittelschlüssel (BLS), Version 4.0, Max Rubner-Institut (2025), DOI 10.25826/Data20251217-134202-0.
+                Markenprodukte: Open Food Facts (openfoodfacts.org), Datenbank unter Open Database License (ODbL).
+                Die Werte sind Durchschnitts- bzw. Herstellerangaben und können vom tatsächlichen Produkt abweichen.
+              </P>
+            </Section>
+
             <Section id="coach" title="Empfehlungen deines Coaches">
               <P>Rezept-Empfehlungen deines Coaches sind Ernährungs- und Trainingstipps im Rahmen des Coachings und ersetzen keine ärztliche Beratung.</P>
             </Section>
