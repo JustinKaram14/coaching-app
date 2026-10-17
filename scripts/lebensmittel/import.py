@@ -259,9 +259,16 @@ def bls_lesen(inhalt):
 def bls_pruefen(eintraege):
     """Stichproben gegen bekannte Nährwerte, damit eine falsch erkannte Spalte nicht importiert wird."""
     proben = [
-        ('banane', 'kcal', 70, 115), ('butter', 'fett', 70, 90), ('haferflocken', 'kh', 45, 72),
+        ('banane', 'kcal', 70, 115), ('butter', 'fett', 70, 90),
         ('vollmilch', 'protein', 2.8, 4.0), ('hühnerei', 'protein', 10, 15),
     ]
+    # Kalorien müssen zu den Makronährstoffen passen (4/4/9/2 kcal je g), sonst ist eine Spalte falsch zugeordnet
+    abw = sorted(abs(e['kcal'] - (4 * (e['protein'] or 0) + 4 * (e['kh'] or 0) + 9 * (e['fett'] or 0) + 2 * (e['ballast'] or 0))) / e['kcal']
+                 for e in eintraege if e['kcal'] > 50)
+    median = abw[len(abw) // 2] if abw else 1
+    print(f'  Kalorien vs. Makros: mittlere Abweichung {median:.1%}')
+    if median > 0.1:
+        sys.exit('Kalorien passen nicht zu den Makronährstoffen. Spaltenzuordnung prüfen.')
     fehler, gefunden = [], 0
     for wort_, feld, lo, hi in proben:
         treffer = sorted((e for e in eintraege if re.match(rf'{wort_}([ ,]|$)', e['name'].lower())), key=lambda e: len(e['name']))
