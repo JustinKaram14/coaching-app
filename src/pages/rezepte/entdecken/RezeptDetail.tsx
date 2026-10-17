@@ -1,5 +1,5 @@
 import { useCallback, useContext, useMemo, useState } from 'react'
-import { BookPlus, ChefHat, Clock, Flame, Minus, Plus, ShoppingCart, Trash2, Users, AlertTriangle } from 'lucide-react'
+import { BookPlus, ChefHat, Clock, Flame, Minus, Play, Plus, ShoppingCart, Trash2, Users, AlertTriangle } from 'lucide-react'
 import type { Treffer } from '../../../lib/entdecken/filter'
 import { ARTEN, GESUNDHEIT_REIHEN, REIHEN, SCHWIERIGKEIT } from '../../../lib/entdecken/katalog'
 import { SCHWELLEN } from '../../../lib/entdecken/engine'
@@ -10,6 +10,7 @@ import { rezeptText, teile } from '../../../lib/entdecken/teilen'
 import { pflanzeFuerKey } from '../../../lib/entdecken/pflanzen'
 import { TagebuchDialog } from './TagebuchDialog'
 import { KostenPrognose } from '../../../components/KostenPrognose'
+import { CookMode } from '../../../components/CookMode'
 import { kostenZutaten } from '../../../lib/einkauf/preise'
 
 function NaehrZeile({ label, wert, einheit, stellen = 1, einzug = false, fett = false }: {
@@ -37,6 +38,7 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
 }) {
   const { r } = t
   const [tagebuch, setTagebuch] = useState(false)
+  const [kochen, setKochen] = useState(false)
   const [wunschPortionen, setWunschPortionen] = useState(r.portionen)
   const faktor = wunschPortionen / r.portionen
   const einkauf = useContext(EinkaufKontext)
@@ -212,6 +214,11 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
               </li>
             ))}
           </ol>
+          {r.schritte.length > 0 && (
+            <button onClick={() => setKochen(true)} className="btn-primary w-full flex items-center justify-center gap-2">
+              <Play size={16} /> Kochmodus starten
+            </button>
+          )}
         </section>
 
         {/* Nährstoffe */}
@@ -241,6 +248,11 @@ export function RezeptDetail({ t, userId, onClose, onLoeschen }: {
       </div>
       {drucken && <DruckAnsicht onFertig={druckFertig}><RezeptDruck r={r} portionen={wunschPortionen} /></DruckAnsicht>}
       {tagebuch && <TagebuchDialog r={r} userId={userId} onClose={() => setTagebuch(false)} />}
+      {kochen && (
+        <CookMode title={r.name} steps={r.schritte}
+          ingredients={r.zutaten.flatMap(z => (ZUTATEN[z.id] ? [zutatZeile(ZUTATEN[z.id], z.g * faktor)] : []))}
+          onClose={() => setKochen(false)} />
+      )}
     </Sheet>
   )
 }
